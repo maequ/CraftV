@@ -38,7 +38,7 @@ namespace
 	constexpr const char*   kSoftware = "RedCraft-MockHost 0.1.0";
 	constexpr double        kPi = 3.14159265358979323846;
 	constexpr double        kRadToDeg = 180.0 / kPi;
-	constexpr std::uint64_t kStatusPeriodMs = 5000;
+	constexpr std::uint64_t kDefaultStatusPeriodMs = 5000;
 	constexpr std::uint64_t kRestartGapMs = 500;
 	constexpr int           kDefaultHz = 60;
 	// Superflat dev world: grass top at y = -61, so feet stand at -60 (DECISIONS.md D-006).
@@ -119,6 +119,7 @@ namespace
 		std::wstring  logPath;
 		bool          noStdin = false;
 		std::uint64_t exitAfterMs = 0;
+		std::uint64_t statusMs = kDefaultStatusPeriodMs;
 	};
 
 	void Usage()
@@ -135,6 +136,7 @@ namespace
 			"  --log PATH            also write the log to PATH\n"
 			"  --no-stdin            ignore stdin (scripts)\n"
 			"  --exit-after-ms N     quit after N ms (tests)\n"
+			"  --status-ms N         @STATUS line period (default 5000)\n"
 			"  --quiet               don't print every received record\n");
 	}
 
@@ -161,6 +163,8 @@ namespace
 				if (!nextU(o.stress)) return false;
 			} else if (a == L"--exit-after-ms") {
 				if (!nextU(o.exitAfterMs)) return false;
+			} else if (a == L"--status-ms") {
+				if (!nextU(o.statusMs) || o.statusMs == 0) return false;
 			} else if (a == L"--hz") {
 				if (!next(d)) return false;
 				o.hz = static_cast<int>(d);
@@ -232,7 +236,7 @@ namespace
 				}
 			}
 			if (a_nowMs >= nextStatusMs_) {
-				nextStatusMs_ = a_nowMs + kStatusPeriodMs;
+				nextStatusMs_ = a_nowMs + options_.statusMs;
 				PrintStatus();
 			}
 		}
@@ -342,7 +346,9 @@ namespace
 			}
 			if (ev & (kEvConnected | kEvPeerRestarted)) {
 				teleportNext_ = true;  // a new Minecraft: snap it onto the circle
-				stressReceived_ = 0;
+			}
+			if (ev & kEvPeerRestarted) {
+				stressReceived_ = 0;  // not on CONNECTED: records may arrive before our own CONNECTED event
 			}
 		}
 
