@@ -17,7 +17,8 @@ As of Phase 1 (2026-10-02). "Planned" names the phase expected to fix it.
 
 ## Minecraft side
 - **Puppet mode has one tick (50 ms) of latency** and Minecraft's physics still runs between ticks.
-  Mouse look in the dev window is overridden every tick by the host's yaw/pitch.
+  While the host is sending, mouse look in the dev window is overridden every tick by the host's
+  yaw/pitch. When no new state has arrived for 250 ms (host paused), the mouse and keyboard take over.
 - **Host place requests skip inventory** in Phase 1 (they place the block directly). Planned: Phase 4
   routes them through the real use-item path.
 - **The dev world is superflat**, not RDR2-shaped. Planned: Phase 2 void mirror world with RDR2 collision.

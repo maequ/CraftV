@@ -11,14 +11,19 @@ import net.minecraft.client.player.LocalPlayer;
  * player is. Applied at the end of every client tick: the player's xo/yo/zo were set to the
  * previous applied position at the start of the tick, so Minecraft's renderer interpolates
  * smoothly between them (one tick of latency). Large jumps, TELEPORT and a new host snap instead.
+ * When the host stops sending (mock {@code stop}, a paused game), the player is handed back to the
+ * mouse and keyboard until a new state arrives.
  */
 public final class PlayerPuppet {
 	private static final double SNAP_DISTANCE = 16.0;
 	private static final float TICKS_PER_SECOND = 20.0F;
+	private static final long HOST_PAUSE_NS = 250_000_000L;
 
 	private static int lastGeneration = -1;
 	private static LocalPlayer lastPlayer;
 	private static long applied;
+	private static Messages.PlayerState lastState;
+	private static long lastNewStateNs;
 
 	private PlayerPuppet() {
 	}
@@ -33,6 +38,15 @@ public final class PlayerPuppet {
 		}
 		Messages.PlayerState ps = link.latestPlayerState();
 		if (ps == null) {
+			lastState = null;
+			return;
+		}
+		// Every received record is a new object, so identity tells a fresh state from a repeat.
+		long now = System.nanoTime();
+		if (ps != lastState) {
+			lastState = ps;
+			lastNewStateNs = now;
+		} else if (now - lastNewStateNs > HOST_PAUSE_NS) {
 			return;
 		}
 		// The host drives this window's player; pausing on focus loss would freeze it.

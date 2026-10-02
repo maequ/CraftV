@@ -24,10 +24,12 @@
 2. **Movement:** within a second of the world loading, the player walks a circle (radius 6, centre
    0.5/0.5, walking speed) and turns to face the way it walks. Press F5 to watch from behind. The green
    line at the top-left reads `RedCraft state=CONNECTED ... 'RedCraft-MockHost 0.1.0' ping=...`.
-3. **Block requests:** break a block, then place a block (e.g. stone from the Creative inventory). The mock
-   host console prints, for each:
+3. **Block requests:** type `stop` in the mock host console. The player stands still and the mouse and
+   keyboard are yours again (while the host is sending, it owns the camera). Break a block, then place a
+   block (press E, drag stone into the hotbar, right-click). The mock host console prints, for each:
    - `@RX BLOCK_BREAK_REQUEST #n (x, y, z) face up` and `@RX BLOCK_SET (x, y, z) = 0 (air)`
    - `@RX BLOCK_PLACE_REQUEST #n against (...) face ... block <id>` and `@RX BLOCK_SET (x, y, z) = <id>`
+   Type `walk` to start walking again.
 4. **Host edits:** in the mock host console type `setblock 2 -60 2 1`. Stone appears next to the circle,
    and the console prints `@RX BLOCK_SET (2, -60, 2) = 1 [echo of host edit]`.
    Also try `place 2 -60 2 1 1` (stone on top) and `break 2 -60 2`.
