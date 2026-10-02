@@ -288,7 +288,8 @@ public final class Endpoint {
 				config.log.log(LOG_WARN, "link stale: no heartbeat from " + roleName(peerRole) + " for " + (nowMs - peerBeatChangedMs) + " ms");
 			}
 			case ATTACHED -> {
-				if (previous == State.CONNECTED || previous == State.STALE) {
+				// Not when a new session just appeared (that's a restart, reported above).
+				if ((previous == State.CONNECTED || previous == State.STALE) && (peerSession == 0 || (peerState & SIDE_ATTACHED) == 0)) {
 					events |= EV_PEER_DETACHED;
 					config.log.log(LOG_INFO, roleName(peerRole) + " detached");
 				}

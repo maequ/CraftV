@@ -18,6 +18,8 @@
 #include <Windows.h>
 #include <timeapi.h>
 
+#include <share.h>
+
 #include <atomic>
 #include <cmath>
 #include <cstdarg>
@@ -88,6 +90,11 @@ namespace
 			std::string s(line);
 			while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) {
 				s.pop_back();
+			}
+			// Some writers (PowerShell's redirected stdin) start the stream with a UTF-8 BOM.
+			if (s.size() >= 3 && static_cast<unsigned char>(s[0]) == 0xEF && static_cast<unsigned char>(s[1]) == 0xBB &&
+				static_cast<unsigned char>(s[2]) == 0xBF) {
+				s.erase(0, 3);
 			}
 			std::lock_guard lock(g_cmdMutex);
 			g_commands.push_back(s);
@@ -505,7 +512,7 @@ int wmain(int argc, wchar_t** argv)
 		return 2;
 	}
 	if (!options.logPath.empty()) {
-		_wfopen_s(&g_logFile, options.logPath.c_str(), L"a");
+		g_logFile = _wfsopen(options.logPath.c_str(), L"a", _SH_DENYNO);  // others may read it while we run
 	}
 	::SetConsoleCtrlHandler(&OnConsoleCtrl, TRUE);
 	::timeBeginPeriod(1);  // 1 ms sleep resolution for a steady 60 Hz

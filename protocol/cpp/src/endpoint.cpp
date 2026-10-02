@@ -269,7 +269,8 @@ namespace redcraft
 				static_cast<unsigned long long>(a_nowMs - peerBeatChangedMs_));
 			break;
 		case LinkState::kAttached:
-			if (previous == LinkState::kConnected || previous == LinkState::kStale) {
+			// Not when a new session just appeared (that's a restart, reported above).
+			if ((previous == LinkState::kConnected || previous == LinkState::kStale) && (peerSession == 0 || !(peerState & kSideAttached))) {
 				events_ |= kEvPeerDetached;
 				Log(kLogInfo, "%s detached", RoleName(peerRole_));
 			}
