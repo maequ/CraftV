@@ -219,6 +219,10 @@ Done once per process incarnation, after validation:
   and stop beating. The peer drops to `ATTACHED` at once without waiting for the timeout.
 - While not `CONNECTED`, a side keeps beating, keeps **draining** its incoming ring, and doesn't produce
   gameplay messages (only `HELLO`/`HEARTBEAT` and `LOG`).
+- Each side computes its state from what it has observed, so the two flip to `CONNECTED` a few
+  milliseconds apart. A receiver therefore **accepts gameplay records in any attached state**. It must
+  not reset per-peer state on its own `CONNECTED` event, only on a new peer session. (The chaos
+  tests found this: the first 1,598 stress records arrived before the receiver's own `CONNECTED`.)
 
 ### 5.4 Timeouts
 

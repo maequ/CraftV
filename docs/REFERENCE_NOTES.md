@@ -143,6 +143,28 @@ New: the puppet that applies `PLAYER_STATE`, block-change reporting (`BLOCK_SET`
 break/place intents), handling of host block messages, a link status line in MC's HUD, and the
 rate-limited `logs/redcraft-fabric.log`.
 
+## 6b. The GTA V project (rehan-remade/universal-modder, MIT, commit `15d6f9d`)
+
+Added 2026-10-02 after the switch to RDR2 (DECISIONS D-001). It's the closest Rockstar-engine reference.
+Notes from its README (code not yet studied in depth; that happens before Phase 2):
+
+- **Link:** WebSocket on `127.0.0.1:25599` for camera/ground/keys/commands/events, plus a shared-memory
+  mapping `Local\MCPassthroughFrame` for Minecraft's frames (3 slots, async GPU readback). We keep
+  shared memory for everything.
+- **Coordinates:** 1 GTA metre = 1 block, GTA (x, y, z) → MC (x, z + yOffset, -y), MC yaw = 180 −
+  heading, pitch = −pitch. yOffset puts the player's ground on a whole block. Check whether RDR2 uses
+  the same conventions in Phase 2.
+- **Drawing:** a ReShade add-on uploads Minecraft's colour + depth. An `.fx` effect depth-tests it
+  against GTA's depth buffer, re-projects it to the current camera, and relights it. That's the strongest
+  option for Phase 3/4 visuals, if ReShade works with RDR2's Vulkan/DX12 renderer (to verify).
+- **Ground:** the script probes GTA's ground around the player (40 blocks out, 160 probes a frame).
+  The mod fills those columns with barrier blocks.
+- **Blocks in the host:** placed blocks become **invisible GTA props** for collision. They cap at 400,
+  because GTA crashes at about 1,500 script objects. Phase 4 must measure RDR2's real limit.
+- **Input:** GTA keeps focus. The plugin forwards mouse buttons, wheel and number keys to Minecraft and
+  suppresses GTA's own handling.
+- Their build needs WSL (bash scripts) plus `build.bat`. Ours stays PowerShell + CMake.
+
 ## 7. Lessons from the porting guide that apply directly
 
 1. Mirror the layout and **self-check it at startup** (sizes and offsets). Refuse to run on mismatch.
