@@ -66,3 +66,28 @@ with javac). Installing Temurin 25 later is recommended, because the launcher ma
 ### D-010: Timeouts: MC gives the host 10 s, the host gives MC 3 s (2026-10-02)
 **Reason:** SkyCraft uses 8 s and 3 s. RDR2's loading screens may pause script ticks (`ASSUMPTION`, to
 measure in Phase 2), and Minecraft beats from its own thread. Both can be overridden for tests.
+
+### D-011: Story-mode gate: any network signal switches the plugin off until the game restarts (2026-10-02)
+**Decision:** Every tick, before touching the link, the plugin reads `NETWORK_IS_GAME_IN_PROGRESS`,
+`NETWORK_IS_SESSION_STARTED` and `NETWORK_IS_IN_SESSION`. If any is true it detaches, draws nothing and
+stays off for the rest of the process (`PluginState::kOnlineBlocked`).
+**Reason:** Brief §2.1. ScriptHookRDR2 already closes the game when you go online. This is a second,
+independent guard that latches, so a flicker can't turn RedCraft back on. `// ASSUMPTION:` all three read
+false in story mode. The debug overlay's last line shows them, so Sary's Phase 2 test verifies it.
+
+### D-012: Build against the official ScriptHookRDR2 SDK; test with whichever hook runs on 1491.50 (2026-10-02)
+**Decision:** `RedCraft.asi` compiles against `ScriptHookRDR2_SDK_1.0.1207.73` from dev-c.com (kept in the
+gitignored `sdk/` folder, because its readme forbids redistribution). Sary's game is build 1491.50. The official
+runtime v1.0.1491.17 (Feb 2023) claims "1491.17 and above", but players report 1491.50 broke the official hook,
+and the community "ScriptHookRDR2 V2" (kepmehz, Nexus mod 1472) targets 1491.50.
+**Reason:** The SDK is the official ABI. Plugins built for it are meant to load in either runtime.
+`// ASSUMPTION:` V2 exports the same functions (`scriptRegister`, `scriptWait`, `nativeInit`, `nativePush64`,
+`nativeCall`, `scriptUnregister`; checked with dumpbin as our only imports besides kernel32/advapi32).
+Which runtime to install is Sary's call (the brief prefers official sources).
+
+### D-013: Plugin logic behind a game interface; SEH guard around the tick (2026-10-02)
+**Decision:** `rdr2/src/core` (link, gate, coordinates, overlay, config, cost) talks to RDR2 only through
+`IGame`. `rdr2/src/asi` implements it with natives. `HostPlugin::Tick` catches C++ exceptions, and
+`main.cpp` wraps it in `__try/__except`. Either fault switches RedCraft off and the game keeps running.
+**Reason:** Everything except the natives is unit-tested without RDR2 (14 tests, including zero heap
+allocations in a steady-state tick). Brief §6 safety: the plugin must never crash RDR2.

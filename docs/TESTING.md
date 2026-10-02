@@ -10,6 +10,7 @@
 |---|---|---|
 | C++ `redcraft_link_tests` | Layout, golden vectors, spec-literal encodings, validation, ring wrap/full/stale/corrupt, mapping create/open/validate, endpoint connect/stale/resume/restart, **1,000,000 records through each ring at once** | 31 |
 | Java `gradlew test` | Same golden vectors (C++ and Java agree byte for byte), ring behaviour, endpoint behaviour, **1,000,000 records through each ring** of a real mapping | 16 |
+| C++ `redcraft_rdr2_tests` | RDR2 plugin logic with a fake game: coordinate/heading conversion, story-mode gate, PLAYER_STATE into a real Minecraft-role endpoint, loading/dead/missing player, Minecraft dying, faults, overlay, config, **zero heap allocations per steady-state tick** | 14 |
 | `gradlew integrationTest` | Real `mockhost.exe` against the real Java link in separate processes: host first, MC first, either killed mid-run and restarted, `kill-link`/`resume-link`, `restart`, both killed, block messages, **1,000,000 records each way across processes and languages** | 9 |
 
 ## Phase 1 manual test (Sary)
@@ -43,3 +44,19 @@
 - `logs\redcraft-fabric.log` (Minecraft side)
 - `logs\mockhost.log` (host side)
 - `fabric\run\logs\latest.log` (Minecraft's own log), plus a screenshot if it's visual
+
+## Phase 2 test (draft; needs RDR2 build 1491.50, story mode)
+
+Prerequisites, done by Sary:
+1. A ScriptHookRDR2 runtime + 64-bit `dinput8.dll` ASI loader in the RDR2 folder (see DECISIONS D-012
+   for official vs V2).
+2. Tell me the RDR2 folder path. I'll set it up for `deploy-rdr2.ps1` (env var `REDCRAFT_RDR2_DIR`).
+
+Steps (final version comes with the Phase 2 report):
+1. `.\scripts\deploy-rdr2.ps1`, which copies `RedCraft.asi` + `RedCraft.ini` and checks the hook and loader are there.
+2. Start Minecraft first: `.\scripts\dev-run.ps1 -NoMock`. Then start RDR2 and load a story save.
+3. The top-left overlay in RDR2 shows `link CONNECTED`. Walking in RDR2 moves the Minecraft player.
+   Walking north should make Minecraft's Z go down.
+4. Check the overlay's last line reads `net game 0 session 0 in 0` in story mode.
+5. Close Minecraft: RDR2 keeps running and the overlay shows STALE. Restart Minecraft: CONNECTED again.
+6. Send `RedCraft.log` (next to RDR2.exe), `logsedcraft-fabric.log`, and a screenshot of the overlay.

@@ -25,6 +25,10 @@ if (-not (Test-Path $golden)) {
 
 if (-not $NoTests) {
     & (Join-Path $build "protocol\cpp\$Config\redcraft_link_tests.exe") | Out-Host
-    if ($LASTEXITCODE -ne 0) { throw "C++ tests failed" }
+    if ($LASTEXITCODE -ne 0) { throw "C++ link tests failed" }
+    & (Join-Path $build "rdr2\$Config\redcraft_rdr2_tests.exe") | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw "RDR2 plugin tests failed" }
 }
+$asi = Join-Path $build "rdr2\$Config\RedCraft.asi"
+if (Test-Path $asi) { Write-Host "RedCraft.asi: $asi" } else { Write-Host "RedCraft.asi not built (ScriptHookRDR2 SDK missing from sdk\ScriptHookRDR2_SDK)" }
 Write-Host "mockhost: $(Join-Path $build "tools\mockhost\$Config\mockhost.exe")"

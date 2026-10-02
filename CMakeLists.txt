@@ -22,3 +22,4 @@ enable_testing()
 
 add_subdirectory(protocol/cpp)
 add_subdirectory(tools/mockhost)
+add_subdirectory(rdr2)

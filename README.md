@@ -13,7 +13,7 @@ ASI plugin talk through shared memory.
 | Phase | What | State |
 |---|---|---|
 | 1 | Protocol + Fabric mod + mock host, no game needed | **Built and tested; awaiting Sary's test** |
-| 2 | RDR2 ASI plugin handshake | Not started (needs RDR2) |
+| 2 | RDR2 ASI plugin handshake | Prep done: `RedCraft.asi` builds and its logic is unit-tested; awaiting RDR2 |
 | 3 | Minecraft-style player and HUD | Not started |
 | 4 | Place and break blocks in RDR2's world | Not started |
 | 5 | Digging into the world (experimental) | Not started |
@@ -29,7 +29,8 @@ ASI plugin talk through shared memory.
 | `protocol/golden/` | Golden byte vectors both languages are tested against |
 | `fabric/` | The Minecraft Fabric mod (Java 25, Minecraft 26.3) |
 | `tools/mockhost/` | A fake RDR2 host for testing without the game |
-| `scripts/` | `build-native.ps1`, `dev-run.ps1`, `test-all.ps1`, `env.ps1` |
+| `rdr2/` | The RDR2 ASI plugin (`RedCraft.asi`, ScriptHookRDR2) and its default `RedCraft.ini` |
+| `scripts/` | `build-native.ps1`, `dev-run.ps1`, `test-all.ps1`, `deploy-rdr2.ps1`, `env.ps1` |
 
 ## Requirements (Phase 1)
 
