@@ -1,0 +1,28 @@
+# Reference clones (SkyCraft, PeakCraft, universal-modder): read-only study material, not shipped
+/reference/
+
+# Native build output
+/build/
+*.asi
+
+# Gradle / Loom
+fabric/.gradle/
+fabric/build/
+fabric/run/
+fabric/out/
+.gradle/
+
+# Logs
+/logs/
+*.log
+
+# IDEs
+.idea/
+.vs/
+.vscode/
+*.iml
+
+# Never commit SDKs or secrets
+/sdk/
+*.env
+secrets.*

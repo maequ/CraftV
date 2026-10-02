@@ -1,0 +1,96 @@
+// Adapted from SkyCraft's fabric/build.gradle (MIT, chasmlol).
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+// Where the RedCraft log files go (docs/TESTING.md). scripts/dev-run.ps1 points this at the repo's logs/.
+def redcraftLogDir = System.getenv("REDCRAFT_LOG_DIR") ?: file("../logs").absolutePath
+// Shared-memory mapping name override, so tests never collide with a running dev session.
+def redcraftLink = System.getenv("REDCRAFT_LINK") ?: "Local\\RedCraft_Shared_v1"
+
+loom {
+	splitEnvironmentSourceSets()
+
+	runs {
+		client {
+			programArgs "--username", (System.getenv("REDCRAFT_USERNAME") ?: "RedCraftDev")
+			// --enable-native-access: the shared-memory link calls kernel32 through java.lang.foreign.
+			vmArgs "--enable-native-access=ALL-UNNAMED",
+				"-Dredcraft.logDir=${redcraftLogDir}",
+				"-Dredcraft.link=${redcraftLink}",
+				"-Dredcraft.autoWorld=true"
+		}
+	}
+
+	mods {
+		"redcraft" {
+			sourceSet sourceSets.main
+			sourceSet sourceSets.client
+		}
+	}
+}
+
+dependencies {
+	// To change the versions see the gradle.properties file
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	testImplementation platform("org.junit:junit-bom:5.11.4")
+	testImplementation "org.junit.jupiter:junit-jupiter"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+// Unit + in-process stress tests. Pure Java: no Minecraft classes are touched.
+test {
+	useJUnitPlatform {
+		excludeTags "integration"
+	}
+	jvmArgs "--enable-native-access=ALL-UNNAMED"
+	systemProperty "redcraft.goldenFile", file("../protocol/golden/golden_vectors.txt").absolutePath
+	testLogging { events "passed", "failed", "skipped"; exceptionFormat "full"; showStandardStreams = false }
+}
+
+// Cross-process chaos + stress tests against the C++ mock host (docs/TESTING.md, "Phase 1 automated").
+// Needs the built mockhost.exe: gradlew integrationTest -Pmockhost=..\build\tools\mockhost\Release\mockhost.exe
+tasks.register('integrationTest', Test) {
+	description = "Chaos and cross-process stress tests (needs -Pmockhost=<path to mockhost.exe>)"
+	group = "verification"
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform {
+		includeTags "integration"
+	}
+	jvmArgs "--enable-native-access=ALL-UNNAMED"
+	systemProperty "redcraft.mockhost", project.findProperty("mockhost") ?: ""
+	systemProperty "redcraft.logDir", redcraftLogDir
+	// The guest child processes reuse this JVM's java and the main classes.
+	systemProperty "redcraft.guestClasspath", sourceSets.main.output.classesDirs.asPath
+	outputs.upToDateWhen { false }
+	testLogging { events "passed", "failed", "skipped"; exceptionFormat "full"; showStandardStreams = true }
+}
+
+processResources {
+	def version = project.version
+	inputs.property "version", version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+	it.options.encoding = "UTF-8"
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+jar {
+	from("../LICENSE") {
+		rename { "${it}_redcraft" }
+	}
+}
