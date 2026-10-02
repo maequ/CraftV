@@ -59,4 +59,4 @@ Steps (final version comes with the Phase 2 report):
    Walking north should make Minecraft's Z go down.
 4. Check the overlay's last line reads `net game 0 session 0 in 0` in story mode.
 5. Close Minecraft: RDR2 keeps running and the overlay shows STALE. Restart Minecraft: CONNECTED again.
-6. Send `RedCraft.log` (next to RDR2.exe), `logsedcraft-fabric.log`, and a screenshot of the overlay.
+6. Send `RedCraft.log` (next to RDR2.exe), `logs\redcraft-fabric.log`, and a screenshot of the overlay.
