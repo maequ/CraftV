@@ -1,52 +1,63 @@
-# CraftV: Minecraft inside Red Dead Redemption 2
+# CraftV: your Minecraft friends inside GTA V
 
-Play RDR2's story mode as a Minecraft player: Minecraft movement, HUD, hotbar, placing and breaking
-blocks on the frontier. Real Minecraft Java Edition runs hidden next to RDR2. A Fabric mod and an RDR2
-ASI plugin talk through shared memory.
+You play GTA V story mode. Your friends play **plain Minecraft Java Edition** on their own PCs and join a
+world. Each friend shows up in your Los Santos and walks, runs and jumps where they do. The blocks they place
+appear in Los Santos as solid objects. They walk around a blocky copy of the streets and hills around them,
+built from GTA's own ground. Your GTA character shows up in their Minecraft and walks where you walk.
 
-> ⚠️ **Story mode only.** CraftV must never be used in Red Dead Online. Using mods online can get
-> your Rockstar account banned. The plugin is designed to do nothing outside story mode, and
-> ScriptHookRDR2 disables itself online. Don't try to work around either.
+Your friends install nothing. On your PC, real Minecraft runs hidden next to GTA V and is the server they join.
+A Fabric mod and a GTA V ASI plugin talk through shared memory.
+
+> ⚠️ **Story mode only.** CraftV must never be used in GTA Online. Using mods online can get your
+> Rockstar account banned. The plugin is designed to do nothing outside story mode, and Script Hook V
+> closes the game if you go online. Don't try to work around either.
 
 ## Status
 
 | Phase | What | State |
 |---|---|---|
-| 1 | Protocol + Fabric mod + mock host, no game needed | **Built and tested; awaiting Sary's test** |
-| 2 | RDR2 ASI plugin handshake | Prep done: `CraftV.asi` builds and its logic is unit-tested; awaiting RDR2 |
-| 3 | Minecraft-style player and HUD | Not started |
-| 4 | Place and break blocks in RDR2's world | Not started |
-| 5 | Digging into the world (experimental) | Not started |
+| 1 | Co-op on the Minecraft side with a fake GTA: friends join, walk on host terrain, everything reaches the host | **Built and tested; awaiting Sary's test** |
+| 2 | GTA V plugin: link, overlay, scanning GTA's ground for friends | Needs GTA V (Legacy) |
+| 3 | Friends appear as characters in Los Santos | Not started |
+| 4 | Friends' blocks appear in Los Santos | Not started |
+| 5 | Friends from anywhere (no port forwarding), whitelist | Not started |
+| 6 | A better blocky Los Santos (buildings) | Not started |
+
+The full plan is in [docs/BRIEF.md](docs/BRIEF.md).
 
 ## Repository
 
 | Path | What |
 |---|---|
-| `docs/PROTOCOL.md` | The shared-memory spec: the source of truth |
+| `docs/BRIEF.md` | The build plan (phases, rules) |
+| `docs/PROTOCOL.md` | The shared-memory spec (v1.1): the source of truth |
 | `docs/TESTING.md` | How to test each phase |
 | `docs/DECISIONS.md`, `docs/KNOWN_LIMITATIONS.md`, `docs/REFERENCE_NOTES.md` | Why things are the way they are |
-| `protocol/cpp/` | C++ link library (used by the mock host now and the RDR2 plugin later) + tests |
-| `protocol/golden/` | Golden byte vectors both languages are tested against |
+| `protocol/cpp/`, `protocol/golden/` | C++ link library + tests, golden byte vectors both languages are tested against |
 | `fabric/` | The Minecraft Fabric mod (Java 25, Minecraft 26.3) |
-| `tools/mockhost/` | A fake RDR2 host for testing without the game |
-| `rdr2/` | The RDR2 ASI plugin (`CraftV.asi`, ScriptHookRDR2) and its default `CraftV.ini` |
-| `scripts/` | `build-native.ps1`, `dev-run.ps1`, `test-all.ps1`, `deploy-rdr2.ps1`, `env.ps1` |
+| `tools/mockhost/` | A fake GTA host with a fake Los Santos, for testing without the game |
+| `gta/` | The GTA V ASI plugin (from Phase 2) |
+| `rdr2/` | A parked RDR2 plugin from an earlier direction; its game-agnostic core is reused for GTA V |
+| `scripts/` | `build-native.ps1`, `dev-run.ps1`, `run-friend.ps1`, `test-all.ps1`, `env.ps1`, `deploy-rdr2.ps1` |
 
-## Requirements (Phase 1)
+## Requirements
 
 - Windows 10/11, Git
 - Visual Studio 2022 (or Build Tools) with "Desktop development with C++" (MSVC v143, Windows SDK, CMake)
 - JDK 25. `scripts/env.ps1` finds `CRAFTV_JAVA_HOME`, `JAVA_HOME`, or the Minecraft Launcher's bundled Java 25
 - Internet on first build (Gradle downloads Minecraft 26.3, Fabric Loader 0.19.5, Fabric API 0.161.0+26.3)
-
-Phase 2 will add: RDR2 for PC (story mode), ScriptHookRDR2 + an ASI loader from the official site.
+- Friends: Minecraft Java Edition 26.3, nothing else
+- From Phase 2: GTA V **Legacy** (story mode), Script Hook V + its ASI loader from http://www.dev-c.com/gtav/scripthookv/
 
 ## Quick start
 
 ```powershell
 .\scripts\test-all.ps1     # every automated test
-.\scripts\dev-run.ps1      # mock host + Minecraft: watch the player walk a circle
+.\scripts\dev-run.ps1      # mock host + the Minecraft friends join (opens to LAN on port 25565)
 ```
+
+Then join from any Minecraft 26.3 on your network: Multiplayer → `CraftVDev - CraftV`. Settings (port, friends'
+game mode, terrain radius) are in `fabric/run/config/craftv.properties`.
 
 The JVM flag `--enable-native-access=ALL-UNNAMED` is required, because the link calls kernel32 through
 `java.lang.foreign`. `gradlew runClient` already sets it.
@@ -54,13 +65,13 @@ The JVM flag `--enable-native-access=ALL-UNNAMED` is required, because the link 
 ## Credits
 
 - **SkyCraft** by chasmlol (MIT): the architecture (hidden Minecraft + host plugin over shared memory),
-  ring algorithm, liveness rules, mirror-world setup. https://github.com/chasmlol/SkyCraft
+  ring algorithm, liveness rules, and the mirror world preset. https://github.com/chasmlol/SkyCraft
 - **PeakCraft** by aeironnsarmiento: the porting guide and lessons. https://github.com/aeironnsarmiento/PeakCraft
-- **Minecraft x GTA V** by rehan-remade (MIT): the closest Rockstar-engine reference.
+- **minecraft-gta5-passthrough** by rehan-remade (MIT): the GTA V reference.
   https://github.com/rehan-remade/universal-modder/tree/main/examples/minecraft-gta5-passthrough
-- **ScriptHookRDR2** by Alexander Blade (used from Phase 2).
+- **Script Hook V** by Alexander Blade (used from Phase 2).
 
 CraftV isn't affiliated with or endorsed by Mojang, Microsoft, Rockstar Games or Take-Two.
-Minecraft and RDR2 aren't included; you need your own copies.
+Minecraft and GTA V aren't included; you need your own copies.
 
 License: MIT (see `LICENSE`, which also carries SkyCraft's license).

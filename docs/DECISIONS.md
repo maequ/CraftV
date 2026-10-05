@@ -39,7 +39,7 @@ PeakCraft's worst bug was a heartbeat thread stalled by a full ring. A dedicated
 through world loads and never blocks on the game. It also keeps each ring single-producer and
 single-consumer.
 
-### D-006: Phase 1 dev world is an auto-created superflat Creative world (2026-10-02)
+### D-006: Phase 1 dev world is an auto-created superflat Creative world (2026-10-02, superseded by D-019)
 **Reason:** In SkyCraft's void mirror world a host-driven player has nothing to look at, so you can't
 see the circle. Superflat grass makes motion obvious. Grass top is y = -61, so feet are at -60, which
 is the mock host's default circle height. Creative lets Sary break and place freely. The void
@@ -111,3 +111,42 @@ the GTA V reference project solves ground probing and block props, and our host 
 **Reason:** Sary picked the name (it was the original GTA V title). The brief says keep all existing work.
 The magic changed with the name, so a RedCraft-era peer and a CraftV peer refuse each other's mapping instead
 of mixing. Nothing was released under the old name, so there's no compatibility to keep.
+
+### D-016: Protocol v1.1: co-op messages, terrain pulled by Minecraft one chunk at a time (2026-10-05)
+**Decision:** Six additive messages (PROTOCOL.md §7.8-7.13): REMOTE_PLAYER_JOIN/STATE/LEAVE, TERRAIN_REQUEST,
+TERRAIN_PATCH, SESSION_INFO. Terrain is a fixed 1296-byte patch per 16x16 chunk column (ground Y, water Y and a
+surface material per column), requested by MC for chunks near any player, nearest first, 32 in flight, retried
+after 5 s. MC picks the blocks for each material; built chunks are remembered in the world save.
+**Reason:** Friends wander away from the host's player, so the host must scan where they are, not just around
+itself. Pull keeps the host stateless about the world. A chunk patch matches Minecraft's own unit and fits a
+ring record. A material enum, not block ids, keeps GTA's side free of Minecraft knowledge. Minor version bump:
+a v1.0 peer skips the new types and still links up.
+
+### D-017: The hidden Minecraft is the server; opened to LAN automatically, authentication always on (2026-10-05)
+**Decision:** Once the owner is in the world, the client thread calls `publishServer(LAN, commands off, port)`
+(config `friends.port`, default 25565, a free port if busy). Friends get `friends.gameMode` (Creative for now).
+Authentication stays on; only the dev-only system property `craftv.devNoAuth` (set solely by the stand-in-friend
+test runs) turns it off.
+**Reason:** Minecraft's own multiplayer carries everything, so CraftV writes no netcode (brief §1). Vanilla's
+"Open to LAN" runs on the client thread, so this does too. Brief §2.4: friends must own Minecraft.
+
+### D-018: Friends spawn next to the host's player and never fall into the void (2026-10-05)
+**Decision:** On join, a friend is placed 2 blocks east of the owner, on the built ground there. While a friend's
+chunk has no ground yet, they hover (flying is switched on); when it arrives they're set down. A friend below the
+built ground (it arrived above them, or they dug through the bottom) is lifted back onto the surface.
+**Reason:** The mirror world is void until the host's ground arrives, and the ground is only `terrain.depth`
+blocks thick. Spawning beside the host is the point of co-op.
+
+### D-019: Mirror world from SkyCraft's preset replaces the superflat dev world (2026-10-05)
+**Decision:** The hidden Minecraft opens or creates the world "CraftV" from SkyCraft's `mirror` world preset and
+dimension type (void, min_y -1024, height 2048), copied under `data/craftv/`. Supersedes D-006.
+**Reason:** GTA's heights fit at 1 metre = 1 block, and all ground comes from the host. The preset is MIT and
+proven on 26.3. Vanilla clients accept data-driven dimension types, so friends need nothing installed.
+
+### D-020: A stand-in friend for automated co-op tests (2026-10-05)
+**Decision:** A second dev client (`gradlew runFriend`, `scripts/run-friend.ps1`, its own `fabric/run-friend`
+folder) joins the host like a Multiplayer player. With `-Bot` it walks, jumps, places and breaks blocks by itself.
+The mock host serves a procedural fake Los Santos and prints friends and their blocks.
+**Reason:** Brief §0: test everything possible before asking Sary. It also gives later phases a moving, building
+friend without a second person. It loads the CraftV mod (in friend mode, doing nothing but joining and the
+autopilot), so the final "plain vanilla Minecraft" check is Sary's own launcher (TESTING.md).

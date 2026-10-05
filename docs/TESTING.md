@@ -8,57 +8,62 @@
 
 | Suite | What it proves | Count |
 |---|---|---|
-| C++ `craftv_link_tests` | Layout, golden vectors, spec-literal encodings, validation, ring wrap/full/stale/corrupt, mapping create/open/validate, endpoint connect/stale/resume/restart, **1,000,000 records through each ring at once** | 31 |
-| Java `gradlew test` | Same golden vectors (C++ and Java agree byte for byte), ring behaviour, endpoint behaviour, **1,000,000 records through each ring** of a real mapping | 16 |
-| C++ `craftv_rdr2_tests` | RDR2 plugin logic with a fake game: coordinate/heading conversion, story-mode gate, PLAYER_STATE into a real Minecraft-role endpoint, loading/dead/missing player, Minecraft dying, faults, overlay, config, **zero heap allocations per steady-state tick** | 14 |
-| `gradlew integrationTest` | Real `mockhost.exe` against the real Java link in separate processes: host first, MC first, either killed mid-run and restarted, `kill-link`/`resume-link`, `restart`, both killed, block messages, **1,000,000 records each way across processes and languages** | 9 |
+| C++ `craftv_link_tests` | Layout, golden vectors for all 13 messages, spec-literal encodings, validation and direction rules, ring wrap/full/stale/corrupt, mapping create/open/validate, endpoint connect/stale/resume/restart, **1,000,000 records through each ring at once** | 35 |
+| Java `gradlew test` | The same golden vectors (C++ and Java agree byte for byte), ring and endpoint behaviour, 1,000,000 records through each ring, terrain column building, the terrain request planner (nearest first, cap, retry), friend tracking (join/state/leave, velocity, swing, resync) | 37 |
+| C++ `craftv_rdr2_tests` | The parked RDR2 plugin's game-agnostic core with a fake game, including zero heap allocations per tick | 14 |
+| `gradlew integrationTest` | Real `mockhost.exe` against the real Java link in separate processes: start orders, crashes, restarts, timeouts, block messages, terrain requests answered (and a host that answers none), a friend joining/moving/leaving, SESSION_INFO, **1,000,000 records each way** | 11 |
 
-## Phase 1 manual test (Sary)
+Done on 2026-10-05 with the mock host, the hidden Minecraft and a stand-in friend (a second dev
+Minecraft, `scripts\run-friend.ps1 -Bot`): the world opened to friends, the friend spawned next to the host's
+player, walked on the mock's terrain, placed and broke blocks (each one reached the mock host), left and was
+reported gone, was re-announced after a host restart, and hovered until its ground arrived when terrain was
+switched off and on.
 
-**Setup, once:** nothing to install. Build with `.\scripts\build-native.ps1`.
+## Phase 1 co-op test (Sary)
 
-1. In PowerShell, from the repo root: `.\scripts\dev-run.ps1`
-   - A **mock host** console opens (you can type commands there).
-   - Minecraft starts. The first run downloads assets. A world called **CraftV Dev**
-     (superflat, Creative) opens by itself.
-2. **Movement:** within a second of the world loading, the player walks a circle (radius 6, centre
-   0.5/0.5, walking speed) and turns to face the way it walks. Press F5 to watch from behind. The green
-   line at the top-left reads `CraftV state=CONNECTED ... 'CraftV-MockHost 0.1.0' ping=...`.
-3. **Block requests:** type `stop` in the mock host console. The player stands still and the mouse and
-   keyboard are yours again (while the host is sending, it owns the camera). Break a block, then place a
-   block (press E, drag stone into the hotbar, right-click). The mock host console prints, for each:
-   - `@RX BLOCK_BREAK_REQUEST #n (x, y, z) face up` and `@RX BLOCK_SET (x, y, z) = 0 (air)`
-   - `@RX BLOCK_PLACE_REQUEST #n against (...) face ... block <id>` and `@RX BLOCK_SET (x, y, z) = <id>`
-   Type `walk` to start walking again.
-4. **Host edits:** in the mock host console type `setblock 2 -60 2 1`. Stone appears next to the circle,
-   and the console prints `@RX BLOCK_SET (2, -60, 2) = 1 [echo of host edit]`.
-   Also try `place 2 -60 2 1 1` (stone on top) and `break 2 -60 2`.
-5. **Timeouts:** type `kill-link`. After about 10 s the top-left line turns red/yellow (`STALE`) and the
-   player stops. Type `resume-link`: back to `CONNECTED` and walking (same session number).
-6. **Restart:** type `restart`. The `host=` number goes up by one and the player snaps back onto the circle.
-7. **Crash recovery:** close the mock host window. After about 10 s Minecraft shows `STALE`. Start
-   `build\tools\mockhost\Release\mockhost.exe` again: back to `CONNECTED` and walking.
-   Then the reverse: close Minecraft, keep the mock running, start `.\scripts\dev-run.ps1 -NoMock`: it reconnects.
+You need: your normal Minecraft Launcher with Minecraft Java Edition **26.3** (Installations → New installation
+→ version "release 26.3", if you don't have it yet).
 
-**Other mock commands:** `help`, `status`, `center X Y Z`, `radius R`, `speed S`, `walk`, `stop`, `quit`.
+1. Open PowerShell in the `craftv` folder and run `.\scripts\dev-run.ps1`.
+   - A **mock host** console opens. Leave it alone; you don't need to type anything in it.
+   - A dev Minecraft opens the world **CraftV** by itself: blocky hills, a lake, grey roads. This window stands
+     in for the hidden Minecraft that will run next to GTA. Leave it open.
+   - Its top-left shows a green `CraftV state=CONNECTED ...` line and, under it, `friends 0 @ <your-ip>:25565`.
+   - If Windows asks whether Java may use the network, choose **Private networks** and Allow.
+2. Start your **normal** Minecraft (the launcher, your own account), version 26.3 → **Multiplayer**.
+   The world shows up at the bottom under the LAN list as `CraftVDev - CraftV`. Join it.
+   (If it doesn't show up: **Direct Connection** → `localhost:25565`.)
+3. **You spawn next to the walking player** (`CraftVDev`, the stand-in for your GTA character), in Creative,
+   standing on the blocky ground. In the mock host console you'll see `@RX REMOTE_PLAYER_JOIN #... '<your name>'`,
+   then once a second `@FRIEND ... at (x, y, z) ...` following you around.
+4. **Walk or fly away** from the start. The ground keeps appearing ahead of you, about 100 blocks around you.
+5. **Place and break a few blocks.** For each one the console prints `@RX BLOCK_SET (x, y, z) = <id>`, and
+   `= 0 (air)` when you break one.
+6. **Leave the world** (Esc → Disconnect). The console prints `@RX REMOTE_PLAYER_LEAVE ... left`.
+
+When you're done, close both Minecraft windows and the mock host console.
 
 ### If something fails, send me
-- `logs\craftv-fabric.log` (Minecraft side)
-- `logs\mockhost.log` (host side)
-- `fabric\run\logs\latest.log` (Minecraft's own log), plus a screenshot if it's visual
+- `logs\craftv-fabric.log` (the dev Minecraft) and `logs\mockhost.log` (the mock host)
+- `fabric\run\logs\latest.log` (the dev Minecraft's own log)
+- the error your own Minecraft shows when joining (a screenshot is fine)
 
-## Phase 2 test (draft; needs RDR2 build 1491.50, story mode)
+### Link checks from the first Phase 1 (still valid, optional)
+Type these in the mock host console: `kill-link` (after about 10 s the green line turns red `STALE` and the
+walking player stops), then `resume-link` (back to `CONNECTED`); `restart` (the `host=` number goes up by one).
+`ground X Z` prints the fake ground at a spot; `terrain off` / `terrain on` stops and restarts the ground supply.
+
+## Phase 2 test (draft; needs GTA V Legacy, story mode)
+
+Sary's GTA V lives in `C:\Rockstar Games\GTA V\` and starts through Sary's own batch launcher. CraftV uses both
+as they are and never moves or replaces anything there.
 
 Prerequisites, done by Sary:
-1. A ScriptHookRDR2 runtime + 64-bit `dinput8.dll` ASI loader in the RDR2 folder (see DECISIONS D-012
-   for official vs V2).
-2. Tell me the RDR2 folder path. I'll set it up for `deploy-rdr2.ps1` (env var `CRAFTV_RDR2_DIR`).
+1. Script Hook V + its ASI loader (`dinput8.dll`) from http://www.dev-c.com/gtav/scripthookv/ in the GTA V folder.
+   I'll confirm the exact version against your game build first.
 
-Steps (final version comes with the Phase 2 report):
-1. `.\scripts\deploy-rdr2.ps1`, which copies `CraftV.asi` + `CraftV.ini` and checks the hook and loader are there.
-2. Start Minecraft first: `.\scripts\dev-run.ps1 -NoMock`. Then start RDR2 and load a story save.
-3. The top-left overlay in RDR2 shows `link CONNECTED`. Walking in RDR2 moves the Minecraft player.
-   Walking north should make Minecraft's Z go down.
-4. Check the overlay's last line reads `net game 0 session 0 in 0` in story mode.
-5. Close Minecraft: RDR2 keeps running and the overlay shows STALE. Restart Minecraft: CONNECTED again.
-6. Send `CraftV.log` (next to RDR2.exe), `logs\craftv-fabric.log`, and a screenshot of the overlay.
+Steps (the final version comes with the Phase 2 report):
+1. `.\scripts\deploy-gta.ps1` copies only `CraftV.asi` + `CraftV.ini` into the GTA V folder.
+2. Start Minecraft first (`.\scripts\dev-run.ps1 -NoMock`), then GTA V through your launcher, and load story mode.
+3. The overlay shows `link CONNECTED`; walking in GTA moves the Minecraft player; a friend in Minecraft walks on
+   blocky ground that matches the streets around them.

@@ -127,7 +127,7 @@ Skyrim creates the mapping; Minecraft only ever opens it (`OpenFileMappingW`, re
 | SPSC ring algorithm (u64 running counters, separate cache lines, pad-to-wrap, skip unknown by length) | **Reuse** | Proven. CraftV uses it for both rings |
 | "Host resets what it owns, magic written last", heartbeat timeouts, explicit SDDL, `_minecraft` mutex | **Reuse** | RDR2 can run elevated too |
 | `MirrorWorld` auto-create/open + game rules (`PLAYER_MOVEMENT_CHECK=false` etc.) | **Reuse** (adapted) | Same need. Phase 1 uses a superflat dev world so motion is visible |
-| Void mirror preset + tall `dimension_type` | **Reuse later** (Phase 2+) | RDR2's height range should fit in -1024..1023 (verify in Phase 2) at 1 block = 1 m |
+| Void mirror preset + tall `dimension_type` | **Reused** (co-op Phase 1, D-019) | Copied to `data/craftv/`; GTA heights fit in -1024..1023 at 1 block = 1 m |
 | SkyCraft's exact v11 protocol | **Rewrite** (CraftV protocol v1) | The brief asks for a header with section table + two typed message rings + HELLO/HEARTBEAT/... Both sides may create the mapping. See `docs/PROTOCOL.md` and DECISIONS D-003 |
 | Triangle collider, collision ring, `SkyCollision`/`TriCollider`/`PlayerEdgeMixin` | **Park** for Phase 3 | Needed only if Phase 3 chooses "MC physics drives the ped" (SkyCraft's model). RDR2 exposes shape tests, not shapes, so export would be PeakCraft-style ray sampling |
 | Input bridge (SDL scancodes, release-all, cursor) | **Park** for Phase 3 | Directly portable if MC owns movement |
