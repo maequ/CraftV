@@ -54,10 +54,19 @@ As of Phase 2 (2026-10-05). "Planned" names the phase expected to fix it.
 - Piping `test-all.ps1` into another command can hang after the tests finish (the Gradle daemon keeps the pipe
   open). Run it plainly or redirect it to a file.
 
-## GTA V plugin (running in Sary's game since 2026-10-05; Phase 2 not yet confirmed)
-- Seen working in game: the link, PLAYER_STATE, terrain requests answered, and the overlay. The first run showed
-  two wrong assumptions, both fixed (DECISIONS D-023, D-024): the synchronous ray is `0x377906D8A31E5586`, and
-  material hashes come from an explicit table, not joaat of the names. The fix awaits an in-game run.
+## GTA V plugin (Phase 2 confirmed in Sary's game on 2026-10-05)
+- Confirmed in game: the link, the Minecraft player following the ped, friends' ground from GTA's real streets
+  with surface materials (every probe returned one), the overlay, and a friend joining (Sary's own account, from
+  the normal launcher) showing on the overlay. Two wrong assumptions were found and fixed on the way (DECISIONS
+  D-023, D-024).
+- **Probe cost:** the synchronous ray costs more than ground-Z. While a lot of new ground is being scanned, the tick
+  averaged up to 1.4 ms with single frames up to 22 ms (a visible hitch). Quiet play is about 0.1 ms. Lower
+  `[Terrain] ProbesPerTick` to trade speed for smoothness; an asynchronous probe pipeline would fix it properly.
+- **GTA pauses scripts when it loses focus,** so the link goes stale while you're in another window. To test with
+  Minecraft on the same PC: Graphics, Screen Type = Windowed Borderless and Pause Game On Focus Loss = Off.
+- **Stray block messages:** a run with no friends online still counted 73 BLOCK_SET messages from Minecraft (likely
+  water spreading from terrain water). Harmless now (counted only); Phase 4 must check them before turning them
+  into props.
 - Chunks Minecraft already built stay as they were. When the material mapping changes, start a fresh CraftV world
   (move `saves/CraftV` aside) to rebuild them.
 - Still unverified in game, marked `// ASSUMPTION:`:
