@@ -2,13 +2,13 @@
 // The Java test (GoldenVectorsTest) uses the same values; keep them identical.
 #pragma once
 
-#include "redcraft/protocol.h"
+#include "craftv/protocol.h"
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace redcraft::golden
+namespace craftv::golden
 {
 	inline constexpr std::uint32_t kSession = 0x11223344;
 	inline constexpr std::uint32_t kSeq = 7;

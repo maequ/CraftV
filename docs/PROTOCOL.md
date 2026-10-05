@@ -1,10 +1,10 @@
-# RedCraft shared-memory protocol, version 1.0
+# CraftV shared-memory protocol, version 1.0
 
 This document is the **source of truth** for the bytes shared between the RDR2 host (the ASI
 plugin, or the mock host) and the Minecraft guest (the Fabric mod). The code mirrors it in:
 
-- C++: `protocol/cpp/include/redcraft/protocol.h` (constants, structs, `static_assert`s on every size/offset)
-- Java: `fabric/src/main/java/dev/redcraft/link/Proto.java`
+- C++: `protocol/cpp/include/craftv/protocol.h` (constants, structs, `static_assert`s on every size/offset)
+- Java: `fabric/src/main/java/dev/craftv/link/Proto.java`
 
 Both are checked against the same golden byte vectors in `protocol/golden/golden_vectors.txt`.
 If you change anything here, change both mirrors, regenerate the goldens, and bump the version (§9).
@@ -31,7 +31,7 @@ rings, symmetric create-or-open, and per-message session tags are new (see `DECI
 
 | Property | Value |
 |---|---|
-| Name | `Local\RedCraft_Shared_v1` (override: `-Dredcraft.link=` in Java, `--mapping` in the mock host. Tests use their own name) |
+| Name | `Local\CraftV_Shared_v1` (override: `-Dcraftv.link=` in Java, `--mapping` in the mock host. Tests use their own name) |
 | Backing | Page file (`CreateFileMappingW(INVALID_HANDLE_VALUE, ...)`, `PAGE_READWRITE`). New mappings are zero-filled by Windows |
 | Size | `MAPPING_BYTES = 0x203000` (2,109,440 bytes) |
 | Access | Created with an explicit DACL: SYSTEM, Administrators and **the current user**, medium integrity label. An elevated RDR2 can still share it with a non-elevated Minecraft (SkyCraft lesson) |
@@ -56,7 +56,7 @@ on its own cache line and written only by that side.
 
 | Offset | Size | Type | Field | Written by | Notes |
 |---|---|---|---|---|---|
-| `0x000` | 4 | u32 | `magic` | creator, **last** | `0x52434452` (bytes `52 44 43 52` = `"RDCR"`). Zero until the creator finished initialising |
+| `0x000` | 4 | u32 | `magic` | creator, **last** | `0x56465243` (bytes `43 52 46 56` = `"CRFV"`). Zero until the creator finished initialising |
 | `0x004` | 2 | u16 | `versionMajor` | creator | `1` |
 | `0x006` | 2 | u16 | `versionMinor` | creator | `0` |
 | `0x008` | 4 | u32 | `headerBytes` | creator | `0x1000` |
@@ -235,7 +235,7 @@ Done once per process incarnation, after validation:
 | `INIT_TIMEOUT_MS` | 2000 | §5.1 |
 | `RETRY_MS` | 1000 | Create/open retry |
 
-Both timeouts can be overridden for tests (`--host-timeout-ms`, `--mc-timeout-ms`, `-Dredcraft.hostTimeoutMs`).
+Both timeouts can be overridden for tests (`--host-timeout-ms`, `--mc-timeout-ms`, `-Dcraftv.hostTimeoutMs`).
 
 ## 6. Memory ordering
 
@@ -291,7 +291,7 @@ Sent right after attach and again whenever a new peer session is seen.
 | 16 | 4 | u32 | `capabilities` | bitmask, `0` in v1.0 |
 | 20 | 2 | u16 | `softwareBytes` | ≤ 40 |
 | 22 | 2 | | reserved | |
-| 24 | 40 | u8[40] | `software` | UTF-8, e.g. `RedCraft-MockHost 0.1.0` |
+| 24 | 40 | u8[40] | `software` | UTF-8, e.g. `CraftV-MockHost 0.1.0` |
 
 A `HELLO` with a different `versionMajor` makes the receiver log an error and refuse gameplay messages.
 
@@ -349,7 +349,7 @@ flagged `ECHO`. MC is always the authority.
 | 20 | 4 | u32 | `requestId` | the `requestId` that caused it, `0` = unsolicited |
 
 Block-state ids depend on the exact MC version and mod set. They are stable for the pinned 26.3 +
-RedCraft set. A `BLOCK_PALETTE` message (id → name) is planned for Phase 4 so the host can choose props by name.
+CraftV set. A `BLOCK_PALETTE` message (id → name) is planned for Phase 4 so the host can choose props by name.
 
 ### 7.5 `BLOCK_BREAK_REQUEST` (5) and `BLOCK_PLACE_REQUEST` (6), 24 bytes each
 

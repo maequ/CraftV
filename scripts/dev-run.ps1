@@ -1,5 +1,5 @@
 # Phase 1 dev loop: starts the mock host in its own console window (type commands there), then the
-# Minecraft dev client with the RedCraft mod in this window. Logs go to <repo>\logs.
+# Minecraft dev client with the CraftV mod in this window. Logs go to <repo>\logs.
 #   .\scripts\dev-run.ps1                 normal
 #   .\scripts\dev-run.ps1 -NoMock         only Minecraft (start a host yourself)
 #   .\scripts\dev-run.ps1 -MockArgs '--radius 10 --speed 2'
@@ -9,7 +9,7 @@ param(
 )
 . "$PSScriptRoot\env.ps1"
 
-$root = $script:RedCraftRoot
+$root = $script:CraftVRoot
 $logs = Join-Path $root 'logs'
 New-Item -ItemType Directory -Force $logs | Out-Null
 $mock = Join-Path $root 'build\tools\mockhost\Release\mockhost.exe'
@@ -26,10 +26,10 @@ if (-not $NoMock) {
 
 $jdk = Use-Jdk25
 Write-Host "JDK: $jdk"
-$env:REDCRAFT_LOG_DIR = $logs
+$env:CRAFTV_LOG_DIR = $logs
 Push-Location (Join-Path $root 'fabric')
 try {
-    Write-Host "Starting Minecraft (gradlew runClient). The 'RedCraft Dev' world opens by itself."
+    Write-Host "Starting Minecraft (gradlew runClient). The 'CraftV Dev' world opens by itself."
     & .\gradlew.bat runClient
 } finally {
     Pop-Location

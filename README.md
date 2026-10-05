@@ -1,10 +1,10 @@
-# RedCraft: Minecraft inside Red Dead Redemption 2
+# CraftV: Minecraft inside Red Dead Redemption 2
 
 Play RDR2's story mode as a Minecraft player: Minecraft movement, HUD, hotbar, placing and breaking
 blocks on the frontier. Real Minecraft Java Edition runs hidden next to RDR2. A Fabric mod and an RDR2
 ASI plugin talk through shared memory.
 
-> ⚠️ **Story mode only.** RedCraft must never be used in Red Dead Online. Using mods online can get
+> ⚠️ **Story mode only.** CraftV must never be used in Red Dead Online. Using mods online can get
 > your Rockstar account banned. The plugin is designed to do nothing outside story mode, and
 > ScriptHookRDR2 disables itself online. Don't try to work around either.
 
@@ -13,7 +13,7 @@ ASI plugin talk through shared memory.
 | Phase | What | State |
 |---|---|---|
 | 1 | Protocol + Fabric mod + mock host, no game needed | **Built and tested; awaiting Sary's test** |
-| 2 | RDR2 ASI plugin handshake | Prep done: `RedCraft.asi` builds and its logic is unit-tested; awaiting RDR2 |
+| 2 | RDR2 ASI plugin handshake | Prep done: `CraftV.asi` builds and its logic is unit-tested; awaiting RDR2 |
 | 3 | Minecraft-style player and HUD | Not started |
 | 4 | Place and break blocks in RDR2's world | Not started |
 | 5 | Digging into the world (experimental) | Not started |
@@ -29,14 +29,14 @@ ASI plugin talk through shared memory.
 | `protocol/golden/` | Golden byte vectors both languages are tested against |
 | `fabric/` | The Minecraft Fabric mod (Java 25, Minecraft 26.3) |
 | `tools/mockhost/` | A fake RDR2 host for testing without the game |
-| `rdr2/` | The RDR2 ASI plugin (`RedCraft.asi`, ScriptHookRDR2) and its default `RedCraft.ini` |
+| `rdr2/` | The RDR2 ASI plugin (`CraftV.asi`, ScriptHookRDR2) and its default `CraftV.ini` |
 | `scripts/` | `build-native.ps1`, `dev-run.ps1`, `test-all.ps1`, `deploy-rdr2.ps1`, `env.ps1` |
 
 ## Requirements (Phase 1)
 
 - Windows 10/11, Git
 - Visual Studio 2022 (or Build Tools) with "Desktop development with C++" (MSVC v143, Windows SDK, CMake)
-- JDK 25. `scripts/env.ps1` finds `REDCRAFT_JAVA_HOME`, `JAVA_HOME`, or the Minecraft Launcher's bundled Java 25
+- JDK 25. `scripts/env.ps1` finds `CRAFTV_JAVA_HOME`, `JAVA_HOME`, or the Minecraft Launcher's bundled Java 25
 - Internet on first build (Gradle downloads Minecraft 26.3, Fabric Loader 0.19.5, Fabric API 0.161.0+26.3)
 
 Phase 2 will add: RDR2 for PC (story mode), ScriptHookRDR2 + an ASI loader from the official site.
@@ -60,7 +60,7 @@ The JVM flag `--enable-native-access=ALL-UNNAMED` is required, because the link 
   https://github.com/rehan-remade/universal-modder/tree/main/examples/minecraft-gta5-passthrough
 - **ScriptHookRDR2** by Alexander Blade (used from Phase 2).
 
-RedCraft isn't affiliated with or endorsed by Mojang, Microsoft, Rockstar Games or Take-Two.
+CraftV isn't affiliated with or endorsed by Mojang, Microsoft, Rockstar Games or Take-Two.
 Minecraft and RDR2 aren't included; you need your own copies.
 
 License: MIT (see `LICENSE`, which also carries SkyCraft's license).

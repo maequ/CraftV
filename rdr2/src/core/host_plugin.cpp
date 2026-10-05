@@ -3,15 +3,15 @@
 #include "coords.h"
 #include "host_log.h"
 
-#include "redcraft/clock.h"
-#include "redcraft/codec.h"
+#include "craftv/clock.h"
+#include "craftv/codec.h"
 
 #include <cstdio>
 #include <exception>
 
-namespace redcraft::host
+namespace craftv::host
 {
-	using namespace redcraft::proto;
+	using namespace craftv::proto;
 
 	namespace
 	{
@@ -19,7 +19,7 @@ namespace redcraft::host
 		constexpr double        kTeleportDistance = 50.0;
 		constexpr double        kCostEmaWeight = 0.05;
 		constexpr std::uint64_t kCostReportPeriodMs = 30000;
-		constexpr const char*   kSoftware = "RedCraft-RDR2 0.1.0";
+		constexpr const char*   kSoftware = "CraftV-RDR2 0.1.0";
 
 		// Overlay layout (screen fractions).
 		constexpr float kOverlayX = 0.01f;
@@ -111,7 +111,7 @@ namespace redcraft::host
 		}
 		game_.Sample(sample_);
 		if (OnlineSession(sample_)) {
-			HostLog::Warn("online session detected (gameInProgress=%d sessionStarted=%d inSession=%d): RedCraft is off until the game restarts",
+			HostLog::Warn("online session detected (gameInProgress=%d sessionStarted=%d inSession=%d): CraftV is off until the game restarts",
 				sample_.networkGameInProgress, sample_.networkSessionStarted, sample_.networkInSession);
 			state_ = PluginState::kOnlineBlocked;
 			endpoint_.reset();  // clean detach: Minecraft sees the host leave at once
@@ -126,7 +126,7 @@ namespace redcraft::host
 			c.log = &HostLog::FromLink;
 			endpoint_ = std::make_unique<Endpoint>(c);  // the only allocation, on the first story-mode tick
 			state_ = PluginState::kActive;
-			HostLog::Info("story mode: link starting (mapping in RedCraft.ini [Link] MappingName)");
+			HostLog::Info("story mode: link starting (mapping in CraftV_RDR2.ini [Link] MappingName)");
 		}
 
 		const bool usable = PlayerUsable(sample_);
@@ -208,7 +208,7 @@ namespace redcraft::host
 		const auto& peer = endpoint_->Peer();
 		const auto& tx = endpoint_->TxStats();
 		const auto& rx = endpoint_->RxStats();
-		std::snprintf(lines[0], sizeof(lines[0]), "RedCraft %s  link %s  ping %.1f ms  MC session %u", kPluginVersion, ToString(st),
+		std::snprintf(lines[0], sizeof(lines[0]), "CraftV %s  link %s  ping %.1f ms  MC session %u", kPluginVersion, ToString(st),
 			peer.rttValid ? peer.rttUs / 1000.0 : 0.0, peer.session);
 		std::snprintf(lines[1], sizeof(lines[1]), "tx %llu  rx %llu  blocks %llu  dropped %llu  bad %llu  tick %.3f ms (max %.3f)",
 			static_cast<unsigned long long>(tx.produced), static_cast<unsigned long long>(rx.consumed),
@@ -234,7 +234,7 @@ namespace redcraft::host
 			return;
 		}
 		state_ = PluginState::kFaulted;
-		HostLog::Error("tick failed (%s): RedCraft is off until the game restarts; the game keeps running", a_what ? a_what : "?");
+		HostLog::Error("tick failed (%s): CraftV is off until the game restarts; the game keeps running", a_what ? a_what : "?");
 		try {
 			endpoint_.reset();
 		} catch (...) {

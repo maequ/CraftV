@@ -1,12 +1,12 @@
-# Shared helpers for the RedCraft scripts. Dot-source it: . "$PSScriptRoot\env.ps1"
+# Shared helpers for the CraftV scripts. Dot-source it: . "$PSScriptRoot\env.ps1"
 #
-# Finds the tools RedCraft needs without hard-coding machine paths:
-#   JDK 25    REDCRAFT_JAVA_HOME, then JAVA_HOME (if it is 25+), then the Java 25 runtime that the
+# Finds the tools CraftV needs without hard-coding machine paths:
+#   JDK 25    CRAFTV_JAVA_HOME, then JAVA_HOME (if it is 25+), then the Java 25 runtime that the
 #             official Minecraft Launcher installs (java-runtime-epsilon, which includes javac).
 #   CMake     on PATH, then the copy bundled with Visual Studio 2022 (any edition / Build Tools).
 $ErrorActionPreference = 'Stop'
 
-$script:RedCraftRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$script:CraftVRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
 function Get-JavaMajor([string]$javaHome) {
     $release = Join-Path $javaHome 'release'
@@ -18,7 +18,7 @@ function Get-JavaMajor([string]$javaHome) {
 
 function Find-Jdk25 {
     $candidates = @()
-    if ($env:REDCRAFT_JAVA_HOME) { $candidates += $env:REDCRAFT_JAVA_HOME }
+    if ($env:CRAFTV_JAVA_HOME) { $candidates += $env:CRAFTV_JAVA_HOME }
     if ($env:JAVA_HOME) { $candidates += $env:JAVA_HOME }
     $launcherRuntimes = @(
         "$env:LOCALAPPDATA\Packages\Microsoft.4297127D64EC6_8wekyb3d8bbwe\LocalCache\Local\runtime\java-runtime-epsilon\windows-x64\java-runtime-epsilon",
@@ -31,7 +31,7 @@ function Find-Jdk25 {
             return (Resolve-Path $c).Path
         }
     }
-    throw "No JDK 25 found. Install one (for example: winget install EclipseAdoptium.Temurin.25.JDK) or set REDCRAFT_JAVA_HOME."
+    throw "No JDK 25 found. Install one (for example: winget install EclipseAdoptium.Temurin.25.JDK) or set CRAFTV_JAVA_HOME."
 }
 
 function Find-CMake {

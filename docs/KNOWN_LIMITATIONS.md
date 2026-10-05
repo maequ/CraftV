@@ -6,7 +6,7 @@ As of Phase 1 (2026-10-02). "Planned" names the phase expected to fix it.
 - **Blocks changed while the link is down are not sent later.** MC only reports changes while
   CONNECTED. After a reconnect the host doesn't get a snapshot of the world. Planned: Phase 4
   (chunk snapshot on connect, `BLOCK_PALETTE`).
-- **Block ids are raw block-state ids** for the pinned MC 26.3 + RedCraft mod set. They change if the
+- **Block ids are raw block-state ids** for the pinned MC 26.3 + CraftV mod set. They change if the
   MC version or the mod list changes. Planned: `BLOCK_PALETTE` (id → name) in Phase 4.
 - **Full rings drop messages** (counted, logged, never blocking). With 1 MiB rings this needs a burst of
   about 40,000 block changes at once (a huge explosion). Planned: Phase 4 resync.
@@ -26,7 +26,7 @@ As of Phase 1 (2026-10-02). "Planned" names the phase expected to fix it.
 
 ## Tooling
 - The JDK comes from the Minecraft Launcher's runtime folder. If the launcher updates or removes it,
-  set `REDCRAFT_JAVA_HOME` or install Temurin 25.
+  set `CRAFTV_JAVA_HOME` or install Temurin 25.
 - The first `runClient` downloads Minecraft's assets (a few hundred MB) and may show a first-launch
   screen. The dev world tries to skip it, but this hasn't been verified on a truly fresh profile.
 
@@ -36,7 +36,7 @@ As of Phase 1 (2026-10-02). "Planned" names the phase expected to fix it.
   - `GET_ENTITY_COORDS(ped, TRUE, TRUE)` argument meaning; `GET_ENTITY_VELOCITY(ped, 0)` world-space.
   - RDR2 uses GTA V's axes and heading convention (`coords.h`). Walk north and Minecraft's Z should go down.
   - The ped's reference point is about 1.0 m above its feet (`FeetOffset`, measure with the overlay's "above ground").
-  - The three network natives read false in story mode (otherwise the gate switches RedCraft off).
+  - The three network natives read false in story mode (otherwise the gate switches CraftV off).
   - RDR2's loading screens may stop script ticks. Minecraft allows 10 s; longer loads show STALE, then resume.
 - **Which ScriptHookRDR2 runs on build 1491.50** is unknown until tried (DECISIONS D-012).
 - **The Phase 1 dev world is superflat.** RDR2 heights put the Minecraft player well above its ground. Phase 2

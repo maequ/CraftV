@@ -5,7 +5,7 @@
 
 #include <cstdint>
 
-namespace redcraft::host
+namespace craftv::host
 {
 	// One snapshot of what the plugin needs from the game, taken once per script tick.
 	// Units: RDR2 world space (metres, Z up). Angles in degrees as the game reports them.

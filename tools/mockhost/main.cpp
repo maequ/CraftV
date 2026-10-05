@@ -1,6 +1,6 @@
-// RedCraft mock host: acts like the RDR2 plugin so Phase 1 needs no game (brief §5.3).
+// CraftV mock host: acts like the RDR2 plugin so Phase 1 needs no game (brief §5.3).
 //
-// - creates/opens the mapping, sends HELLO and heartbeats (redcraft::Endpoint, role host)
+// - creates/opens the mapping, sends HELLO and heartbeats (craftv::Endpoint, role host)
 // - walks a simulated player in a circle and sends PLAYER_STATE at ~60 Hz while connected
 // - prints every message Minecraft sends
 // - CLI on stdin: help, status, setblock, break, place, center, radius, speed, walk, stop,
@@ -9,9 +9,9 @@
 //
 // Lines starting with '@' are machine-readable (the chaos tests parse them):
 //   @EVENT <NAME> ...   @STATUS key=value ...   @STRESS ...   @RX <TYPE> ...
-#include "redcraft/clock.h"
-#include "redcraft/codec.h"
-#include "redcraft/endpoint.h"
+#include "craftv/clock.h"
+#include "craftv/codec.h"
+#include "craftv/endpoint.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -32,12 +32,12 @@
 #include <string>
 #include <thread>
 
-using namespace redcraft;
-using namespace redcraft::proto;
+using namespace craftv;
+using namespace craftv::proto;
 
 namespace
 {
-	constexpr const char*   kSoftware = "RedCraft-MockHost 0.1.0";
+	constexpr const char*   kSoftware = "CraftV-MockHost 0.1.0";
 	constexpr double        kPi = 3.14159265358979323846;
 	constexpr double        kRadToDeg = 180.0 / kPi;
 	constexpr std::uint64_t kDefaultStatusPeriodMs = 5000;
@@ -133,7 +133,7 @@ namespace
 	{
 		std::printf(
 			"mockhost [options]\n"
-			"  --mapping NAME        shared-memory name (default Local\\RedCraft_Shared_v1)\n"
+			"  --mapping NAME        shared-memory name (default Local\\CraftV_Shared_v1)\n"
 			"  --mc-timeout-ms N     how long Minecraft may stay silent before STALE (default 3000)\n"
 			"  --hz N                PLAYER_STATE rate (default 60)\n"
 			"  --center X Y Z        circle centre (default 0.5 -60 0.5)\n"
@@ -517,7 +517,7 @@ int wmain(int argc, wchar_t** argv)
 	::SetConsoleCtrlHandler(&OnConsoleCtrl, TRUE);
 	::timeBeginPeriod(1);  // 1 ms sleep resolution for a steady 60 Hz
 
-	Out("RedCraft mock host (protocol %u.%u), pid %lu. Type 'help' for commands.", kVersionMajor, kVersionMinor, ::GetCurrentProcessId());
+	Out("CraftV mock host (protocol %u.%u), pid %lu. Type 'help' for commands.", kVersionMajor, kVersionMinor, ::GetCurrentProcessId());
 	if (!options.noStdin) {
 		std::thread(StdinReader).detach();
 	}

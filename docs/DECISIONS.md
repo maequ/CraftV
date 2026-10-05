@@ -3,7 +3,7 @@
 Newest last. Format: decision, reason, date.
 
 ### D-001: Target RDR2 instead of GTA V (2026-10-02)
-**Decision:** Build "Minecraft inside Red Dead Redemption 2" (story mode). Working name RedCraft;
+**Decision:** Build "Minecraft inside Red Dead Redemption 2" (story mode). Working name CraftV;
 the folder was renamed from `craftv/` the same day.
 **Reason:** Minecraft-in-GTA V already exists ([rehan-remade/universal-modder](https://github.com/rehan-remade/universal-modder/tree/main/examples/minecraft-gta5-passthrough)).
 Ports also exist for Skyrim, PEAK, Fallout 4 and Outer Wilds. Searches on 2026-10-02 found no
@@ -28,8 +28,8 @@ minor versions.
 
 ### D-004: Mock host in C++ sharing `protocol/cpp` with the future ASI (2026-10-02)
 **Reason:** The brief says the RDR2 plugin should reuse the code the mock host proved. Writing the
-mock in Python or Rust would prove a different implementation. The `redcraft_link` static library
-is the exact code `RedCraft.asi` will link.
+mock in Python or Rust would prove a different implementation. The `craftv_link` static library
+is the exact code `CraftV.asi` will link.
 
 ### D-005: Minecraft's link runs on its own thread (2026-10-02)
 **Decision:** `LinkService` owns the Endpoint on a daemon thread (2 ms loop). Game threads only read
@@ -60,7 +60,7 @@ Phase 1 test wants the mock host to log block requests when Sary breaks or place
 
 ### D-009: Build with VS 2022 Build Tools + bundled CMake; JDK 25 from the Minecraft Launcher runtime (2026-10-02)
 **Reason:** Both are already on this PC, so nothing new needed installing. `scripts/env.ps1` looks for
-`REDCRAFT_JAVA_HOME`, then `JAVA_HOME`, then the launcher's `java-runtime-epsilon` (a full JDK 25.0.1
+`CRAFTV_JAVA_HOME`, then `JAVA_HOME`, then the launcher's `java-runtime-epsilon` (a full JDK 25.0.1
 with javac). Installing Temurin 25 later is recommended, because the launcher may update or remove its runtime.
 
 ### D-010: Timeouts: MC gives the host 10 s, the host gives MC 3 s (2026-10-02)
@@ -72,11 +72,11 @@ measure in Phase 2), and Minecraft beats from its own thread. Both can be overri
 `NETWORK_IS_SESSION_STARTED` and `NETWORK_IS_IN_SESSION`. If any is true it detaches, draws nothing and
 stays off for the rest of the process (`PluginState::kOnlineBlocked`).
 **Reason:** Brief §2.1. ScriptHookRDR2 already closes the game when you go online. This is a second,
-independent guard that latches, so a flicker can't turn RedCraft back on. `// ASSUMPTION:` all three read
+independent guard that latches, so a flicker can't turn CraftV back on. `// ASSUMPTION:` all three read
 false in story mode. The debug overlay's last line shows them, so Sary's Phase 2 test verifies it.
 
 ### D-012: Build against the official ScriptHookRDR2 SDK; test with whichever hook runs on 1491.50 (2026-10-02)
-**Decision:** `RedCraft.asi` compiles against `ScriptHookRDR2_SDK_1.0.1207.73` from dev-c.com (kept in the
+**Decision:** `CraftV.asi` compiles against `ScriptHookRDR2_SDK_1.0.1207.73` from dev-c.com (kept in the
 gitignored `sdk/` folder, because its readme forbids redistribution). Sary's game is build 1491.50. The official
 runtime v1.0.1491.17 (Feb 2023) claims "1491.17 and above", but players report 1491.50 broke the official hook,
 and the community "ScriptHookRDR2 V2" (kepmehz, Nexus mod 1472) targets 1491.50.
@@ -88,6 +88,26 @@ Which runtime to install is Sary's call (the brief prefers official sources).
 ### D-013: Plugin logic behind a game interface; SEH guard around the tick (2026-10-02)
 **Decision:** `rdr2/src/core` (link, gate, coordinates, overlay, config, cost) talks to RDR2 only through
 `IGame`. `rdr2/src/asi` implements it with natives. `HostPlugin::Tick` catches C++ exceptions, and
-`main.cpp` wraps it in `__try/__except`. Either fault switches RedCraft off and the game keeps running.
+`main.cpp` wraps it in `__try/__except`. Either fault switches CraftV off and the game keeps running.
 **Reason:** Everything except the natives is unit-tested without RDR2 (14 tests, including zero heap
 allocations in a steady-state tick). Brief §6 safety: the plugin must never crash RDR2.
+
+### D-014: Pivot to cross-game co-op in GTA V (2026-10-05)
+**Decision:** Drop "Minecraft inside RDR2". New goal (docs/BRIEF.md): Sary plays GTA V story mode, friends in
+plain vanilla Minecraft join the hidden Minecraft's world, appear in Los Santos as characters, and their blocks
+appear as props. Friends walk on a blocky copy of Los Santos built from GTA's ground.
+**Reason:** On 2026-10-04 Sary found [@Theyoungpixel's video](https://x.com/Theyoungpixel/status/2105758613520421303)
+of Minecraft in RDR2, posted 2026-10-01 (video only, no release). The 2026-10-02 search missed it because it
+didn't cover X. A search on 2026-10-05 (GitHub, Nexus, YouTube, TikTok, X) found ports of Skyrim, GTA V, GTA IV,
+GTA SA, Fallout 4, Cyberpunk, Max Payne 2, R.E.P.O., PEAK and Zelda TP. All of them are either "you play game X
+as a Minecraft player" alone, or SkyCraft-style multiplayer where every friend needs game X too. None lets a
+friend in plain Minecraft appear inside the host game. GTA V over RDR2: Script Hook V is the most mature hook,
+the GTA V reference project solves ground probing and block props, and our host core ports over almost unchanged.
+
+### D-015: Name CraftV; the RDR2 plugin is parked as CraftV_RDR2 (2026-10-05)
+**Decision:** Project, folder (`craftv/`), mod id, Java package (`dev.craftv`), C++ namespace, mapping name
+(`Local\CraftV_Shared_v1`) and magic (`"CRFV"`, `0x56465243`) all say CraftV again. The RDR2 plugin stays in
+`rdr2/` and builds `CraftV_RDR2.asi` / `CraftV_RDR2.ini`, leaving `CraftV.asi` for GTA V.
+**Reason:** Sary picked the name (it was the original GTA V title). The brief says keep all existing work.
+The magic changed with the name, so a RedCraft-era peer and a CraftV peer refuse each other's mapping instead
+of mixing. Nothing was released under the old name, so there's no compatibility to keep.

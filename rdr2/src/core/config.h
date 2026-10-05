@@ -1,4 +1,4 @@
-// RedCraft.ini (brief §11): read once at startup with GetPrivateProfileString. Every value has a
+// CraftV_RDR2.ini (brief §11): read once at startup with GetPrivateProfileString. Every value has a
 // default, so a missing or broken file still gives a working plugin.
 #pragma once
 
@@ -7,12 +7,12 @@
 #include <cstdint>
 #include <string>
 
-namespace redcraft::host
+namespace craftv::host
 {
 	struct Config
 	{
 		// [Link]
-		std::wstring  mappingName = L"Local\\RedCraft_Shared_v1";
+		std::wstring  mappingName = L"Local\\CraftV_Shared_v1";
 		std::uint64_t mcTimeoutMs = 0;  // 0 = protocol default (3000)
 		// [World]
 		WorldConfig world{};

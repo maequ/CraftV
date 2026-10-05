@@ -3,27 +3,27 @@ plugins {
 	id 'net.fabricmc.fabric-loom' version "${loom_version}"
 }
 
-// Where the RedCraft log files go (docs/TESTING.md). scripts/dev-run.ps1 points this at the repo's logs/.
-def redcraftLogDir = System.getenv("REDCRAFT_LOG_DIR") ?: file("../logs").absolutePath
+// Where the CraftV log files go (docs/TESTING.md). scripts/dev-run.ps1 points this at the repo's logs/.
+def craftvLogDir = System.getenv("CRAFTV_LOG_DIR") ?: file("../logs").absolutePath
 // Shared-memory mapping name override, so tests never collide with a running dev session.
-def redcraftLink = System.getenv("REDCRAFT_LINK") ?: "Local\\RedCraft_Shared_v1"
+def craftvLink = System.getenv("CRAFTV_LINK") ?: "Local\\CraftV_Shared_v1"
 
 loom {
 	splitEnvironmentSourceSets()
 
 	runs {
 		client {
-			programArgs "--username", (System.getenv("REDCRAFT_USERNAME") ?: "RedCraftDev")
+			programArgs "--username", (System.getenv("CRAFTV_USERNAME") ?: "CraftVDev")
 			// --enable-native-access: the shared-memory link calls kernel32 through java.lang.foreign.
 			vmArgs "--enable-native-access=ALL-UNNAMED",
-				"-Dredcraft.logDir=${redcraftLogDir}",
-				"-Dredcraft.link=${redcraftLink}",
-				"-Dredcraft.autoWorld=true"
+				"-Dcraftv.logDir=${craftvLogDir}",
+				"-Dcraftv.link=${craftvLink}",
+				"-Dcraftv.autoWorld=true"
 		}
 	}
 
 	mods {
-		"redcraft" {
+		"craftv" {
 			sourceSet sourceSets.main
 			sourceSet sourceSets.client
 		}
@@ -47,7 +47,7 @@ test {
 		excludeTags "integration"
 	}
 	jvmArgs "--enable-native-access=ALL-UNNAMED"
-	systemProperty "redcraft.goldenFile", file("../protocol/golden/golden_vectors.txt").absolutePath
+	systemProperty "craftv.goldenFile", file("../protocol/golden/golden_vectors.txt").absolutePath
 	testLogging { events "passed", "failed", "skipped"; exceptionFormat "full"; showStandardStreams = false }
 }
 
@@ -62,10 +62,10 @@ tasks.register('integrationTest', Test) {
 		includeTags "integration"
 	}
 	jvmArgs "--enable-native-access=ALL-UNNAMED"
-	systemProperty "redcraft.mockhost", project.findProperty("mockhost") ?: ""
-	systemProperty "redcraft.logDir", redcraftLogDir
+	systemProperty "craftv.mockhost", project.findProperty("mockhost") ?: ""
+	systemProperty "craftv.logDir", craftvLogDir
 	// The guest child processes reuse this JVM's java and the main classes.
-	systemProperty "redcraft.guestClasspath", sourceSets.main.output.classesDirs.asPath
+	systemProperty "craftv.guestClasspath", sourceSets.main.output.classesDirs.asPath
 	outputs.upToDateWhen { false }
 	testLogging { events "passed", "failed", "skipped"; exceptionFormat "full"; showStandardStreams = true }
 }
@@ -91,6 +91,6 @@ java {
 
 jar {
 	from("../LICENSE") {
-		rename { "${it}_redcraft" }
+		rename { "${it}_craftv" }
 	}
 }

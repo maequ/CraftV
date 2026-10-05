@@ -10,7 +10,7 @@
 #include <cstdio>
 #include <mutex>
 
-namespace redcraft::host
+namespace craftv::host
 {
 	namespace
 	{
@@ -74,11 +74,11 @@ namespace redcraft::host
 		va_end(args);
 	}
 
-	void HostLog::FromLink(void*, redcraft::proto::LogLevel a_level, const char* a_text)
+	void HostLog::FromLink(void*, craftv::proto::LogLevel a_level, const char* a_text)
 	{
-		if (a_level >= redcraft::proto::kLogError) {
+		if (a_level >= craftv::proto::kLogError) {
 			Error("link: %s", a_text);
-		} else if (a_level == redcraft::proto::kLogWarn) {
+		} else if (a_level == craftv::proto::kLogWarn) {
 			Warn("link: %s", a_text);
 		} else {
 			Info("link: %s", a_text);

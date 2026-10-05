@@ -1,10 +1,10 @@
-#include "redcraft/clock.h"
+#include "craftv/clock.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
 
-namespace redcraft::clock
+namespace craftv::clock
 {
 	namespace
 	{

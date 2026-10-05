@@ -1,8 +1,8 @@
-#include "redcraft/codec.h"
+#include "craftv/codec.h"
 
 #include <cmath>
 
-namespace redcraft::codec
+namespace craftv::codec
 {
 	namespace
 	{

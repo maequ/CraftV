@@ -3,9 +3,9 @@
 // checked for order and content. A watchdog fails the test instead of hanging on a deadlock.
 #include "test.h"
 
-#include "redcraft/codec.h"
-#include "redcraft/mapping.h"
-#include "redcraft/ring.h"
+#include "craftv/codec.h"
+#include "craftv/mapping.h"
+#include "craftv/ring.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -16,8 +16,8 @@
 #include <string>
 #include <thread>
 
-using namespace redcraft;
-using namespace redcraft::proto;
+using namespace craftv;
+using namespace craftv::proto;
 
 namespace
 {
@@ -84,7 +84,7 @@ namespace
 
 TEST_CASE("stress: 1,000,000 records through each ring at once, no corruption, no deadlock")
 {
-	const std::wstring name = L"Local\\RedCraft_Test_stress_" + std::to_wstring(::GetCurrentProcessId());
+	const std::wstring name = L"Local\\CraftV_Test_stress_" + std::to_wstring(::GetCurrentProcessId());
 	SharedMapping      mapping;
 	char               err[160] = {};
 	REQUIRE(mapping.CreateOrOpen(name.c_str(), Role::kHost, err, sizeof(err)));

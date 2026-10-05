@@ -6,7 +6,7 @@
 
 #include <cwchar>
 
-namespace redcraft::host
+namespace craftv::host
 {
 	namespace
 	{

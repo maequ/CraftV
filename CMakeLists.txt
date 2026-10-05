@@ -1,12 +1,12 @@
-# RedCraft native code: the shared protocol library, its tests, the mock host, and (Phase 2) the
+# CraftV native code: the shared protocol library, its tests, the mock host, and (Phase 2) the
 # RDR2 ASI plugin. Build with scripts/build-native.ps1, or:
 #   cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 #   cmake --build build --config Release
 cmake_minimum_required(VERSION 3.24)
-project(RedCraft LANGUAGES CXX)
+project(CraftV LANGUAGES CXX)
 
 if(NOT WIN32)
-	message(FATAL_ERROR "RedCraft's native parts are Windows-only (shared memory via Win32, RDR2 via ScriptHookRDR2).")
+	message(FATAL_ERROR "CraftV's native parts are Windows-only (shared memory via Win32, RDR2 via ScriptHookRDR2).")
 endif()
 
 set(CMAKE_CXX_STANDARD 20)

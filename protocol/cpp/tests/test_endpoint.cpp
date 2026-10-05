@@ -2,7 +2,7 @@
 // by a fake clock, so connect / stale / resume / restart / clean detach are deterministic.
 #include "test.h"
 
-#include "redcraft/endpoint.h"
+#include "craftv/endpoint.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -12,14 +12,14 @@
 #include <string>
 #include <vector>
 
-using namespace redcraft;
-using namespace redcraft::proto;
+using namespace craftv;
+using namespace craftv::proto;
 
 namespace
 {
 	std::wstring UniqueName(const wchar_t* a_tag)
 	{
-		return std::wstring(L"Local\\RedCraft_Test_") + a_tag + L"_" + std::to_wstring(::GetCurrentProcessId()) + L"_" +
+		return std::wstring(L"Local\\CraftV_Test_") + a_tag + L"_" + std::to_wstring(::GetCurrentProcessId()) + L"_" +
 		       std::to_wstring(::GetTickCount64());
 	}
 

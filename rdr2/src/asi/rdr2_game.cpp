@@ -6,7 +6,7 @@
 #include "natives.h"
 #pragma warning(pop)
 
-namespace redcraft::host
+namespace craftv::host
 {
 	namespace
 	{

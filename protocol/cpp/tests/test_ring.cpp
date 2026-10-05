@@ -2,15 +2,15 @@
 // sessions, corruption handling, and that the consumer never reads outside the data area.
 #include "test.h"
 
-#include "redcraft/codec.h"
-#include "redcraft/ring.h"
+#include "craftv/codec.h"
+#include "craftv/ring.h"
 
 #include <cstring>
 #include <memory>
 #include <vector>
 
-using namespace redcraft;
-using namespace redcraft::proto;
+using namespace craftv;
+using namespace craftv::proto;
 
 namespace
 {

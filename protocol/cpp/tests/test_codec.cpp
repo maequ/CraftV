@@ -3,7 +3,7 @@
 #include "golden_values.h"
 #include "test.h"
 
-#include "redcraft/codec.h"
+#include "craftv/codec.h"
 
 #include <cmath>
 #include <cstring>
@@ -12,15 +12,15 @@
 #include <map>
 #include <sstream>
 
-using namespace redcraft;
-using namespace redcraft::proto;
+using namespace craftv;
+using namespace craftv::proto;
 
 namespace
 {
 	std::map<std::string, std::string> LoadGoldenFile()
 	{
 		std::map<std::string, std::string> out;
-		std::ifstream                      in(REDCRAFT_GOLDEN_FILE);
+		std::ifstream                      in(CRAFTV_GOLDEN_FILE);
 		std::string                        line;
 		while (std::getline(in, line)) {
 			if (line.empty() || line[0] == '#') {
@@ -63,7 +63,7 @@ TEST_CASE("codec: golden file matches the C++ encoder byte for byte")
 			continue;
 		}
 		if (it->second != test::Hex(v.record.data(), v.record.size())) {
-			test::Fail(__FILE__, __LINE__, v.name + " differs from the golden file (regenerate with redcraft_golden_gen after a deliberate change)");
+			test::Fail(__FILE__, __LINE__, v.name + " differs from the golden file (regenerate with craftv_golden_gen after a deliberate change)");
 		}
 	}
 }
@@ -163,8 +163,8 @@ TEST_CASE("codec: golden records decode back to the documented fields")
 			REQUIRE(codec::Decode(h, p, m));
 			CHECK_EQ(m.role, std::uint32_t(1));
 			CHECK_EQ(m.pid, std::uint32_t(4242));
-			CHECK_EQ(m.softwareBytes, std::uint16_t(15));
-			CHECK(std::memcmp(m.software, "RedCraft-Golden", 15) == 0);
+			CHECK_EQ(m.softwareBytes, std::uint16_t(13));
+			CHECK(std::memcmp(m.software, "CraftV-Golden", 13) == 0);
 		} else if (v.name == "LOG") {
 			LogMsg m;
 			REQUIRE(codec::Decode(h, p, m));

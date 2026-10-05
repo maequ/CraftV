@@ -1,19 +1,19 @@
 {
   "schemaVersion": 1,
-  "id": "redcraft",
+  "id": "craftv",
   "version": "${version}",
-  "name": "RedCraft",
-  "description": "Minecraft inside Red Dead Redemption 2 (story mode only). The Minecraft half of the RedCraft link. Architecture adapted from SkyCraft by chasmlol.",
+  "name": "CraftV",
+  "description": "Minecraft inside Red Dead Redemption 2 (story mode only). The Minecraft half of the CraftV link. Architecture adapted from SkyCraft by chasmlol.",
   "authors": ["Sary"],
   "contributors": ["chasmlol (SkyCraft, original architecture and code, MIT)"],
   "license": "MIT",
   "environment": "client",
   "entrypoints": {
-    "main": ["dev.redcraft.RedCraft"],
-    "client": ["dev.redcraft.client.RedCraftClient"]
+    "main": ["dev.craftv.CraftV"],
+    "client": ["dev.craftv.client.CraftVClient"]
   },
   "mixins": [
-    "redcraft.mixins.json"
+    "craftv.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.19.5",

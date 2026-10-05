@@ -7,8 +7,8 @@
 #include "core/coords.h"
 #include "core/host_plugin.h"
 
-#include "redcraft/codec.h"
-#include "redcraft/endpoint.h"
+#include "craftv/codec.h"
+#include "craftv/endpoint.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -24,9 +24,9 @@
 #include <string>
 #include <vector>
 
-using namespace redcraft;
-using namespace redcraft::host;
-using namespace redcraft::proto;
+using namespace craftv;
+using namespace craftv::host;
+using namespace craftv::proto;
 
 // ---- allocation counter (for the hot-path test) ------------------------------------------------
 namespace
@@ -80,7 +80,7 @@ namespace
 	std::wstring UniqueName(const wchar_t* a_tag)
 	{
 		static int n = 0;
-		return std::wstring(L"Local\\RedCraft_Test_rdr2_") + a_tag + L"_" + std::to_wstring(::GetCurrentProcessId()) + L"_" + std::to_wstring(++n) + L"_" +
+		return std::wstring(L"Local\\CraftV_Test_rdr2_") + a_tag + L"_" + std::to_wstring(::GetCurrentProcessId()) + L"_" + std::to_wstring(++n) + L"_" +
 		       std::to_wstring(::GetTickCount64());
 	}
 
@@ -394,11 +394,11 @@ TEST_CASE("rdr2 plugin: a steady-state tick allocates nothing and is cheap")
 
 // ---- config ---------------------------------------------------------------------------------------
 
-TEST_CASE("rdr2 config: reads RedCraft.ini, falls back on bad values and missing files")
+TEST_CASE("rdr2 config: reads CraftV_RDR2.ini, falls back on bad values and missing files")
 {
 	wchar_t tmp[MAX_PATH];
 	::GetTempPathW(MAX_PATH, tmp);
-	const std::wstring path = std::wstring(tmp) + L"redcraft_test_" + std::to_wstring(::GetCurrentProcessId()) + L".ini";
+	const std::wstring path = std::wstring(tmp) + L"craftv_test_" + std::to_wstring(::GetCurrentProcessId()) + L".ini";
 	{
 		std::ofstream f(path);
 		f << "[Link]\nMappingName=Local\\Custom_Map\nMcTimeoutMs=2500\n[World]\nBlocksPerMetre=abc\nFeetOffset=0.95\nYOffset=-64\n[Debug]\nOverlay=0\n";
@@ -414,5 +414,5 @@ TEST_CASE("rdr2 config: reads RedCraft.ini, falls back on bad values and missing
 	::DeleteFileW(path.c_str());
 	Config d;
 	CHECK(!d.Load(path + L".missing"));
-	CHECK(d.mappingName == L"Local\\RedCraft_Shared_v1" && d.debugOverlay);
+	CHECK(d.mappingName == L"Local\\CraftV_Shared_v1" && d.debugOverlay);
 }

@@ -124,11 +124,11 @@ Skyrim creates the mapping; Minecraft only ever opens it (`OpenFileMappingW`, re
 | MIT license, credit | **Reuse** | Keep SkyCraft's copyright notice in `LICENSE` and credit in README and file headers |
 | Gradle/Loom setup, MC 26.3 / Loader 0.19.5 / Fabric API 0.161.0+26.3 / Java 25 / Gradle 9.7.1 | **Reuse as-is** | Proven working; pinned to the same versions |
 | FFM kernel32 bindings and `--enable-native-access` | **Reuse** (adapted) | Same Windows APIs. I add `CreateFileMappingW` (MC may start first) and `VirtualQuery` (validate the view size) |
-| SPSC ring algorithm (u64 running counters, separate cache lines, pad-to-wrap, skip unknown by length) | **Reuse** | Proven. RedCraft uses it for both rings |
+| SPSC ring algorithm (u64 running counters, separate cache lines, pad-to-wrap, skip unknown by length) | **Reuse** | Proven. CraftV uses it for both rings |
 | "Host resets what it owns, magic written last", heartbeat timeouts, explicit SDDL, `_minecraft` mutex | **Reuse** | RDR2 can run elevated too |
 | `MirrorWorld` auto-create/open + game rules (`PLAYER_MOVEMENT_CHECK=false` etc.) | **Reuse** (adapted) | Same need. Phase 1 uses a superflat dev world so motion is visible |
 | Void mirror preset + tall `dimension_type` | **Reuse later** (Phase 2+) | RDR2's height range should fit in -1024..1023 (verify in Phase 2) at 1 block = 1 m |
-| SkyCraft's exact v11 protocol | **Rewrite** (RedCraft protocol v1) | The brief asks for a header with section table + two typed message rings + HELLO/HEARTBEAT/... Both sides may create the mapping. See `docs/PROTOCOL.md` and DECISIONS D-003 |
+| SkyCraft's exact v11 protocol | **Rewrite** (CraftV protocol v1) | The brief asks for a header with section table + two typed message rings + HELLO/HEARTBEAT/... Both sides may create the mapping. See `docs/PROTOCOL.md` and DECISIONS D-003 |
 | Triangle collider, collision ring, `SkyCollision`/`TriCollider`/`PlayerEdgeMixin` | **Park** for Phase 3 | Needed only if Phase 3 chooses "MC physics drives the ped" (SkyCraft's model). RDR2 exposes shape tests, not shapes, so export would be PeakCraft-style ray sampling |
 | Input bridge (SDL scancodes, release-all, cursor) | **Park** for Phase 3 | Directly portable if MC owns movement |
 | Overlay triple buffer + `FrameExporter` | **Park** for Phase 3 | Needs a Vulkan/DX12 overlay or a ReShade add-on (as the GTA V project does). ScriptHookRDR2 draw natives can't stream frames. Evaluate in Phase 3 |
@@ -137,11 +137,11 @@ Skyrim creates the mapping; Minecraft only ever opens it (`OpenFileMappingW`, re
 
 ### Phase 1 guest contents after stripping
 
-Kept and adapted: Gradle project, FFM link (rewritten for the RedCraft protocol), world auto-open
+Kept and adapted: Gradle project, FFM link (rewritten for the CraftV protocol), world auto-open
 (`DevWorld`, from `MirrorWorld`), server game rules, the running-Minecraft mutex.
 New: the puppet that applies `PLAYER_STATE`, block-change reporting (`BLOCK_SET`, player
 break/place intents), handling of host block messages, a link status line in MC's HUD, and the
-rate-limited `logs/redcraft-fabric.log`.
+rate-limited `logs/craftv-fabric.log`.
 
 ## 6b. The GTA V project (rehan-remade/universal-modder, MIT, commit `15d6f9d`)
 
@@ -175,6 +175,6 @@ Notes from its README (code not yet studied in depth; that happens before Phase 
 6. Send **release-all** on every routing change (Phase 3).
 7. **Link loss = host owns** (Phase 2/3 ownership state machine).
 8. A fake peer (`fake_minecraft.py`, `fake_skyrim.py`) proves link, layout and link loss before
-   the real game is involved. RedCraft's mock host is that fake peer, written in C++ so its link code is
+   the real game is involved. CraftV's mock host is that fake peer, written in C++ so its link code is
    exactly what the ASI will run.
 9. A dev harness that reads a command file helps in-game testing (consider for Phase 2).

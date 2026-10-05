@@ -1,6 +1,6 @@
-#include "redcraft/mapping.h"
+#include "craftv/mapping.h"
 
-#include "redcraft/ring.h"
+#include "craftv/ring.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -10,9 +10,9 @@
 #include <cstdio>
 #include <cstring>
 
-namespace redcraft
+namespace craftv
 {
-	using namespace redcraft::proto;
+	using namespace craftv::proto;
 
 	namespace
 	{

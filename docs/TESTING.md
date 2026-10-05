@@ -8,9 +8,9 @@
 
 | Suite | What it proves | Count |
 |---|---|---|
-| C++ `redcraft_link_tests` | Layout, golden vectors, spec-literal encodings, validation, ring wrap/full/stale/corrupt, mapping create/open/validate, endpoint connect/stale/resume/restart, **1,000,000 records through each ring at once** | 31 |
+| C++ `craftv_link_tests` | Layout, golden vectors, spec-literal encodings, validation, ring wrap/full/stale/corrupt, mapping create/open/validate, endpoint connect/stale/resume/restart, **1,000,000 records through each ring at once** | 31 |
 | Java `gradlew test` | Same golden vectors (C++ and Java agree byte for byte), ring behaviour, endpoint behaviour, **1,000,000 records through each ring** of a real mapping | 16 |
-| C++ `redcraft_rdr2_tests` | RDR2 plugin logic with a fake game: coordinate/heading conversion, story-mode gate, PLAYER_STATE into a real Minecraft-role endpoint, loading/dead/missing player, Minecraft dying, faults, overlay, config, **zero heap allocations per steady-state tick** | 14 |
+| C++ `craftv_rdr2_tests` | RDR2 plugin logic with a fake game: coordinate/heading conversion, story-mode gate, PLAYER_STATE into a real Minecraft-role endpoint, loading/dead/missing player, Minecraft dying, faults, overlay, config, **zero heap allocations per steady-state tick** | 14 |
 | `gradlew integrationTest` | Real `mockhost.exe` against the real Java link in separate processes: host first, MC first, either killed mid-run and restarted, `kill-link`/`resume-link`, `restart`, both killed, block messages, **1,000,000 records each way across processes and languages** | 9 |
 
 ## Phase 1 manual test (Sary)
@@ -19,11 +19,11 @@
 
 1. In PowerShell, from the repo root: `.\scripts\dev-run.ps1`
    - A **mock host** console opens (you can type commands there).
-   - Minecraft starts. The first run downloads assets. A world called **RedCraft Dev**
+   - Minecraft starts. The first run downloads assets. A world called **CraftV Dev**
      (superflat, Creative) opens by itself.
 2. **Movement:** within a second of the world loading, the player walks a circle (radius 6, centre
    0.5/0.5, walking speed) and turns to face the way it walks. Press F5 to watch from behind. The green
-   line at the top-left reads `RedCraft state=CONNECTED ... 'RedCraft-MockHost 0.1.0' ping=...`.
+   line at the top-left reads `CraftV state=CONNECTED ... 'CraftV-MockHost 0.1.0' ping=...`.
 3. **Block requests:** type `stop` in the mock host console. The player stands still and the mouse and
    keyboard are yours again (while the host is sending, it owns the camera). Break a block, then place a
    block (press E, drag stone into the hotbar, right-click). The mock host console prints, for each:
@@ -43,7 +43,7 @@
 **Other mock commands:** `help`, `status`, `center X Y Z`, `radius R`, `speed S`, `walk`, `stop`, `quit`.
 
 ### If something fails, send me
-- `logs\redcraft-fabric.log` (Minecraft side)
+- `logs\craftv-fabric.log` (Minecraft side)
 - `logs\mockhost.log` (host side)
 - `fabric\run\logs\latest.log` (Minecraft's own log), plus a screenshot if it's visual
 
@@ -52,13 +52,13 @@
 Prerequisites, done by Sary:
 1. A ScriptHookRDR2 runtime + 64-bit `dinput8.dll` ASI loader in the RDR2 folder (see DECISIONS D-012
    for official vs V2).
-2. Tell me the RDR2 folder path. I'll set it up for `deploy-rdr2.ps1` (env var `REDCRAFT_RDR2_DIR`).
+2. Tell me the RDR2 folder path. I'll set it up for `deploy-rdr2.ps1` (env var `CRAFTV_RDR2_DIR`).
 
 Steps (final version comes with the Phase 2 report):
-1. `.\scripts\deploy-rdr2.ps1`, which copies `RedCraft.asi` + `RedCraft.ini` and checks the hook and loader are there.
+1. `.\scripts\deploy-rdr2.ps1`, which copies `CraftV.asi` + `CraftV.ini` and checks the hook and loader are there.
 2. Start Minecraft first: `.\scripts\dev-run.ps1 -NoMock`. Then start RDR2 and load a story save.
 3. The top-left overlay in RDR2 shows `link CONNECTED`. Walking in RDR2 moves the Minecraft player.
    Walking north should make Minecraft's Z go down.
 4. Check the overlay's last line reads `net game 0 session 0 in 0` in story mode.
 5. Close Minecraft: RDR2 keeps running and the overlay shows STALE. Restart Minecraft: CONNECTED again.
-6. Send `RedCraft.log` (next to RDR2.exe), `logs\redcraft-fabric.log`, and a screenshot of the overlay.
+6. Send `CraftV.log` (next to RDR2.exe), `logs\craftv-fabric.log`, and a screenshot of the overlay.

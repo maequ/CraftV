@@ -1,0 +1,9 @@
+{
+  "required": true,
+  "package": "dev.craftv.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "LevelChunkMixin"
+  ],
+  "injectors": { "defaultRequire": 1 }
+}

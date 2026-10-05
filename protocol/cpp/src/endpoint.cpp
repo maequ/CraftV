@@ -1,4 +1,4 @@
-#include "redcraft/endpoint.h"
+#include "craftv/endpoint.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -8,9 +8,9 @@
 #include <cstdio>
 #include <cstring>
 
-namespace redcraft
+namespace craftv
 {
-	using namespace redcraft::proto;
+	using namespace craftv::proto;
 
 	namespace
 	{

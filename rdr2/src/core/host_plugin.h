@@ -1,6 +1,6 @@
-// The RDR2 side of RedCraft, minus the natives: one object, ticked once per script frame.
+// The RDR2 side of CraftV, minus the natives: one object, ticked once per script frame.
 //   - story mode only: any sign of an online session switches it off for good (DECISIONS D-011)
-//   - owns the redcraft::Endpoint (role host, PROTOCOL.md §5) and drains Minecraft's ring every tick
+//   - owns the craftv::Endpoint (role host, PROTOCOL.md §5) and drains Minecraft's ring every tick
 //   - sends PLAYER_STATE from the player ped (PROTOCOL.md §7.3), converted by coords.h
 //   - draws a debug overlay through IGame
 //   - never throws, never blocks; no heap allocation after the first tick
@@ -9,12 +9,12 @@
 #include "config.h"
 #include "game_api.h"
 
-#include "redcraft/endpoint.h"
+#include "craftv/endpoint.h"
 
 #include <cstdint>
 #include <memory>
 
-namespace redcraft::host
+namespace craftv::host
 {
 	inline constexpr const char* kPluginVersion = "0.1.0";
 

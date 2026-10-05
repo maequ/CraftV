@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace redcraft::host
+namespace craftv::host
 {
 	struct WorldConfig
 	{

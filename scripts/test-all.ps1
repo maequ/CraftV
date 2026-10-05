@@ -1,10 +1,10 @@
 # Runs every automated Phase 1 test:
-#   1. C++: build, then unit + 1M-record stress tests (redcraft_link_tests)
+#   1. C++: build, then unit + 1M-record stress tests (craftv_link_tests)
 #   2. Java: unit + 1M-record stress tests (gradlew test)
 #   3. Chaos + cross-process stress: real mockhost.exe vs the Java headless guest (gradlew integrationTest)
 . "$PSScriptRoot\env.ps1"
 
-$root = $script:RedCraftRoot
+$root = $script:CraftVRoot
 Write-Host "== 1/3 C++ build + tests" -ForegroundColor Cyan
 & "$PSScriptRoot\build-native.ps1"
 

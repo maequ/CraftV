@@ -1,14 +1,14 @@
 #include "golden_values.h"
 
-#include "redcraft/codec.h"
+#include "craftv/codec.h"
 
-namespace redcraft::golden
+namespace craftv::golden
 {
-	using namespace redcraft::proto;
+	using namespace craftv::proto;
 
 	HelloMsg Hello()
 	{
-		return codec::MakeHello(Role::kHost, 4242, kSession, "RedCraft-Golden");
+		return codec::MakeHello(Role::kHost, 4242, kSession, "CraftV-Golden");
 	}
 
 	HeartbeatMsg Heartbeat()

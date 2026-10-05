@@ -2,7 +2,7 @@
 // process, and that ValidateLayout refuses every kind of bad header.
 #include "test.h"
 
-#include "redcraft/mapping.h"
+#include "craftv/mapping.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -12,14 +12,14 @@
 #include <memory>
 #include <string>
 
-using namespace redcraft;
-using namespace redcraft::proto;
+using namespace craftv;
+using namespace craftv::proto;
 
 namespace
 {
 	std::wstring UniqueName(const wchar_t* a_tag)
 	{
-		return std::wstring(L"Local\\RedCraft_Test_") + a_tag + L"_" + std::to_wstring(::GetCurrentProcessId()) + L"_" +
+		return std::wstring(L"Local\\CraftV_Test_") + a_tag + L"_" + std::to_wstring(::GetCurrentProcessId()) + L"_" +
 		       std::to_wstring(::GetTickCount64());
 	}
 
@@ -52,7 +52,7 @@ TEST_CASE("mapping: a fresh layout validates and points at the documented offset
 	CHECK(reinterpret_cast<std::uint8_t*>(layout.mcToHost.control) == b.bytes.get() + kOffRingMcToHost);
 	CHECK_EQ(layout.hostToMc.dataBytes, kRingDataBytes);
 	CHECK_EQ(b.H()->magic, kMagic);
-	const std::uint8_t magicBytes[4] = { 0x52, 0x44, 0x43, 0x52 };  // "RDCR"
+	const std::uint8_t magicBytes[4] = { 0x43, 0x52, 0x46, 0x56 };  // "CRFV"
 	CHECK(std::memcmp(b.bytes.get(), magicBytes, 4) == 0);
 }
 

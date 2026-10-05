@@ -3,7 +3,7 @@
 
 #include "../core/game_api.h"
 
-namespace redcraft::host
+namespace craftv::host
 {
 	class Rdr2Game final : public IGame
 	{

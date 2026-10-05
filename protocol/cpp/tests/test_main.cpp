@@ -3,7 +3,7 @@
 #include <chrono>
 #include <cstring>
 
-namespace redcraft::test
+namespace craftv::test
 {
 	namespace
 	{
@@ -42,7 +42,7 @@ namespace redcraft::test
 
 int main(int argc, char** argv)
 {
-	using namespace redcraft::test;
+	using namespace craftv::test;
 	const char* filter = argc > 1 ? argv[1] : nullptr;
 	int         passed = 0, failed = 0;
 	for (const auto& c : Registry()) {
