@@ -168,6 +168,15 @@ once. Each column is one straight-down ray from 1200 m to -250 m against map col
 means friends stand on roofs and bridges, which is the "blocky copy" a friend sees; underneath bridges isn't
 modelled yet (KNOWN_LIMITATIONS).
 
+### D-026: Phase 3 is the passthrough: Sary plays as a Minecraft player in GTA (2026-10-05)
+**Decision:** Phase 3 draws the hidden Minecraft into GTA's picture with a ReShade add-on, like
+minecraft-gta5-passthrough (rehan-remade, MIT), instead of spawning GTA characters for friends. The camera,
+frame export, compositor and effect are adapted from that project with credit. CraftV hides its blocky terrain in
+Sary's view only, so friends keep walking on it.
+**Reason:** Sary chose it ("me as Minecraft") after Phase 2 passed. It gives the Minecraft hand, hotbar and hearts
+they asked for, and friends get drawn with their real skins and builds for free. Friends as GTA characters
+becomes the fallback.
+
 ### D-023: GTA surface materials by name hash (2026-10-05)
 **Decision:** A compile-time table of GTA V materials.dat names, hashed with RAGE's joaat, maps the shape test's
 material hash to the protocol's 13 materials. Unknown hashes become stone and are logged once each.
