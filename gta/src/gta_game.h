@@ -23,10 +23,7 @@ namespace craftv::host
 		{
 			std::uint64_t probes = 0, ready = 0, hits = 0, withMaterial = 0;
 		};
-		static constexpr int kUnknownSlots = 32;  // distinct unknown surface hashes logged per session
 
-		ProbeStats    stats_{};
-		std::uint32_t unknown_[kUnknownSlots]{};
-		int           unknownCount_ = 0;
+		ProbeStats stats_{};
 	};
 }

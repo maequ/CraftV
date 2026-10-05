@@ -69,6 +69,19 @@ namespace craftv::host
 			{ "METAL_CORRUGATED_IRON", 0x31B80AD6, kMatMetal }, { "METAL_GRILLE", 0xE699F485, kMatMetal }, { "METAL_RAILING", 0x7D368D93, kMatMetal },
 			{ "METAL_DUCT", 0x68FEB9FD, kMatMetal }, { "METAL_GARAGE_DOOR", 0xF2373DE9, kMatMetal }, { "METAL_MANHOLE", 0xD2FFA63D, kMatMetal },
 
+			{ "PHYS_ELECTRIC_METAL", 0x87F87187, kMatMetal }, { "PHYS_ELECTRIC_FENCE", 0xBA428CAB, kMatMetal },
+			{ "PHYS_BARBED_WIRE", 0xA402C0C0, kMatMetal }, { "VFX_METAL_ELECTRIFIED", 0xED92FC47, kMatMetal },
+			{ "VFX_METAL_WATER_TOWER", 0x2473B1BF, kMatMetal }, { "VFX_METAL_STEAM", 0xD6CBF212, kMatMetal },
+			{ "VFX_METAL_FLAME", 0x13D5CB0D, kMatMetal }, { "STUNT_RAMP_SURFACE", 0x8388FA6C, kMatMetal },
+
+			// "DEFAULT" was the most common unknown on the second run, on roofs and walls around Forum Drive.
+			{ "DEFAULT", 0x962C3F7B, kMatBuilding }, { "PLASTIC", 0x846BC4FF, kMatBuilding }, { "PLASTIC_HOLLOW", 0x25612338, kMatBuilding },
+			{ "PLASTIC_HIGH_DENSITY", 0x9F154729, kMatBuilding }, { "FIBREGLASS_HOLLOW", 0xD256ED46, kMatBuilding },
+			{ "RUBBER", 0xF7503F13, kMatBuilding }, { "CARPET_SOLID", 0x27E49616, kMatBuilding }, { "CARPET_SOLID_DUSTY", 0x0973AE44, kMatBuilding },
+			{ "CARPET_FLOORBOARD", 0xACC354B1, kMatBuilding }, { "CLOTH", 0x07519E5D, kMatBuilding }, { "FEATHER_PILLOW", 0x4FFB413F, kMatBuilding },
+			{ "CARDBOARD_SHEET", 0x0E18DFF5, kMatBuilding }, { "CARDBOARD_BOX", 0xAC038918, kMatBuilding }, { "POLYSTYRENE", 0x97476A9D, kMatBuilding },
+			{ "GLASS_SHOOT_THROUGH", 0x37E12A0B, kMatBuilding }, { "GLASS_BULLETPROOF", 0x0E931A0E, kMatBuilding }, { "GLASS_OPAQUE", 0x596C55D1, kMatBuilding },
+			{ "PERSPEX", 0x9F73E76C, kMatBuilding }, { "EMISSIVE_GLASS", 0x5978A2ED, kMatBuilding }, { "EMISSIVE_PLASTIC", 0x3F28ABAC, kMatBuilding },
 			{ "ROOF_TILE", 0x689E0E75, kMatBuilding }, { "ROOF_FELT", 0xAB87C845, kMatBuilding }, { "PLASTER_SOLID", 0xDDC7963F, kMatBuilding },
 			{ "PLASTER_BRITTLE", 0xF0FC7AFE, kMatBuilding }, { "FIBREGLASS", 0x50B728DB, kMatBuilding }, { "TARPAULIN", 0xD9B1CDE0, kMatBuilding },
 		};

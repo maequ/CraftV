@@ -159,8 +159,12 @@ namespace craftv::host
 			stats_.lastMaterialHash = g.materialHash;
 			if (patch_.material[i] == kMatUnknown && g.materialHash != 0) {
 				++stats_.unknownMaterials;
-				if (g.materialHash != lastUnknownLogged_) {  // log each new one once in a row, not every column
-					lastUnknownLogged_ = g.materialHash;
+				bool logged = false;  // log each one once, so the material table can grow
+				for (int k = 0; k < unknownLoggedCount_ && !logged; ++k) {
+					logged = unknownLogged_[k] == g.materialHash;
+				}
+				if (!logged && unknownLoggedCount_ < kUnknownLogged) {
+					unknownLogged_[unknownLoggedCount_++] = g.materialHash;
 					HostLog::Info("terrain: unknown surface material hash 0x%08X at %.1f, %.1f (shown as stone)", g.materialHash, x, y);
 				}
 			}

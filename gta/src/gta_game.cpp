@@ -4,7 +4,6 @@
 #include "gta_game.h"
 
 #include "core/host_log.h"
-#include "core/materials.h"
 
 #pragma warning(push, 0)
 #include "natives.h"
@@ -112,24 +111,13 @@ namespace craftv::host
 		return true;
 	}
 
-	// Counters for CraftV.log, plus each surface hash missing from the material table (logged once, so the
-	// table can grow).
+	// Counters for the probe summary line in CraftV.log.
 	void GtaGame::Count(bool a_ready, bool a_hit, std::uint32_t a_material)
 	{
 		++stats_.probes;
 		stats_.ready += a_ready ? 1 : 0;
 		stats_.hits += a_ready && a_hit ? 1 : 0;
 		stats_.withMaterial += a_ready && a_hit && a_material != 0 ? 1 : 0;
-		if (a_ready && a_hit && a_material != 0 && !MaterialName(a_material) && unknownCount_ < kUnknownSlots) {
-			bool seen = false;
-			for (int i = 0; i < unknownCount_ && !seen; ++i) {
-				seen = unknown_[i] == a_material;
-			}
-			if (!seen) {
-				unknown_[unknownCount_++] = a_material;
-				HostLog::Info("surface 0x%08X isn't in the material table (built as stone)", a_material);
-			}
-		}
 		if (stats_.probes % kProbeSummaryEvery == 0) {
 			HostLog::Info("probes so far %llu: ready %llu, hit %llu, with material %llu, fell back to ground-Z %llu",
 				static_cast<unsigned long long>(stats_.probes), static_cast<unsigned long long>(stats_.ready),

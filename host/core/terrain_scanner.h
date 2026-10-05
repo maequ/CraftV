@@ -98,7 +98,9 @@ namespace craftv::host
 		proto::TerrainPatchMsg     patch_{};
 		AttemptSlot                attempts_[kAttemptSlots];
 		int                        nextAttemptSlot_ = 0;
-		std::uint32_t              lastUnknownLogged_ = 0;
+		static constexpr int       kUnknownLogged = 32;  // distinct unknown surface hashes logged per session
+		std::uint32_t              unknownLogged_[kUnknownLogged]{};
+		int                        unknownLoggedCount_ = 0;
 		TerrainStats               stats_{};
 	};
 }
