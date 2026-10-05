@@ -53,17 +53,34 @@ Type these in the mock host console: `kill-link` (after about 10 s the green lin
 walking player stops), then `resume-link` (back to `CONNECTED`); `restart` (the `host=` number goes up by one).
 `ground X Z` prints the fake ground at a spot; `terrain off` / `terrain on` stops and restarts the ground supply.
 
-## Phase 2 test (draft; needs GTA V Legacy, story mode)
+## Phase 2 test (needs GTA V Legacy, story mode)
 
-Sary's GTA V lives in `C:\Rockstar Games\GTA V\` and starts through Sary's own batch launcher. CraftV uses both
-as they are and never moves or replaces anything there.
+Done on 2026-10-05 without the game: `tools\hostsim` ran the plugin core (everything in CraftV.asi
+except the natives) against the real Minecraft and the stand-in friend. It answered 205 terrain requests (none
+empty, none retried), showed the friend on its overlay with a live distance (`friends 1/8 join: ...
+CraftVFriend 6m`), counted the friend's blocks, saw them leave, and averaged 42 µs per tick.
 
-Prerequisites, done by Sary:
-1. Script Hook V + its ASI loader (`dinput8.dll`) from http://www.dev-c.com/gtav/scripthookv/ in the GTA V folder.
-   I'll confirm the exact version against your game build first.
+What you need: GTA V Legacy in story mode, and Script Hook V + its ASI loader (`dinput8.dll`) from
+http://www.dev-c.com/gtav/scripthookv/ for your exact game build (the current release, 3889.0, is for
+1.0.3889.0; store installs update to it).
 
-Steps (the final version comes with the Phase 2 report):
-1. `.\scripts\deploy-gta.ps1` copies only `CraftV.asi` + `CraftV.ini` into the GTA V folder.
-2. Start Minecraft first (`.\scripts\dev-run.ps1 -NoMock`), then GTA V through your launcher, and load story mode.
-3. The overlay shows `link CONNECTED`; walking in GTA moves the Minecraft player; a friend in Minecraft walks on
-   blocky ground that matches the streets around them.
+1. Tell the deploy script where the game is and run it. It only adds `CraftV.asi` and `CraftV.ini`:
+   `$env:CRAFTV_GTA_DIR = '<the folder with GTA5.exe>'` then `.\scripts\deploy-gta.ps1`
+2. Start Minecraft first: `.\scripts\dev-run.ps1 -NoMock`. It waits for GTA.
+3. Start GTA V and load story mode. The overlay in the top-left should show:
+   - line 1, green: `CraftV 0.1.0  link CONNECTED`
+   - line 2: `friends 0/8  join: <your-ip>:25565`
+   - line 5: `net game 0 session 0 in 0`
+4. **Walk north** in GTA: the Minecraft player follows, and its Z goes down (line 4 shows both positions).
+5. **The ground:** in the Minecraft window, the ground around your player takes the shape of the streets: grey
+   roads, green grass, sand on beaches. Line 3 shows `terrain sent N` going up and the last surface material
+   (`TARMAC`, `GRASS`, ...).
+6. **A friend** joins from their own Minecraft 26.3 (Multiplayer → your world, or `<your-ip>:25565`). They stand
+   next to your player in Minecraft, and line 2 shows their name and distance. (They appear in GTA itself in
+   Phase 3.)
+7. Close Minecraft: GTA keeps running and line 1 turns red `STALE`. Start Minecraft again: `CONNECTED`.
+
+### If something fails, send me
+- `CraftV.log` (next to GTA5.exe) and `logs\craftv-fabric.log`
+- a screenshot of the overlay
+- what the deploy script printed (it shows the GTA5.exe version)

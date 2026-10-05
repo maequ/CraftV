@@ -150,3 +150,40 @@ The mock host serves a procedural fake Los Santos and prints friends and their b
 **Reason:** Brief §0: test everything possible before asking Sary. It also gives later phases a moving, building
 friend without a second person. It loads the CraftV mod (in friend mode, doing nothing but joining and the
 autopilot), so the final "plain vanilla Minecraft" check is Sary's own launcher (TESTING.md).
+
+### D-021: One plugin core for every game: host/ (2026-10-05)
+**Decision:** The game-agnostic plugin core (link, story-mode gate, coordinates, terrain scanner, friends,
+overlay, config) lives in `host/core` and is linked by both `gta/` (CraftV.asi) and the parked `rdr2/`. Games
+plug in through `IGame` (sample, draw, probe ground, request collision). Its tests run with a fake game.
+**Reason:** Everything but the natives is tested without a game (brief §0), and moving to GTA V reused the RDR2
+work unchanged.
+
+### D-022: Terrain scanning: one chunk at a time, a probe budget per frame, collision requested for far chunks (2026-10-05)
+**Decision:** `TerrainScanner` answers TERRAIN_REQUESTs in arrival order (Minecraft asks nearest first): 64
+probes per frame by default (`[Terrain] ProbesPerTick`); chunks more than 150 m from the player first get
+`REQUEST_COLLISION_AT_COORD` and a 10-frame wait; a chunk where nothing is hit isn't answered (Minecraft asks
+again) until the third try, then it's answered with no ground; chunks outside the map are answered empty at
+once. Each column is one straight-down ray from 1200 m to -250 m against map collision, plus a water-height check.
+**Reason:** A bounded per-frame cost (brief §13), and GTA only has collision near the player. Probing from above
+means friends stand on roofs and bridges, which is the "blocky copy" a friend sees; underneath bridges isn't
+modelled yet (KNOWN_LIMITATIONS).
+
+### D-023: GTA surface materials by name hash (2026-10-05)
+**Decision:** A compile-time table of GTA V materials.dat names, hashed with RAGE's joaat, maps the shape test's
+material hash to the protocol's 13 materials. Unknown hashes become stone and are logged once each.
+**Reason:** No hash list to copy, and names are readable. `// ASSUMPTION:` the reported hash is joaat(name);
+Phase 2's in-game test checks it (the overlay shows the material name).
+
+### D-024: Natives from the 2016 Script Hook V SDK, with a fallback for the material ray (2026-10-05)
+**Decision:** `gta/` compiles against the official SDK v1.0.617.1a (gitignored; its readme forbids
+redistribution). Its natives.h predates some names, so the synchronous ray `0x7EE9F5D83DD4F90E` is wrapped under
+a clear name. If its result isn't ready at once, `ProbeGround` falls back to `GET_GROUND_Z_FOR_3D_COORD` (height
+without material). `CraftV.asi` imports only ScriptHookV.dll, KERNEL32 and ADVAPI32.
+**Reason:** The official SDK is the stable ABI (the runtime translates hashes per game build). The fallback keeps
+friends' ground working even if the assumption about the ray is wrong.
+
+### D-025: hostsim: the plugin core against real Minecraft without GTA (2026-10-05)
+**Decision:** `tools/hostsim` runs `HostPlugin` with a simulated game (a player walking on the mock's fake map,
+probes reading that map with GTA material names) and prints the overlay to the console.
+**Reason:** It tests everything CraftV.asi does except the natives, end to end with the real Minecraft and the
+stand-in friend (brief §0).

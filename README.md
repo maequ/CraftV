@@ -17,7 +17,7 @@ A Fabric mod and a GTA V ASI plugin talk through shared memory.
 | Phase | What | State |
 |---|---|---|
 | 1 | Co-op on the Minecraft side with a fake GTA: friends join, walk on host terrain, everything reaches the host | **Built and tested; awaiting Sary's test** |
-| 2 | GTA V plugin: link, overlay, scanning GTA's ground for friends | Needs GTA V (Legacy) |
+| 2 | GTA V plugin: link, overlay, scanning GTA's ground for friends | **Built and tested without the game; awaiting the in-game test** |
 | 3 | Friends appear as characters in Los Santos | Not started |
 | 4 | Friends' blocks appear in Los Santos | Not started |
 | 5 | Friends from anywhere (no port forwarding), whitelist | Not started |
@@ -36,9 +36,11 @@ The full plan is in [docs/BRIEF.md](docs/BRIEF.md).
 | `protocol/cpp/`, `protocol/golden/` | C++ link library + tests, golden byte vectors both languages are tested against |
 | `fabric/` | The Minecraft Fabric mod (Java 25, Minecraft 26.3) |
 | `tools/mockhost/` | A fake GTA host with a fake Los Santos, for testing without the game |
-| `gta/` | The GTA V ASI plugin (from Phase 2) |
+| `gta/` | The GTA V ASI plugin (`CraftV.asi`, Script Hook V) and its default `CraftV.ini` |
 | `rdr2/` | A parked RDR2 plugin from an earlier direction; its game-agnostic core is reused for GTA V |
-| `scripts/` | `build-native.ps1`, `dev-run.ps1`, `run-friend.ps1`, `test-all.ps1`, `env.ps1`, `deploy-rdr2.ps1` |
+| `host/` | The plugin core shared by the GTA V and RDR2 plugins (link, terrain scanner, friends, overlay) + tests |
+| `tools/hostsim/` | The plugin core with a simulated GTA, for end-to-end tests against real Minecraft |
+| `scripts/` | `build-native.ps1`, `dev-run.ps1`, `run-friend.ps1`, `test-all.ps1`, `deploy-gta.ps1`, `env.ps1`, `deploy-rdr2.ps1` |
 
 ## Requirements
 

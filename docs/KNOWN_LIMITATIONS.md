@@ -1,6 +1,6 @@
 # Known limitations
 
-As of co-op Phase 1 (2026-10-05). "Planned" names the phase expected to fix it.
+As of Phase 2 (2026-10-05). "Planned" names the phase expected to fix it.
 
 ## Co-op (Minecraft side)
 - **The ground is fake until Phase 2.** The mock host serves a made-up map. Real Los Santos ground comes from
@@ -54,7 +54,22 @@ As of co-op Phase 1 (2026-10-05). "Planned" names the phase expected to fix it.
 - Piping `test-all.ps1` into another command can hang after the tests finish (the Gradle daemon keeps the pipe
   open). Run it plainly or redirect it to a file.
 
-## GTA V plugin (Phase 2, not started)
-- GTA V Legacy is the target. Script Hook V v3889.0 also supports Enhanced 1.0.1158.13, but the reference
-  project was only proven on Legacy.
-- The parked RDR2 plugin (`rdr2/`, `CraftV_RDR2.asi`) was built against ScriptHookRDR2 and never run in RDR2.
+## GTA V plugin (built and tested without the game, not yet run in GTA V)
+- **Every native is unverified in game.** Names, hashes and signatures match the SDK's `natives.h`. These are
+  marked `// ASSUMPTION:` and get checked in the Phase 2 test:
+  - `0x7EE9F5D83DD4F90E` is the synchronous ray and its result is ready at once (otherwise ground still works
+    through `GET_GROUND_Z_FOR_3D_COORD`, without materials).
+  - Shape-test flag 1 is map collision (terrain, roads, buildings) without props, peds and vehicles.
+  - The reported material hash is joaat of the materials.dat name (the overlay shows the name it matched).
+  - `GET_WATER_HEIGHT_NO_WAVES(x, y, groundZ)` reports the water surface above the ground.
+  - `REQUEST_COLLISION_AT_COORD` loads collision for a far chunk within 10 frames.
+  - The ped's root is 1.0 m above its feet (`FeetOffset`); the network natives read false in story mode.
+- **Ground is probed from above,** so friends stand on roofs and bridge decks, and under a bridge the ground is
+  hidden. Planned: Phase 6 (several hits per column).
+- **Chunks far from you may come slowly** (GTA only streams collision near the player). A chunk with no hits is
+  retried twice, then left empty. The map bounds that count as "outside" are an estimate.
+- **Probe cost per frame is unmeasured in GTA.** 64 probes per frame by default (`[Terrain] ProbesPerTick`). The
+  overlay and CraftV.log report the tick cost so it can be tuned.
+- **Script Hook V must match the game build exactly;** after a GTA update, wait for a new Script Hook V.
+- The parked RDR2 plugin (`rdr2/`, `CraftV_RDR2.asi`) was built against ScriptHookRDR2 and never run in RDR2. It
+  has no terrain scanning.
