@@ -1,17 +1,19 @@
-// CraftV mock host: acts like the RDR2 plugin so Phase 1 needs no game (brief §5.3).
+// CraftV mock host: acts like the GTA V plugin so Phase 1 needs no game (brief §6.3).
 //
 // - creates/opens the mapping, sends HELLO and heartbeats (craftv::Endpoint, role host)
 // - walks a simulated player in a circle and sends PLAYER_STATE at ~60 Hz while connected
-// - prints every message Minecraft sends
-// - CLI on stdin: help, status, setblock, break, place, center, radius, speed, walk, stop,
-//   kill-link, resume-link, restart, quit
+// - serves TERRAIN_REQUEST from a procedural fake Los Santos (fake_terrain.h); its player walks on it
+// - prints every message Minecraft sends; each friend's position at most once a second
+// - CLI on stdin: help, status, friends, ground, terrain on|off, setblock, break, place, center, radius, speed,
+//   walk, stop, kill-link, resume-link, restart, quit
 // - --stress N: sends N TEST_PATTERN records and checks N coming back (cross-process stress test)
 //
 // Lines starting with '@' are machine-readable (the chaos tests parse them):
-//   @EVENT <NAME> ...   @STATUS key=value ...   @STRESS ...   @RX <TYPE> ...
+//   @EVENT <NAME> ...   @STATUS key=value ...   @STRESS ...   @RX <TYPE> ...   @FRIEND ...
 #include "craftv/clock.h"
 #include "craftv/codec.h"
 #include "craftv/endpoint.h"
+#include "fake_terrain.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -26,6 +28,7 @@
 #include <cstdio>
 #include <cstring>
 #include <deque>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -43,7 +46,9 @@ namespace
 	constexpr std::uint64_t kDefaultStatusPeriodMs = 5000;
 	constexpr std::uint64_t kRestartGapMs = 500;
 	constexpr int           kDefaultHz = 60;
-	// Superflat dev world: grass top at y = -61, so feet stand at -60 (DECISIONS.md D-006).
+	constexpr int           kPatchesPerTick = 8;    // TERRAIN_PATCH answers per tick (1.3 KiB each)
+	constexpr std::uint64_t kFriendPrintMs = 1000;  // an @FRIEND line per friend at most this often
+	// --no-terrain keeps the old superflat behaviour: grass top at y = -61, feet at -60 (DECISIONS.md D-006).
 	constexpr double kDefaultCenterX = 0.5, kDefaultCenterY = -60.0, kDefaultCenterZ = 0.5;
 	constexpr double kDefaultRadius = 6.0;
 	constexpr double kDefaultSpeed = 4.317;  // Minecraft walking speed, blocks per second
@@ -127,6 +132,7 @@ namespace
 		bool          noStdin = false;
 		std::uint64_t exitAfterMs = 0;
 		std::uint64_t statusMs = kDefaultStatusPeriodMs;
+		bool          terrain = true;
 	};
 
 	void Usage()
@@ -136,7 +142,7 @@ namespace
 			"  --mapping NAME        shared-memory name (default Local\\CraftV_Shared_v1)\n"
 			"  --mc-timeout-ms N     how long Minecraft may stay silent before STALE (default 3000)\n"
 			"  --hz N                PLAYER_STATE rate (default 60)\n"
-			"  --center X Y Z        circle centre (default 0.5 -60 0.5)\n"
+			"  --center X Y Z        circle centre (default 0.5 -60 0.5; Y only matters with --no-terrain)\n"
 			"  --radius R            circle radius in blocks (default 6)\n"
 			"  --speed S             walking speed, blocks/s (default 4.317)\n"
 			"  --stress N            send N TEST_PATTERN records, check N back, print @STRESS_DONE\n"
@@ -144,7 +150,8 @@ namespace
 			"  --no-stdin            ignore stdin (scripts)\n"
 			"  --exit-after-ms N     quit after N ms (tests)\n"
 			"  --status-ms N         @STATUS line period (default 5000)\n"
-			"  --quiet               don't print every received record\n");
+			"  --quiet               don't print every received record\n"
+			"  --no-terrain          ignore TERRAIN_REQUEST and walk at the centre's Y (old superflat mode)\n");
 	}
 
 	bool ParseArgs(int argc, wchar_t** argv, Options& o)
@@ -187,6 +194,8 @@ namespace
 				o.noStdin = true;
 			} else if (a == L"--quiet") {
 				g_quiet = true;
+			} else if (a == L"--no-terrain") {
+				o.terrain = false;
 			} else {
 				return false;
 			}
@@ -241,6 +250,7 @@ namespace
 				} else if (walking_) {
 					SendPlayerState(a_nowUs);
 				}
+				ServeTerrain();
 			}
 			if (a_nowMs >= nextStatusMs_) {
 				nextStatusMs_ = a_nowMs + options_.statusMs;
@@ -257,10 +267,34 @@ namespace
 				return;
 			}
 			if (cmd == "help") {
-				Out("commands: status | setblock X Y Z ID | break X Y Z | place X Y Z FACE [ID] | center X Y Z | radius R | speed S |"
-					" walk | stop | kill-link | resume-link | restart | quit");
+				Out("commands: status | friends | ground X Z | terrain on|off | setblock X Y Z ID | break X Y Z | place X Y Z FACE [ID] | center X Y Z |"
+					" radius R | speed S | walk | stop | kill-link | resume-link | restart | quit");
 			} else if (cmd == "status") {
 				PrintStatus();
+			} else if (cmd == "friends") {
+				PrintFriends();
+			} else if (cmd == "ground") {
+				int x = 0, z = 0;
+				if (!(in >> x >> z)) {
+					Out("usage: ground X Z   (the fake terrain column there)");
+					return;
+				}
+				static const char* materials[] = { "unknown", "grass", "dirt", "sand", "rock", "road", "pavement", "gravel", "snow", "wood", "metal",
+					"building", "mud" };
+				const auto c = mock::FakeColumn(x, z);
+				Out("ground at (%d, %d): top block y %d, %s, water %s", x, z, c.ground, materials[c.material],
+					c.water == kNoWater ? "none" : std::to_string(c.water).c_str());
+			} else if (cmd == "terrain") {
+				std::string arg;
+				in >> arg;
+				if (arg == "on" || arg == "off") {
+					options_.terrain = arg == "on";
+					if (!options_.terrain) {
+						terrainQueue_.clear();
+					}
+				}
+				Out("terrain %s (served %llu patches)", options_.terrain ? "on" : "off (requests are ignored; Minecraft asks again)",
+					static_cast<unsigned long long>(terrainServed_));
 			} else if (cmd == "setblock") {
 				BlockSetMsg m{};
 				if (!(in >> m.x >> m.y >> m.z >> m.blockId)) {
@@ -353,6 +387,8 @@ namespace
 			}
 			if (ev & (kEvConnected | kEvPeerRestarted)) {
 				teleportNext_ = true;  // a new Minecraft: snap it onto the circle
+				friends_.clear();      // it re-sends REMOTE_PLAYER_JOIN for everyone (PROTOCOL.md §7.10)
+				terrainQueue_.clear();
 			}
 			if (ev & kEvPeerRestarted) {
 				stressReceived_ = 0;  // not on CONNECTED: records may arrive before our own CONNECTED event
@@ -370,8 +406,9 @@ namespace
 			angle_ = std::fmod(angle_ + omega * dt, 2.0 * kPi);
 			PlayerStateMsg m{};
 			m.x = options_.cx + options_.radius * std::cos(angle_);
-			m.y = options_.cy;
 			m.z = options_.cz + options_.radius * std::sin(angle_);
+			// Feet on top of the fake ground's top block.
+			m.y = options_.terrain ? mock::FakeColumn(static_cast<int>(std::floor(m.x)), static_cast<int>(std::floor(m.z))).ground + 1.0 : options_.cy;
 			m.vx = static_cast<float>(-options_.radius * omega * std::sin(angle_));
 			m.vy = 0.0f;
 			m.vz = static_cast<float>(options_.radius * omega * std::cos(angle_));
@@ -437,6 +474,68 @@ namespace
 					Out("@RX LOG [minecraft] %.*s", static_cast<int>(m.textBytes), m.text);
 					return;
 				}
+			case kMsgRemotePlayerJoin:
+				{
+					RemotePlayerJoinMsg m;
+					if (!codec::Decode(h, p, m)) break;
+					Friend& f = friends_[m.playerId];
+					f.name.assign(m.name, m.nameBytes);
+					f.hasState = false;
+					f.nextPrintMs = 0;
+					Out("@RX REMOTE_PLAYER_JOIN #%u '%s' uuid %02x%02x%02x%02x-... (%zu friend%s online)", m.playerId, f.name.c_str(), m.uuid[0], m.uuid[1],
+						m.uuid[2], m.uuid[3], friends_.size(), friends_.size() == 1 ? "" : "s");
+					return;
+				}
+			case kMsgRemotePlayerState:
+				{
+					RemotePlayerStateMsg m;
+					if (!codec::Decode(h, p, m)) break;
+					auto it = friends_.find(m.playerId);
+					if (it == friends_.end()) {
+						return;  // a state before its JOIN: normal right after a restart (§7.10)
+					}
+					Friend& f = it->second;
+					f.last = m;
+					f.hasState = true;
+					++friendStates_;
+					const auto nowMs = clock::NowMs();
+					if (nowMs >= f.nextPrintMs) {
+						f.nextPrintMs = nowMs + kFriendPrintMs;
+						PrintFriend(m.playerId, f);
+					}
+					return;
+				}
+			case kMsgRemotePlayerLeave:
+				{
+					RemotePlayerLeaveMsg m;
+					if (!codec::Decode(h, p, m)) break;
+					static const char* reasons[] = { "left", "went to another dimension", "world closing" };
+					auto               it = friends_.find(m.playerId);
+					Out("@RX REMOTE_PLAYER_LEAVE #%u '%s' %s", m.playerId, it != friends_.end() ? it->second.name.c_str() : "?", reasons[m.reason]);
+					if (it != friends_.end()) {
+						friends_.erase(it);
+					}
+					return;
+				}
+			case kMsgTerrainRequest:
+				{
+					TerrainRequestMsg m;
+					if (!codec::Decode(h, p, m)) break;
+					++terrainRequests_;
+					if (options_.terrain) {
+						terrainQueue_.push_back(m);
+					}
+					return;
+				}
+			case kMsgSessionInfo:
+				{
+					SessionInfoMsg m;
+					if (!codec::Decode(h, p, m)) break;
+					Out("@RX SESSION_INFO %s port=%u friends=%u/%u gameMode=%u auth=%d whitelist=%d address='%.*s'",
+						(m.flags & kSessionOpen) ? "OPEN" : "CLOSED", m.port, m.friends, m.maxPlayers, m.gameMode, (m.flags & kSessionAuth) ? 1 : 0,
+						(m.flags & kSessionWhitelist) ? 1 : 0, static_cast<int>(m.addressBytes), m.address);
+					return;
+				}
 			case kMsgTestPattern:
 				{
 					std::uint64_t idx = 0;
@@ -458,6 +557,51 @@ namespace
 			}
 		}
 
+		struct Friend
+		{
+			std::string          name;
+			RemotePlayerStateMsg last{};
+			bool                 hasState = false;
+			std::uint64_t        nextPrintMs = 0;
+		};
+
+		void PrintFriend(std::uint32_t a_id, const Friend& a_friend)
+		{
+			if (!a_friend.hasState) {
+				Out("@FRIEND #%u '%s' (no position yet)", a_id, a_friend.name.c_str());
+				return;
+			}
+			const auto& s = a_friend.last;
+			const int   ground = mock::FakeColumn(static_cast<int>(std::floor(s.x)), static_cast<int>(std::floor(s.z))).ground;
+			Out("@FRIEND #%u '%s' at (%.1f, %.1f, %.1f) yaw %.0f speed %.1f%s%s%s%s%s mode %u health %u (fake ground top y %d)", a_id,
+				a_friend.name.c_str(), s.x, s.y, s.z, s.yaw, std::sqrt(s.vx * s.vx + s.vz * s.vz), (s.flags & kRemoteOnGround) ? " on-ground" : "",
+				(s.flags & kRemoteSprinting) ? " sprinting" : "", (s.flags & kRemoteCrouching) ? " crouching" : "",
+				(s.flags & kRemoteSwimming) ? " swimming" : "", (s.flags & kRemoteFlying) ? " flying" : "", s.gameMode, s.health, ground);
+		}
+
+		void PrintFriends()
+		{
+			Out("%zu friend%s online", friends_.size(), friends_.size() == 1 ? "" : "s");
+			for (const auto& [id, f] : friends_) {
+				PrintFriend(id, f);
+			}
+		}
+
+		void ServeTerrain()
+		{
+			for (int i = 0; i < kPatchesPerTick && !terrainQueue_.empty(); ++i) {
+				const TerrainRequestMsg rq = terrainQueue_.front();
+				TerrainPatchMsg         patch{};
+				mock::FillPatch(rq.chunkX, rq.chunkZ, patch);
+				patch.requestId = rq.requestId;
+				if (!endpoint_->Send(patch)) {
+					return;  // ring full or not connected: try again next tick
+				}
+				terrainQueue_.pop_front();
+				++terrainServed_;
+			}
+		}
+
 		void PrintStatus()
 		{
 			if (!endpoint_) {
@@ -468,13 +612,16 @@ namespace
 			const auto& rx = endpoint_->RxStats();
 			const auto& peer = endpoint_->Peer();
 			Out("@STATUS state=%s session=%u peerSession=%u peerPid=%u rttUs=%llu playerStates=%llu tx=%llu txDropped=%llu rx=%llu "
-				"stale=%llu unknown=%llu malformed=%llu corrupt=%llu notConnected=%llu%s",
+				"stale=%llu unknown=%llu malformed=%llu corrupt=%llu notConnected=%llu friends=%zu friendStates=%llu terrainRequests=%llu "
+				"terrainServed=%llu terrainQueued=%zu%s",
 				ToString(endpoint_->State()), endpoint_->Session(), peer.session, peer.pid,
 				static_cast<unsigned long long>(peer.rttValid ? peer.rttUs : 0), static_cast<unsigned long long>(sentPlayerStates_),
 				static_cast<unsigned long long>(tx.produced), static_cast<unsigned long long>(tx.droppedFull),
 				static_cast<unsigned long long>(rx.consumed), static_cast<unsigned long long>(rx.stale), static_cast<unsigned long long>(rx.unknown),
 				static_cast<unsigned long long>(rx.malformed), static_cast<unsigned long long>(rx.corrupt),
-				static_cast<unsigned long long>(endpoint_->DroppedNotConnected()), killed_ ? " (link killed)" : "");
+				static_cast<unsigned long long>(endpoint_->DroppedNotConnected()), friends_.size(), static_cast<unsigned long long>(friendStates_),
+				static_cast<unsigned long long>(terrainRequests_), static_cast<unsigned long long>(terrainServed_), terrainQueue_.size(),
+				killed_ ? " (link killed)" : "");
 		}
 
 		Options                   options_;
@@ -494,6 +641,11 @@ namespace
 		std::uint64_t             stressReceived_ = 0;
 		std::uint64_t             stressErrors_ = 0;
 		bool                      stressDone_ = false;
+		std::map<std::uint32_t, Friend> friends_;
+		std::deque<TerrainRequestMsg>   terrainQueue_;
+		std::uint64_t                   friendStates_ = 0;
+		std::uint64_t                   terrainRequests_ = 0;
+		std::uint64_t                   terrainServed_ = 0;
 	};
 
 	std::atomic<bool> g_ctrlC{ false };
