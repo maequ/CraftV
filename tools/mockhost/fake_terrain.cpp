@@ -30,7 +30,7 @@ namespace craftv::mock
 		// Smooth natural ground, before roads, lots and water.
 		double Natural(double x, double z)
 		{
-			double h = 66.0 + 10.0 * std::sin(x / 53.0) * std::cos(z / 71.0) + 5.0 * std::sin((x + 2.0 * z) / 29.0) + 3.0 * std::cos((2.0 * x - z) / 17.0);
+			double h = 72.0 + 10.0 * std::sin(x / 53.0) * std::cos(z / 71.0) + 5.0 * std::sin((x + 2.0 * z) / 29.0) + 3.0 * std::cos((2.0 * x - z) / 17.0);
 			if (z < kMountainStartZ) {
 				h += std::min((kMountainStartZ - z) * kMountainSlope, static_cast<double>(kMountainMaxRise));
 			}

@@ -1,5 +1,7 @@
 package dev.craftv;
 
+import dev.craftv.coop.CoopServer;
+import dev.craftv.link.Proto;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -8,8 +10,9 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.gamerules.GameRules;
 
 /**
- * CraftV: Minecraft inside Red Dead Redemption 2 (story mode only). This is the Minecraft half;
- * the RDR2 half is an ASI plugin (Phase 2). Architecture adapted from SkyCraft by chasmlol (MIT).
+ * CraftV: your friends in plain Minecraft, inside GTA V story mode (docs/BRIEF.md). This is the Minecraft
+ * half: the hidden Minecraft hosts the world friends join and talks to the GTA V plugin over shared memory.
+ * Architecture adapted from SkyCraft by chasmlol (MIT).
  */
 public final class CraftV implements ModInitializer {
 	public static final String MOD_ID = "craftv";
@@ -21,13 +24,14 @@ public final class CraftV implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		CraftLog.open(FabricLoader.getInstance().getGameDir());
-		CraftLog.info("CraftV " + version() + " loading (protocol 1.0)");
+		CraftLog.info("CraftV " + version() + " loading (protocol " + Proto.VERSION_MAJOR + "." + Proto.VERSION_MINOR + ")");
 		ServerLifecycleEvents.SERVER_STARTED.register(CraftV::configureServer);
 		ServerTickEvents.END_SERVER_TICK.register(BlockSync::applyHostOps);
+		CoopServer.init(FabricLoader.getInstance().getGameDir());
 	}
 
 	/**
-	 * The host drives the player and owns the world around it, so the integrated server must not
+	 * The host drives the owner's player and owns the world around it, so the integrated server must not
 	 * fight it (rules from SkyCraft's mirror world).
 	 */
 	private static void configureServer(MinecraftServer server) {

@@ -15,10 +15,25 @@ loom {
 		client {
 			programArgs "--username", (System.getenv("CRAFTV_USERNAME") ?: "CraftVDev")
 			// --enable-native-access: the shared-memory link calls kernel32 through java.lang.foreign.
+			// craftv.devNoAuth lets the offline stand-in friend join (scripts/run-friend.ps1 only; brief §2.4).
 			vmArgs "--enable-native-access=ALL-UNNAMED",
 				"-Dcraftv.logDir=${craftvLogDir}",
 				"-Dcraftv.link=${craftvLink}",
-				"-Dcraftv.autoWorld=true"
+				"-Dcraftv.autoWorld=true",
+				"-Dcraftv.devNoAuth=${System.getenv("CRAFTV_DEV_NO_AUTH") ?: "false"}"
+		}
+		// A stand-in friend for automated co-op tests (gradlew runFriend): joins the host like a player
+		// using Multiplayer would. Its own run folder, so it never shares saves or options with the host.
+		friend {
+			client()
+			configName = "Minecraft Client (CraftV stand-in friend)"
+			runDir "run-friend"
+			programArgs "--username", (System.getenv("CRAFTV_FRIEND_NAME") ?: "CraftVFriend")
+			vmArgs "--enable-native-access=ALL-UNNAMED",
+				"-Dcraftv.logDir=${craftvLogDir}${File.separator}friend",
+				"-Dcraftv.role=friend",
+				"-Dcraftv.join=${System.getenv("CRAFTV_JOIN") ?: "localhost:25565"}",
+				"-Dcraftv.friendBot=${System.getenv("CRAFTV_FRIEND_BOT") ?: "false"}"
 		}
 	}
 

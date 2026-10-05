@@ -3,14 +3,22 @@
   "id": "craftv",
   "version": "${version}",
   "name": "CraftV",
-  "description": "Minecraft inside Red Dead Redemption 2 (story mode only). The Minecraft half of the CraftV link. Architecture adapted from SkyCraft by chasmlol.",
-  "authors": ["Sary"],
-  "contributors": ["chasmlol (SkyCraft, original architecture and code, MIT)"],
+  "description": "Your friends in plain Minecraft, inside GTA V story mode. The Minecraft half of CraftV: hosts the world friends join and talks to the GTA V plugin. Architecture adapted from SkyCraft by chasmlol.",
+  "authors": [
+    "Sary"
+  ],
+  "contributors": [
+    "chasmlol (SkyCraft, original architecture, code and the mirror world preset, MIT)"
+  ],
   "license": "MIT",
   "environment": "client",
   "entrypoints": {
-    "main": ["dev.craftv.CraftV"],
-    "client": ["dev.craftv.client.CraftVClient"]
+    "main": [
+      "dev.craftv.CraftV"
+    ],
+    "client": [
+      "dev.craftv.client.CraftVClient"
+    ]
   },
   "mixins": [
     "craftv.mixins.json"

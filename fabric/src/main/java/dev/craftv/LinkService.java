@@ -12,19 +12,21 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * Owns the link on its own daemon thread (DECISIONS.md D-005): attaches, heartbeats, drains the
  * host's ring and sends what the game queued. The game threads never touch shared memory; they
- * read the latest {@link Messages.PlayerState}, take host block ops, and {@link #send} payloads.
+ * read the latest {@link Messages.PlayerState}, take host block ops and terrain patches, and {@link #send} payloads.
  * Because this thread keeps beating while Minecraft loads a world, the host never sees a stall.
  */
 public final class LinkService {
 	private static final long LOOP_SLEEP_MS = 2;
 	private static final long STATUS_LOG_PERIOD_MS = 30_000;
 	private static final int OUTBOX_LIMIT = 50_000;
+	private static final int TERRAIN_INBOX_LIMIT = 4_096; // ~5 MiB of patches; beyond that MC asks again later
 
 	private static final LinkService INSTANCE = new LinkService();
 
 	private final AtomicReference<Messages.PlayerState> latestPlayerState = new AtomicReference<>();
 	private final Queue<Messages.Payload> hostBlockOps = new ConcurrentLinkedQueue<>();
 	private final Queue<Messages.Payload> outbox = new ConcurrentLinkedQueue<>();
+	private final Queue<Messages.TerrainPatch> terrainInbox = new ConcurrentLinkedQueue<>();
 	private volatile Thread thread;
 	private volatile boolean running;
 	private volatile boolean inGame;
@@ -100,6 +102,7 @@ public final class LinkService {
 						case MSG_BLOCK_SET -> queueBlockOp(ep, bytes >= BLOCK_SET_BYTES ? Messages.BlockSet.read(s, off) : null);
 						case MSG_BLOCK_BREAK_REQUEST -> queueBlockOp(ep, bytes >= BLOCK_REQUEST_BYTES ? Messages.BlockBreakRequest.read(s, off) : null);
 						case MSG_BLOCK_PLACE_REQUEST -> queueBlockOp(ep, bytes >= BLOCK_REQUEST_BYTES ? Messages.BlockPlaceRequest.read(s, off) : null);
+						case MSG_TERRAIN_PATCH -> acceptTerrain(ep, bytes >= TERRAIN_PATCH_BYTES ? Messages.TerrainPatch.read(s, off) : null);
 						case MSG_LOG -> {
 							Messages.Log log = bytes >= LOG_BYTES ? Messages.Log.read(s, off) : null;
 							if (log != null && log.valid()) {
@@ -150,6 +153,19 @@ public final class LinkService {
 			return;
 		}
 		latestPlayerState.set(ps);
+	}
+
+	private void acceptTerrain(Endpoint ep, Messages.TerrainPatch patch) {
+		if (patch == null || !patch.valid()) {
+			ep.countMalformed();
+			CraftLog.limited("badterrain", 5000, "ignored an invalid TERRAIN_PATCH from the host");
+			return;
+		}
+		if (terrainInbox.size() >= TERRAIN_INBOX_LIMIT) {
+			CraftLog.limited("terraininbox", 5000, "terrain inbox full; dropping patches (they'll be requested again)");
+			return;
+		}
+		terrainInbox.add(patch);
 	}
 
 	private void queueBlockOp(Endpoint ep, Messages.Payload op) {
@@ -221,6 +237,11 @@ public final class LinkService {
 
 	public Messages.Payload pollHostBlockOp() {
 		return hostBlockOps.poll();
+	}
+
+	/** The next ground patch from the host (PROTOCOL.md §7.12), or null. Server thread. */
+	public Messages.TerrainPatch pollTerrainPatch() {
+		return terrainInbox.poll();
 	}
 
 	public int peerGeneration() {

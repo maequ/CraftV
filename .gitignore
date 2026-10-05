@@ -9,6 +9,7 @@
 fabric/.gradle/
 fabric/build/
 fabric/run/
+fabric/run-friend/
 fabric/out/
 .gradle/
 

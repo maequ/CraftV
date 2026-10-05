@@ -1,7 +1,8 @@
 package dev.craftv.client;
 
-import dev.craftv.LinkService;
 import dev.craftv.CraftLog;
+import dev.craftv.LinkService;
+import dev.craftv.coop.CoopServer;
 import dev.craftv.link.Messages;
 import dev.craftv.link.Proto;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -18,17 +19,29 @@ import net.minecraft.world.level.block.Block;
 
 public final class CraftVClient implements ClientModInitializer {
 	private static final boolean SHOW_HUD = Boolean.parseBoolean(System.getProperty("craftv.hud", "true"));
-	private static final int HUD_X = 4, HUD_Y = 4;
-	private static final int COLOR_OK = 0xFF55FF55, COLOR_WAIT = 0xFFFFFF55, COLOR_BAD = 0xFFFF5555;
+	private static final int HUD_X = 4, HUD_Y = 4, HUD_LINE = 10;
+	private static final int COLOR_OK = 0xFF55FF55, COLOR_WAIT = 0xFFFFFF55, COLOR_BAD = 0xFFFF5555, COLOR_INFO = 0xFFFFFFFF;
 	private static final AtomicInteger REQUEST_IDS = new AtomicInteger();
 
 	@Override
 	public void onInitializeClient() {
+		if (MirrorWorld.FRIEND) {
+			// A stand-in friend for automated co-op tests: plays like anyone joining from Multiplayer.
+			ClientTickEvents.END_CLIENT_TICK.register(minecraft -> {
+				MirrorWorld.tick(minecraft);
+				FriendBot.tick(minecraft);
+			});
+			CraftLog.info("client initialised as a stand-in friend (no link)" + (FriendBot.ENABLED ? " with the autopilot on" : ""));
+			return;
+		}
 		LinkService.get().start();
 		ClientTickEvents.END_CLIENT_TICK.register(minecraft -> {
 			try {
-				DevWorld.tick(minecraft);
+				MirrorWorld.tick(minecraft);
 				PlayerPuppet.tick(minecraft);
+				if (minecraft.player != null) {
+					CoopServer.publishIfNeeded(minecraft.getSingleplayerServer()); // vanilla's "Open to LAN" runs here too
+				}
 			} catch (RuntimeException e) {
 				CraftLog.error("client tick failed", e);
 			}
@@ -44,6 +57,7 @@ public final class CraftVClient implements ClientModInitializer {
 					default -> COLOR_BAD;
 				};
 				graphics.text(minecraft.font, "CraftV " + link.statusLine(), HUD_X, HUD_Y, color, true);
+				graphics.text(minecraft.font, CoopServer.hudLine(), HUD_X, HUD_Y + HUD_LINE, COLOR_INFO, true);
 			});
 		}
 		CraftLog.info("client initialised");

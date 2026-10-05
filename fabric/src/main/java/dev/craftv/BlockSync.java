@@ -27,6 +27,8 @@ public final class BlockSync {
 
 	// While applying a host op on the server thread: the flags/request id for the echo.
 	private static final ThreadLocal<int[]> APPLYING = new ThreadLocal<>();
+	// While building host terrain: those blocks came from the host, so they are not reported back (§7.12).
+	private static final ThreadLocal<Boolean> SILENT = new ThreadLocal<>();
 
 	private BlockSync() {
 	}
@@ -34,7 +36,7 @@ public final class BlockSync {
 	/** From LevelChunkMixin, after a chunk's block actually changed (server side only). */
 	public static void onBlockChanged(BlockPos pos, BlockState newState) {
 		LinkService link = LinkService.get();
-		if (!link.connected()) {
+		if (!link.connected() || SILENT.get() != null) {
 			return; // Phase 4 will resync on (re)connect; see KNOWN_LIMITATIONS.md
 		}
 		int[] applying = APPLYING.get();
@@ -112,6 +114,16 @@ public final class BlockSync {
 			return item.getBlock().defaultBlockState();
 		}
 		return null;
+	}
+
+	/** Runs {@code action} (on the server thread) without reporting the block changes it makes. */
+	public static void silently(Runnable action) {
+		SILENT.set(Boolean.TRUE);
+		try {
+			action.run();
+		} finally {
+			SILENT.remove();
+		}
 	}
 
 	private static void withEcho(int requestId, Runnable action) {

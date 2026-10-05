@@ -268,6 +268,44 @@ class ChaosIntegrationTest {
 		host.awaitContains(0, "@RX BLOCK_SET", CONNECT_WAIT_MS);
 	}
 
+	// ---- co-op, protocol v1.1 (brief §6.4) ---------------------------------------------------------
+
+	static String hashOf(String patchLine) {
+		return patchLine.substring(patchLine.indexOf("hash=") + 5).trim();
+	}
+
+	@Test
+	void coopTerrainFriendAndSessionInfoCrossProcesses() throws Exception {
+		Proc host = startHost();
+		Proc guest = startGuest("--coop");
+		List<String> patches = new ArrayList<>();
+		for (int req = 1; req <= 4; req++) {
+			String tag = "req=" + req + " ";
+			patches.add(guest.await(0, l -> l.startsWith("@RX TERRAIN_PATCH") && l.contains(tag), CONNECT_WAIT_MS, "the patch answering " + tag.trim()));
+		}
+		for (String p : patches) {
+			assertTrue(p.contains("valid=1") && p.contains("ground=256"), "a full, valid chunk of ground: " + p);
+		}
+		assertTrue(patches.get(0).contains("chunk=(0,0)") && patches.get(1).contains("chunk=(-1,0)") && patches.get(2).contains("chunk=(5,-3)"), patches.toString());
+		assertEquals(hashOf(patches.get(0)), hashOf(patches.get(3)), "the same chunk asked twice gives the same ground");
+		assertNotEquals(hashOf(patches.get(0)), hashOf(patches.get(1)), "neighbouring chunks differ");
+		host.awaitContains(0, "@RX REMOTE_PLAYER_JOIN #42 'HeadlessFriend'", CONNECT_WAIT_MS);
+		host.awaitContains(0, "@FRIEND #42 'HeadlessFriend' at (", CONNECT_WAIT_MS);
+		host.awaitContains(0, "@RX SESSION_INFO OPEN port=25565 friends=1/8", CONNECT_WAIT_MS);
+		host.awaitContains(0, "@RX REMOTE_PLAYER_LEAVE #42 'HeadlessFriend' left", CONNECT_WAIT_MS);
+		String status = host.await(host.mark(), l -> l.startsWith("@STATUS"), CONNECT_WAIT_MS, "a status line");
+		assertTrue(status.contains("malformed=0") && status.contains("terrainServed=4"), status);
+	}
+
+	@Test
+	void hostWithoutTerrainLeavesRequestsUnanswered() throws Exception {
+		Proc host = startHost("--no-terrain");
+		Proc guest = startGuest("--coop");
+		host.await(0, l -> l.startsWith("@STATUS") && l.contains("terrainRequests=4"), CONNECT_WAIT_MS, "4 terrain requests");
+		Thread.sleep(500);
+		assertTrue(guest.lines.stream().noneMatch(l -> l.startsWith("@RX TERRAIN_PATCH")), "no patch when the host has no terrain");
+	}
+
 	// ---- cross-process stress -------------------------------------------------------------------
 
 	@Test
