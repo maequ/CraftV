@@ -58,6 +58,9 @@ namespace craftv::host
 		terrain.maxAttempts = attempts >= 1 && attempts <= 100 ? static_cast<int>(attempts) : TerrainConfig{}.maxAttempts;
 
 		debugOverlay = ReadBool(L"Debug", L"Overlay", debugOverlay, a_iniPath);
+		const std::wstring corner = ReadString(L"Debug", L"OverlayCorner", L"TopRight", a_iniPath);
+		overlayCorner = _wcsicmp(corner.c_str(), L"TopLeft") == 0 ? OverlayCorner::kTopLeft : OverlayCorner::kTopRight;
+		overlayDetails = ReadBool(L"Debug", L"OverlayDetails", overlayDetails, a_iniPath);
 		logEveryTickCost = ReadBool(L"Debug", L"LogTickCost", logEveryTickCost, a_iniPath);
 		return exists;
 	}

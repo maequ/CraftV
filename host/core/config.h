@@ -10,6 +10,12 @@
 
 namespace craftv::host
 {
+	enum class OverlayCorner
+	{
+		kTopRight,  // default: below GTA's own HUD on the right
+		kTopLeft,
+	};
+
 	struct Config
 	{
 		// Set by the ASI, not the .ini: the name in HELLO and the logs, e.g. "CraftV-GTA5 0.1.0".
@@ -22,7 +28,9 @@ namespace craftv::host
 		// [Terrain]
 		TerrainConfig terrain{};
 		// [Debug]
-		bool debugOverlay = true;
+		bool          debugOverlay = true;
+		OverlayCorner overlayCorner = OverlayCorner::kTopRight;
+		bool          overlayDetails = false;
 		bool logEveryTickCost = false;
 
 		// Reads a_iniPath; missing keys keep their defaults. Returns false if the file doesn't exist.

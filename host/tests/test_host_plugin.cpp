@@ -61,6 +61,7 @@ namespace
 		bool                     recordDraws = true;
 		int                      textCalls = 0, rectCalls = 0;
 		std::vector<std::string> texts;
+		float                    lastLabelX = 0;
 		float                    groundZ = 49.6f;  // flat ground everywhere
 		std::uint32_t            material = Joaat("GRASS");
 		int                      probes = 0, collisionRequests = 0;
@@ -72,9 +73,10 @@ namespace
 			}
 			a_out = sample;
 		}
-		void DrawLabel(float, float, float, Rgba, const char* a_text) override
+		void DrawLabel(float a_x, float, float, Rgba, const char* a_text) override
 		{
 			++textCalls;
+			lastLabelX = a_x;
 			if (recordDraws) {
 				texts.emplace_back(a_text);
 			}
@@ -370,19 +372,32 @@ TEST_CASE("host plugin: an exception from the game switches it off and nothing e
 	CHECK(rig.mc->State() == LinkState::kAttached);  // clean detach
 }
 
-TEST_CASE("host plugin: overlay shows five lines and CONNECTED when linked; off when disabled")
+TEST_CASE("host plugin: overlay is three lines top right by default, five with details, top left on request; off when disabled")
 {
 	Rig rig(L"overlay");
 	rig.game.sample = StoryPlayer(0, 0, 50, 0);
 	rig.Tick(10);
 	rig.game.texts.clear();
 	rig.Tick(1);
-	REQUIRE(rig.game.texts.size() == 5);
+	REQUIRE(rig.game.texts.size() == 3);
 	CHECK(rig.game.texts[0].find("link CONNECTED") != std::string::npos);
 	CHECK(rig.game.texts[1].find("friends 0") != std::string::npos);
-	CHECK(rig.game.texts[2].find("terrain sent 0") != std::string::npos);
-	CHECK(rig.game.texts[3].find("-> ") != std::string::npos);
-	CHECK(rig.game.texts[4].find("net game 0 session 0 in 0") != std::string::npos);
+	CHECK(rig.game.texts[2].find("ground sent 0") != std::string::npos);
+	CHECK(rig.game.lastLabelX > 0.5f);  // right half of the screen
+
+	Rig detailed(L"overlaydetails");
+	detailed.config.overlayDetails = true;
+	detailed.config.overlayCorner = OverlayCorner::kTopLeft;
+	detailed.plugin = std::make_unique<HostPlugin>(detailed.game, detailed.config);
+	detailed.game.sample = StoryPlayer(0, 0, 50, 0);
+	detailed.Tick(10);
+	detailed.game.texts.clear();
+	detailed.Tick(1);
+	REQUIRE(detailed.game.texts.size() == 5);
+	CHECK(detailed.game.texts[2].find("terrain sent 0") != std::string::npos);
+	CHECK(detailed.game.texts[3].find("-> ") != std::string::npos);
+	CHECK(detailed.game.texts[4].find("net game 0 session 0 in 0") != std::string::npos);
+	CHECK(detailed.game.lastLabelX < 0.1f);
 
 	Rig quiet(L"overlayoff");
 	quiet.config.debugOverlay = false;
@@ -432,7 +447,7 @@ TEST_CASE("host config: reads the .ini, falls back on bad values and missing fil
 	const std::wstring path = std::wstring(tmp) + L"craftv_test_" + std::to_wstring(::GetCurrentProcessId()) + L".ini";
 	{
 		std::ofstream f(path);
-		f << "[Link]\nMappingName=Local\\Custom_Map\nMcTimeoutMs=2500\n[World]\nBlocksPerMetre=abc\nFeetOffset=0.95\nYOffset=-64\n[Debug]\nOverlay=0\n"
+		f << "[Link]\nMappingName=Local\\Custom_Map\nMcTimeoutMs=2500\n[World]\nBlocksPerMetre=abc\nFeetOffset=0.95\nYOffset=-64\n[Debug]\nOverlay=0\nOverlayCorner=topleft\nOverlayDetails=1\n"
 		  << "[Terrain]\nProbesPerTick=128\nCollisionWaitTicks=-5\nNearDistance=300\n";
 	}
 	Config c;
@@ -446,6 +461,8 @@ TEST_CASE("host config: reads the .ini, falls back on bad values and missing fil
 	CHECK_EQ(c.terrain.probesPerTick, 128);
 	CHECK_EQ(c.terrain.collisionWaitTicks, TerrainConfig{}.collisionWaitTicks);  // -5 -> default
 	CHECK(Near(c.terrain.nearDistance, 300.0));
+	CHECK(c.overlayCorner == OverlayCorner::kTopLeft);
+	CHECK(c.overlayDetails);
 	::DeleteFileW(path.c_str());
 	Config d;
 	CHECK(!d.Load(path + L".missing"));
@@ -506,7 +523,7 @@ TEST_CASE("host plugin: friends and session info from Minecraft show on the over
 	CHECK(rig.plugin->HasSessionInfo());
 	rig.game.texts.clear();
 	rig.Tick(1);
-	REQUIRE(rig.game.texts.size() == 5);
+	REQUIRE(rig.game.texts.size() == 3);
 	CHECK(rig.game.texts[1].find("friends 1/8") != std::string::npos);
 	CHECK(rig.game.texts[1].find("join: 192.168.1.23:25565") != std::string::npos);
 	CHECK(rig.game.texts[1].find("Alex 30m") != std::string::npos);

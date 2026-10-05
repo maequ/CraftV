@@ -3,6 +3,8 @@
 // Text drawing copies the SDK sample (NativeTrainer/script.cpp).
 #include "gta_game.h"
 
+#include "core/host_log.h"
+
 #pragma warning(push, 0)
 #include "natives.h"
 #pragma warning(pop)
@@ -32,6 +34,10 @@ namespace craftv::host
 		{
 			return WORLDPROBE::_0x7EE9F5D83DD4F90E(a_x1, a_y1, a_z1, a_x2, a_y2, a_z2, kShapeTestMap, 0, kShapeTestOptions);
 		}
+
+		constexpr std::uint64_t kDiagnosticProbes = 8;        // log every detail of the first probes
+		constexpr std::uint64_t kProbeSummaryEvery = 16384;   // then a summary line every this many probes
+		constexpr int           kDiagnosticMaxPolls = 120;    // frames to wait for an asynchronous diagnostic ray
 
 		// _ADD_TEXT_COMPONENT_STRING takes at most 99 characters; longer lines go in as several components.
 		constexpr std::size_t kTextComponentChars = 90;
@@ -75,12 +81,32 @@ namespace craftv::host
 	bool GtaGame::ProbeGround(float a_x, float a_y, GroundProbe& a_out)
 	{
 		a_out = GroundProbe{};
+		PollDiagnosticRays();
 		BOOL    hit = FALSE;
 		Vector3 end{}, normal{};
 		Hash    material = 0;
 		Entity  entity = 0;
 		const int ray = StartSynchronousRay(a_x, a_y, kProbeTopZ, a_x, a_y, kProbeBottomZ);
-		if (WORLDPROBE::_GET_RAYCAST_RESULT_2(ray, &hit, &end, &normal, &material, &entity) == kShapeTestReady) {
+		const int status = WORLDPROBE::_GET_RAYCAST_RESULT_2(ray, &hit, &end, &normal, &material, &entity);
+		++stats_.probes;
+		if (status == kShapeTestReady) {
+			++stats_.syncReady;
+			stats_.syncHits += hit ? 1 : 0;
+			stats_.withMaterial += hit && material != 0 ? 1 : 0;
+		} else {
+			++stats_.fallbacks;
+		}
+		if (stats_.probes <= kDiagnosticProbes) {
+			HostLog::Info("probe %llu at %.1f, %.1f: synchronous ray status %d hit %d z %.2f material 0x%08X entity %d", static_cast<unsigned long long>(stats_.probes),
+				a_x, a_y, status, hit, end.z, material, entity);
+			StartDiagnosticRay(a_x, a_y);
+		} else if (stats_.probes % kProbeSummaryEvery == 0) {
+			HostLog::Info("probes so far %llu: synchronous ready %llu, hit %llu, with material %llu, fell back to ground-Z %llu",
+				static_cast<unsigned long long>(stats_.probes), static_cast<unsigned long long>(stats_.syncReady),
+				static_cast<unsigned long long>(stats_.syncHits), static_cast<unsigned long long>(stats_.withMaterial),
+				static_cast<unsigned long long>(stats_.fallbacks));
+		}
+		if (status == kShapeTestReady) {
 			if (!hit) {
 				return false;  // nothing there, or its collision isn't streamed in
 			}
@@ -101,6 +127,43 @@ namespace craftv::host
 			a_out.waterZ = water;
 		}
 		return true;
+	}
+
+	// Diagnostics for the first probes (remove once the material path is verified in game): the same ray
+	// through the asynchronous shape test (0x377906D8A31E5586, _CAST_RAY_POINT_TO_POINT in the SDK), whose
+	// result arrives a frame or more later, to compare what each kind reports.
+	void GtaGame::StartDiagnosticRay(float a_x, float a_y)
+	{
+		for (auto& d : diagnostic_) {
+			if (!d.pending) {
+				d.handle = WORLDPROBE::_CAST_RAY_POINT_TO_POINT(a_x, a_y, kProbeTopZ, a_x, a_y, kProbeBottomZ, kShapeTestMap, 0, kShapeTestOptions);
+				d.x = a_x;
+				d.y = a_y;
+				d.polls = 0;
+				d.pending = true;
+				return;
+			}
+		}
+	}
+
+	void GtaGame::PollDiagnosticRays()
+	{
+		for (auto& d : diagnostic_) {
+			if (!d.pending) {
+				continue;
+			}
+			BOOL      hit = FALSE;
+			Vector3   end{}, normal{};
+			Hash      material = 0;
+			Entity    entity = 0;
+			const int status = WORLDPROBE::_GET_RAYCAST_RESULT_2(d.handle, &hit, &end, &normal, &material, &entity);
+			++d.polls;
+			if (status != 1 || d.polls > kDiagnosticMaxPolls) {  // 1 = still pending
+				HostLog::Info("asynchronous ray at %.1f, %.1f after %d polls: status %d hit %d z %.2f material 0x%08X entity %d", d.x, d.y, d.polls, status,
+					hit, end.z, material, entity);
+				d.pending = false;
+			}
+		}
 	}
 
 	void GtaGame::RequestCollision(float a_x, float a_y, float a_z)

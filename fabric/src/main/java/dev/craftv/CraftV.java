@@ -6,7 +6,12 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.clock.ClockTimeMarkers;
+import net.minecraft.world.clock.WorldClock;
+import net.minecraft.world.clock.WorldClocks;
 import net.minecraft.world.level.gamerules.GameRules;
 
 /**
@@ -42,6 +47,14 @@ public final class CraftV implements ModInitializer {
 		rules.set(GameRules.SPAWN_MONSTERS, false, server);
 		rules.set(GameRules.ADVANCE_WEATHER, false, server);
 		rules.set(GameRules.KEEP_INVENTORY, true, server);
-		CraftLog.info("server configured (movement check off, no mob spawning)");
+		// Always midday, so the host game's ground is easy to see (following GTA's clock is for later).
+		rules.set(GameRules.ADVANCE_TIME, false, server);
+		try {
+			Holder<WorldClock> clock = server.registryAccess().lookupOrThrow(Registries.WORLD_CLOCK).getOrThrow(WorldClocks.OVERWORLD);
+			server.clockManager().moveToTimeMarker(clock, ClockTimeMarkers.NOON);
+		} catch (RuntimeException e) {
+			CraftLog.error("couldn't set the time to noon", e);
+		}
+		CraftLog.info("server configured (movement check off, no mob spawning, always noon)");
 	}
 }

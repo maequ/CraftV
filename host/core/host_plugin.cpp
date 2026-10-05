@@ -23,12 +23,15 @@ namespace craftv::host
 		constexpr std::uint64_t kCostReportPeriodMs = 30000;
 
 		// Overlay layout (screen fractions).
-		constexpr float kOverlayX = 0.01f;
-		constexpr float kOverlayY = 0.01f;
+		constexpr float kOverlayMargin = 0.01f;
+		constexpr float kOverlayTopRightY = 0.17f;  // below GTA's wanted stars, cash and weapon/ammo
+		constexpr float kPanelPad = 0.005f;
 		constexpr float kLineHeight = 0.022f;
 		constexpr float kTextScale = 0.28f;
-		constexpr float kPanelWidth = 0.46f;
-		constexpr int   kOverlayLines = 5;
+		constexpr float kPanelWidthCompact = 0.25f;
+		constexpr float kPanelWidthDetailed = 0.46f;
+		constexpr int   kOverlayLinesCompact = 3;
+		constexpr int   kOverlayLinesDetailed = 5;
 		constexpr int   kOverlayFriends = 3;  // names shown on the friends line
 		constexpr Rgba  kPanel{ 0, 0, 0, 140 };
 		constexpr Rgba  kGreen{ 90, 255, 90, 255 };
@@ -264,25 +267,33 @@ namespace craftv::host
 
 	void HostPlugin::DrawOverlay()
 	{
-		char        lines[kOverlayLines][200];
+		// Three short lines by default; [Debug] OverlayDetails=1 adds counters, positions and session flags.
+		const bool  details = config_.overlayDetails;
+		const int   count = details ? kOverlayLinesDetailed : kOverlayLinesCompact;
+		char        lines[kOverlayLinesDetailed][200];
 		const auto  st = endpoint_->State();
 		const auto& peer = endpoint_->Peer();
 		const auto& tx = endpoint_->TxStats();
 		const auto& rx = endpoint_->RxStats();
-		std::snprintf(lines[0], sizeof(lines[0]), "CraftV %s  link %s  ping %.1f ms  tx %llu rx %llu  bad %llu  tick %.3f ms (max %.3f)", kPluginVersion,
-			ToString(st), peer.rttValid ? peer.rttUs / 1000.0 : 0.0, static_cast<unsigned long long>(tx.produced),
-			static_cast<unsigned long long>(rx.consumed), static_cast<unsigned long long>(rx.malformed + rx.corrupt), cost_.avgUs / 1000.0,
-			cost_.maxUs / 1000.0);
+		if (details) {
+			std::snprintf(lines[0], sizeof(lines[0]), "CraftV %s  link %s  ping %.1f ms  tx %llu rx %llu  bad %llu  tick %.3f ms (max %.3f)", kPluginVersion,
+				ToString(st), peer.rttValid ? peer.rttUs / 1000.0 : 0.0, static_cast<unsigned long long>(tx.produced),
+				static_cast<unsigned long long>(rx.consumed), static_cast<unsigned long long>(rx.malformed + rx.corrupt), cost_.avgUs / 1000.0,
+				cost_.maxUs / 1000.0);
+		} else {
+			std::snprintf(lines[0], sizeof(lines[0]), "CraftV  link %s  ping %.0f ms  tick %.2f ms", ToString(st), peer.rttValid ? peer.rttUs / 1000.0 : 0.0,
+				cost_.avgUs / 1000.0);
+		}
 
 		// Friends: how many, how they join, and the first few by name with their distance.
 		int        n = 0;
-		const int  count = friends_.Count();
+		const int  friends = friends_.Count();
 		const auto me = ToMinecraft(sample_.x, sample_.y, sample_.z, config_.world);
 		if (hasSession_ && (session_.flags & kSessionOpen)) {
-			n = std::snprintf(lines[1], sizeof(lines[1]), "friends %d/%u  join: %.*s", count, session_.maxPlayers, static_cast<int>(session_.addressBytes),
+			n = std::snprintf(lines[1], sizeof(lines[1]), "friends %d/%u  join: %.*s", friends, session_.maxPlayers, static_cast<int>(session_.addressBytes),
 				session_.address);
 		} else {
-			n = std::snprintf(lines[1], sizeof(lines[1]), "friends %d  (not open to friends yet)", count);
+			n = std::snprintf(lines[1], sizeof(lines[1]), "friends %d  (not open to friends yet)", friends);
 		}
 		for (int i = 0, shown = 0; i < Friends::kMax && shown < kOverlayFriends && n > 0 && n < static_cast<int>(sizeof(lines[1])); ++i) {
 			const Friend& f = friends_.Slot(i);
@@ -297,20 +308,30 @@ namespace craftv::host
 
 		const auto& ts = terrain_.Stats();
 		const char* mat = MaterialName(ts.lastMaterialHash);
-		std::snprintf(lines[2], sizeof(lines[2]), "terrain sent %llu  empty %llu  retry %llu  queue %d  %s (%d,%d) %d/256  material %s",
-			static_cast<unsigned long long>(ts.served), static_cast<unsigned long long>(ts.empty), static_cast<unsigned long long>(ts.deferred),
-			terrain_.Queued(), terrain_.Scanning() ? "scanning" : "idle", terrain_.CurrentChunkX(), terrain_.CurrentChunkZ(), terrain_.Progress(),
-			mat ? mat : (ts.lastMaterialHash ? "?" : "-"));
-		std::snprintf(lines[3], sizeof(lines[3]), "game %.1f %.1f %.1f hdg %.0f above ground %.2f  ->  mc %.1f %.1f %.1f yaw %.0f", sample_.x, sample_.y,
-			sample_.z, sample_.heading, sample_.heightAboveGround, me.x, me.y, me.z, HeadingToYaw(sample_.heading));
-		std::snprintf(lines[4], sizeof(lines[4]), "net game %d session %d in %d | loading %d faded %d | vehicle %d air %d swim %d", sample_.networkGameInProgress,
-			sample_.networkSessionStarted, sample_.networkInSession, sample_.loadingScreen, sample_.screenFadedOut, sample_.inVehicle, sample_.inAir,
-			sample_.swimming);
+		const char* surface = mat ? mat : (ts.lastMaterialHash ? "?" : "-");
+		if (details) {
+			std::snprintf(lines[2], sizeof(lines[2]), "terrain sent %llu  empty %llu  retry %llu  queue %d  %s (%d,%d) %d/256  material %s",
+				static_cast<unsigned long long>(ts.served), static_cast<unsigned long long>(ts.empty), static_cast<unsigned long long>(ts.deferred),
+				terrain_.Queued(), terrain_.Scanning() ? "scanning" : "idle", terrain_.CurrentChunkX(), terrain_.CurrentChunkZ(), terrain_.Progress(), surface);
+			std::snprintf(lines[3], sizeof(lines[3]), "game %.1f %.1f %.1f hdg %.0f above ground %.2f  ->  mc %.1f %.1f %.1f yaw %.0f", sample_.x, sample_.y,
+				sample_.z, sample_.heading, sample_.heightAboveGround, me.x, me.y, me.z, HeadingToYaw(sample_.heading));
+			std::snprintf(lines[4], sizeof(lines[4]), "net game %d session %d in %d | loading %d faded %d | vehicle %d air %d swim %d",
+				sample_.networkGameInProgress, sample_.networkSessionStarted, sample_.networkInSession, sample_.loadingScreen, sample_.screenFadedOut,
+				sample_.inVehicle, sample_.inAir, sample_.swimming);
+		} else {
+			std::snprintf(lines[2], sizeof(lines[2]), "ground sent %llu  queue %d  surface %s", static_cast<unsigned long long>(ts.served), terrain_.Queued(),
+				surface);
+		}
 
-		game_.DrawBox(kOverlayX - 0.005f, kOverlayY - 0.004f, kPanelWidth, kLineHeight * kOverlayLines + 0.008f, kPanel);
+		// Top right sits below GTA's own wanted stars, cash and weapon; top left is the old spot.
+		const float width = details ? kPanelWidthDetailed : kPanelWidthCompact;
+		const bool  right = config_.overlayCorner == OverlayCorner::kTopRight;
+		const float x = right ? 1.0f - kOverlayMargin - width + kPanelPad : kOverlayMargin;
+		const float y = right ? kOverlayTopRightY : kOverlayMargin;
+		game_.DrawBox(x - kPanelPad, y - 0.004f, width, kLineHeight * static_cast<float>(count) + 0.008f, kPanel);
 		const Rgba status = st == LinkState::kConnected ? kGreen : (st == LinkState::kStale || st == LinkState::kDetached) ? kRed : kYellow;
-		for (int i = 0; i < kOverlayLines; ++i) {
-			game_.DrawLabel(kOverlayX, kOverlayY + kLineHeight * static_cast<float>(i), kTextScale, i == 0 ? status : kWhite, lines[i]);
+		for (int i = 0; i < count; ++i) {
+			game_.DrawLabel(x, y + kLineHeight * static_cast<float>(i), kTextScale, i == 0 ? status : kWhite, lines[i]);
 		}
 	}
 
