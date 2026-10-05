@@ -54,13 +54,14 @@ As of Phase 2 (2026-10-05). "Planned" names the phase expected to fix it.
 - Piping `test-all.ps1` into another command can hang after the tests finish (the Gradle daemon keeps the pipe
   open). Run it plainly or redirect it to a file.
 
-## GTA V plugin (built and tested without the game, not yet run in GTA V)
-- **Every native is unverified in game.** Names, hashes and signatures match the SDK's `natives.h`. These are
-  marked `// ASSUMPTION:` and get checked in the Phase 2 test:
-  - `0x7EE9F5D83DD4F90E` is the synchronous ray and its result is ready at once (otherwise ground still works
-    through `GET_GROUND_Z_FOR_3D_COORD`, without materials).
+## GTA V plugin (running in Sary's game since 2026-10-05; Phase 2 not yet confirmed)
+- Seen working in game: the link, PLAYER_STATE, terrain requests answered, and the overlay. The first run showed
+  two wrong assumptions, both fixed (DECISIONS D-023, D-024): the synchronous ray is `0x377906D8A31E5586`, and
+  material hashes come from an explicit table, not joaat of the names. The fix awaits an in-game run.
+- Chunks Minecraft already built stay as they were. When the material mapping changes, start a fresh CraftV world
+  (move `saves/CraftV` aside) to rebuild them.
+- Still unverified in game, marked `// ASSUMPTION:`:
   - Shape-test flag 1 is map collision (terrain, roads, buildings) without props, peds and vehicles.
-  - The reported material hash is joaat of the materials.dat name (the overlay shows the name it matched).
   - `GET_WATER_HEIGHT_NO_WAVES(x, y, groundZ)` reports the water surface above the ground.
   - `REQUEST_COLLISION_AT_COORD` loads collision for a far chunk within 10 frames.
   - The ped's root is 1.0 m above its feet (`FeetOffset`); the network natives read false in story mode.

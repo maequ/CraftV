@@ -40,21 +40,21 @@ namespace
 	{
 		switch (a_terrain) {
 		case kMatGrass:
-			return Joaat("GRASS");
+			return MaterialHashOf("GRASS");
 		case kMatSand:
-			return Joaat("SAND_LOOSE");
+			return MaterialHashOf("SAND_LOOSE");
 		case kMatRock:
-			return Joaat("ROCK");
+			return MaterialHashOf("ROCK");
 		case kMatRoad:
-			return Joaat("TARMAC");
+			return MaterialHashOf("TARMAC");
 		case kMatPavement:
-			return Joaat("CONCRETE");
+			return MaterialHashOf("CONCRETE");
 		case kMatSnow:
-			return Joaat("SNOW_LOOSE");
+			return MaterialHashOf("SNOW_LOOSE");
 		case kMatBuilding:
-			return Joaat("ROOF_TILE");
+			return MaterialHashOf("ROOF_TILE");
 		case kMatMud:
-			return Joaat("MUD_SOFT");
+			return MaterialHashOf("MUD_SOFT");
 		default:
 			return 0;
 		}

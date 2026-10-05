@@ -173,6 +173,9 @@ modelled yet (KNOWN_LIMITATIONS).
 material hash to the protocol's 13 materials. Unknown hashes become stone and are logged once each.
 **Reason:** No hash list to copy, and names are readable. `// ASSUMPTION:` the reported hash is joaat(name);
 Phase 2's in-game test checks it (the overlay shows the material name).
+**Revised 2026-10-05 after the first in-game run:** the assumption was wrong. GTA reported 0x10DD5498 for a road,
+and joaat("tarmac") is 0x0DD8089A. The table now lists each name's hash explicitly, taken from Script Hook V .NET's
+`MaterialHash` enum (zlib), where 0x10DD5498 is Tarmac. Names stay for the overlay and logs.
 
 ### D-024: Natives from the 2016 Script Hook V SDK, with a fallback for the material ray (2026-10-05)
 **Decision:** `gta/` compiles against the official SDK v1.0.617.1a (gitignored; its readme forbids
@@ -181,6 +184,10 @@ a clear name. If its result isn't ready at once, `ProbeGround` falls back to `GE
 without material). `CraftV.asi` imports only ScriptHookV.dll, KERNEL32 and ADVAPI32.
 **Reason:** The official SDK is the stable ABI (the runtime translates hashes per game build). The fallback keeps
 friends' ground working even if the assumption about the ray is wrong.
+**Revised 2026-10-05 after the first in-game run:** `0x7EE9F5D83DD4F90E` stayed pending (status 1) on every
+probe, so all ground came from the fallback, without materials. It's the asynchronous START_SHAPE_TEST_LOS_PROBE.
+The SDK's `_CAST_RAY_POINT_TO_POINT` (`0x377906D8A31E5586`, START_EXPENSIVE_SYNCHRONOUS_SHAPE_TEST_LOS_PROBE) was
+ready on the first poll with hit, height and material (tarmac), so `ProbeGround` uses that now.
 
 ### D-025: hostsim: the plugin core against real Minecraft without GTA (2026-10-05)
 **Decision:** `tools/hostsim` runs `HostPlugin` with a simulated game (a player walking on the mock's fake map,

@@ -63,7 +63,7 @@ namespace
 		std::vector<std::string> texts;
 		float                    lastLabelX = 0;
 		float                    groundZ = 49.6f;  // flat ground everywhere
-		std::uint32_t            material = Joaat("GRASS");
+		std::uint32_t            material = MaterialHashOf("GRASS");
 		int                      probes = 0, collisionRequests = 0;
 
 		void Sample(GameSample& a_out) override
@@ -476,7 +476,7 @@ TEST_CASE("host plugin: answers Minecraft's terrain requests with the game's gro
 	Rig rig(L"terrain");
 	rig.game.sample = StoryPlayer(0, 0, 50, 0);
 	rig.game.groundZ = 70.3f;
-	rig.game.material = Joaat("TARMAC");
+	rig.game.material = MaterialHashOf("TARMAC");
 	rig.Tick(10);
 	REQUIRE(rig.mc->Connected());
 	TerrainRequestMsg rq{};

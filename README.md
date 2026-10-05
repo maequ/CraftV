@@ -72,6 +72,8 @@ The JVM flag `--enable-native-access=ALL-UNNAMED` is required, because the link 
 - **minecraft-gta5-passthrough** by rehan-remade (MIT): the GTA V reference.
   https://github.com/rehan-remade/universal-modder/tree/main/examples/minecraft-gta5-passthrough
 - **Script Hook V** by Alexander Blade (used from Phase 2).
+- **Script Hook V .NET** by crosire, kagikn and contributors (zlib): the GTA V surface material hash list.
+  https://github.com/scripthookvdotnet/scripthookvdotnet
 
 CraftV isn't affiliated with or endorsed by Mojang, Microsoft, Rockstar Games or Take-Two.
 Minecraft and GTA V aren't included; you need your own copies.

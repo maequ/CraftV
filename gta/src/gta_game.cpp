@@ -4,6 +4,7 @@
 #include "gta_game.h"
 
 #include "core/host_log.h"
+#include "core/materials.h"
 
 #pragma warning(push, 0)
 #include "natives.h"
@@ -26,18 +27,18 @@ namespace craftv::host
 		constexpr int kShapeTestOptions = 7;
 		constexpr int kShapeTestReady = 2;  // GET_SHAPE_TEST_RESULT status: 0 failed, 1 pending, 2 ready
 
-		// ASSUMPTION: 0x7EE9F5D83DD4F90E is START_EXPENSIVE_SYNCHRONOUS_SHAPE_TEST_LOS_PROBE (unnamed in the 2016
-		// SDK): a ray whose result is ready at once. 0x65287525D951F6BE (_GET_RAYCAST_RESULT_2 in the SDK) is
-		// GET_SHAPE_TEST_RESULT_INCLUDING_MATERIAL. If the result isn't ready, ProbeGround falls back to
+		// 0x377906D8A31E5586 (_CAST_RAY_POINT_TO_POINT in the 2016 SDK, START_EXPENSIVE_SYNCHRONOUS_SHAPE_TEST_LOS_PROBE
+		// today) answers at once: in the first in-game run its result was ready on the first poll, with hit, height
+		// and material. 0x7EE9F5D83DD4F90E, which I had assumed was the synchronous one, stayed pending (it's the
+		// asynchronous START_SHAPE_TEST_LOS_PROBE). 0x65287525D951F6BE (_GET_RAYCAST_RESULT_2) is
+		// GET_SHAPE_TEST_RESULT_INCLUDING_MATERIAL. If a result still isn't ready, ProbeGround falls back to
 		// GET_GROUND_Z_FOR_3D_COORD (height only).
 		int StartSynchronousRay(float a_x1, float a_y1, float a_z1, float a_x2, float a_y2, float a_z2)
 		{
-			return WORLDPROBE::_0x7EE9F5D83DD4F90E(a_x1, a_y1, a_z1, a_x2, a_y2, a_z2, kShapeTestMap, 0, kShapeTestOptions);
+			return WORLDPROBE::_CAST_RAY_POINT_TO_POINT(a_x1, a_y1, a_z1, a_x2, a_y2, a_z2, kShapeTestMap, 0, kShapeTestOptions);
 		}
 
-		constexpr std::uint64_t kDiagnosticProbes = 8;        // log every detail of the first probes
-		constexpr std::uint64_t kProbeSummaryEvery = 16384;   // then a summary line every this many probes
-		constexpr int           kDiagnosticMaxPolls = 120;    // frames to wait for an asynchronous diagnostic ray
+		constexpr std::uint64_t kProbeSummaryEvery = 65536;  // a probe summary line in CraftV.log every this many probes
 
 		// _ADD_TEXT_COMPONENT_STRING takes at most 99 characters; longer lines go in as several components.
 		constexpr std::size_t kTextComponentChars = 90;
@@ -81,31 +82,13 @@ namespace craftv::host
 	bool GtaGame::ProbeGround(float a_x, float a_y, GroundProbe& a_out)
 	{
 		a_out = GroundProbe{};
-		PollDiagnosticRays();
 		BOOL    hit = FALSE;
 		Vector3 end{}, normal{};
 		Hash    material = 0;
 		Entity  entity = 0;
 		const int ray = StartSynchronousRay(a_x, a_y, kProbeTopZ, a_x, a_y, kProbeBottomZ);
 		const int status = WORLDPROBE::_GET_RAYCAST_RESULT_2(ray, &hit, &end, &normal, &material, &entity);
-		++stats_.probes;
-		if (status == kShapeTestReady) {
-			++stats_.syncReady;
-			stats_.syncHits += hit ? 1 : 0;
-			stats_.withMaterial += hit && material != 0 ? 1 : 0;
-		} else {
-			++stats_.fallbacks;
-		}
-		if (stats_.probes <= kDiagnosticProbes) {
-			HostLog::Info("probe %llu at %.1f, %.1f: synchronous ray status %d hit %d z %.2f material 0x%08X entity %d", static_cast<unsigned long long>(stats_.probes),
-				a_x, a_y, status, hit, end.z, material, entity);
-			StartDiagnosticRay(a_x, a_y);
-		} else if (stats_.probes % kProbeSummaryEvery == 0) {
-			HostLog::Info("probes so far %llu: synchronous ready %llu, hit %llu, with material %llu, fell back to ground-Z %llu",
-				static_cast<unsigned long long>(stats_.probes), static_cast<unsigned long long>(stats_.syncReady),
-				static_cast<unsigned long long>(stats_.syncHits), static_cast<unsigned long long>(stats_.withMaterial),
-				static_cast<unsigned long long>(stats_.fallbacks));
-		}
+		Count(status == kShapeTestReady, hit != FALSE, material);
 		if (status == kShapeTestReady) {
 			if (!hit) {
 				return false;  // nothing there, or its collision isn't streamed in
@@ -129,40 +112,29 @@ namespace craftv::host
 		return true;
 	}
 
-	// Diagnostics for the first probes (remove once the material path is verified in game): the same ray
-	// through the asynchronous shape test (0x377906D8A31E5586, _CAST_RAY_POINT_TO_POINT in the SDK), whose
-	// result arrives a frame or more later, to compare what each kind reports.
-	void GtaGame::StartDiagnosticRay(float a_x, float a_y)
+	// Counters for CraftV.log, plus each surface hash missing from the material table (logged once, so the
+	// table can grow).
+	void GtaGame::Count(bool a_ready, bool a_hit, std::uint32_t a_material)
 	{
-		for (auto& d : diagnostic_) {
-			if (!d.pending) {
-				d.handle = WORLDPROBE::_CAST_RAY_POINT_TO_POINT(a_x, a_y, kProbeTopZ, a_x, a_y, kProbeBottomZ, kShapeTestMap, 0, kShapeTestOptions);
-				d.x = a_x;
-				d.y = a_y;
-				d.polls = 0;
-				d.pending = true;
-				return;
+		++stats_.probes;
+		stats_.ready += a_ready ? 1 : 0;
+		stats_.hits += a_ready && a_hit ? 1 : 0;
+		stats_.withMaterial += a_ready && a_hit && a_material != 0 ? 1 : 0;
+		if (a_ready && a_hit && a_material != 0 && !MaterialName(a_material) && unknownCount_ < kUnknownSlots) {
+			bool seen = false;
+			for (int i = 0; i < unknownCount_ && !seen; ++i) {
+				seen = unknown_[i] == a_material;
+			}
+			if (!seen) {
+				unknown_[unknownCount_++] = a_material;
+				HostLog::Info("surface 0x%08X isn't in the material table (built as stone)", a_material);
 			}
 		}
-	}
-
-	void GtaGame::PollDiagnosticRays()
-	{
-		for (auto& d : diagnostic_) {
-			if (!d.pending) {
-				continue;
-			}
-			BOOL      hit = FALSE;
-			Vector3   end{}, normal{};
-			Hash      material = 0;
-			Entity    entity = 0;
-			const int status = WORLDPROBE::_GET_RAYCAST_RESULT_2(d.handle, &hit, &end, &normal, &material, &entity);
-			++d.polls;
-			if (status != 1 || d.polls > kDiagnosticMaxPolls) {  // 1 = still pending
-				HostLog::Info("asynchronous ray at %.1f, %.1f after %d polls: status %d hit %d z %.2f material 0x%08X entity %d", d.x, d.y, d.polls, status,
-					hit, end.z, material, entity);
-				d.pending = false;
-			}
+		if (stats_.probes % kProbeSummaryEvery == 0) {
+			HostLog::Info("probes so far %llu: ready %llu, hit %llu, with material %llu, fell back to ground-Z %llu",
+				static_cast<unsigned long long>(stats_.probes), static_cast<unsigned long long>(stats_.ready),
+				static_cast<unsigned long long>(stats_.hits), static_cast<unsigned long long>(stats_.withMaterial),
+				static_cast<unsigned long long>(stats_.probes - stats_.ready));
 		}
 	}
 

@@ -43,7 +43,7 @@ namespace
 			}
 			a_out.hit = true;
 			a_out.groundZ = 70.3f;
-			a_out.materialHash = a_x < 40.0f ? Joaat("TARMAC") : Joaat("GRASS");
+			a_out.materialHash = a_x < 40.0f ? MaterialHashOf("TARMAC") : MaterialHashOf("GRASS");
 			if (a_x > 45.0f) {
 				a_out.water = true;
 				a_out.waterZ = 72.2f;
@@ -196,18 +196,20 @@ TEST_CASE("terrain: heights round to the nearest block top; scale and offset app
 	CHECK(Near(x, -0.5) && Near(y, 0.5));
 }
 
-TEST_CASE("materials: joaat matches RAGE and materials.dat names map to terrain materials")
+TEST_CASE("materials: joaat matches RAGE, and GTA's material hashes map to terrain materials")
 {
 	CHECK_EQ(Joaat("adder"), 0xB779A091u);  // the well-known GTA V vehicle hash
 	CHECK_EQ(Joaat("GRASS"), Joaat("grass"));
-	CHECK_EQ(TerrainMaterialFor(Joaat("TARMAC")), std::uint8_t(kMatRoad));
-	CHECK_EQ(TerrainMaterialFor(Joaat("SAND_LOOSE")), std::uint8_t(kMatSand));
-	CHECK_EQ(TerrainMaterialFor(Joaat("GRASS_LONG")), std::uint8_t(kMatGrass));
-	CHECK_EQ(TerrainMaterialFor(Joaat("CONCRETE")), std::uint8_t(kMatPavement));
-	CHECK_EQ(TerrainMaterialFor(Joaat("ROOF_TILE")), std::uint8_t(kMatBuilding));
+	CHECK_EQ(MaterialHashOf("TARMAC"), 0x10DD5498u);  // what GTA reported for a road in the first in-game run
+	CHECK_EQ(MaterialHashOf("NOT_A_MATERIAL"), 0u);
+	CHECK_EQ(TerrainMaterialFor(MaterialHashOf("TARMAC")), std::uint8_t(kMatRoad));
+	CHECK_EQ(TerrainMaterialFor(MaterialHashOf("SAND_LOOSE")), std::uint8_t(kMatSand));
+	CHECK_EQ(TerrainMaterialFor(MaterialHashOf("GRASS_LONG")), std::uint8_t(kMatGrass));
+	CHECK_EQ(TerrainMaterialFor(MaterialHashOf("CONCRETE")), std::uint8_t(kMatPavement));
+	CHECK_EQ(TerrainMaterialFor(MaterialHashOf("ROOF_TILE")), std::uint8_t(kMatBuilding));
 	CHECK_EQ(TerrainMaterialFor(0), std::uint8_t(kMatUnknown));
 	CHECK_EQ(TerrainMaterialFor(0x12345678u), std::uint8_t(kMatUnknown));
-	REQUIRE(MaterialName(Joaat("MUD_SOFT")) != nullptr);
-	CHECK(std::string(MaterialName(Joaat("MUD_SOFT"))) == "MUD_SOFT");
+	REQUIRE(MaterialName(MaterialHashOf("MUD_SOFT")) != nullptr);
+	CHECK(std::string(MaterialName(MaterialHashOf("MUD_SOFT"))) == "MUD_SOFT");
 	CHECK(MaterialName(0x12345678u) == nullptr);
 }

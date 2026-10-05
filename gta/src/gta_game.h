@@ -17,21 +17,16 @@ namespace craftv::host
 		void RequestCollision(float a_x, float a_y, float a_z) override;
 
 	private:
-		void StartDiagnosticRay(float a_x, float a_y);
-		void PollDiagnosticRays();
+		void Count(bool a_ready, bool a_hit, std::uint32_t a_material);
 
 		struct ProbeStats
 		{
-			std::uint64_t probes = 0, syncReady = 0, syncHits = 0, withMaterial = 0, fallbacks = 0;
+			std::uint64_t probes = 0, ready = 0, hits = 0, withMaterial = 0;
 		};
-		struct DiagnosticRay
-		{
-			bool  pending = false;
-			int   handle = 0;
-			int   polls = 0;
-			float x = 0, y = 0;
-		};
+		static constexpr int kUnknownSlots = 32;  // distinct unknown surface hashes logged per session
+
 		ProbeStats    stats_{};
-		DiagnosticRay diagnostic_[8]{};
+		std::uint32_t unknown_[kUnknownSlots]{};
+		int           unknownCount_ = 0;
 	};
 }
