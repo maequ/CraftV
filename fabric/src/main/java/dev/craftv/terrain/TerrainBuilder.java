@@ -2,6 +2,7 @@ package dev.craftv.terrain;
 
 import dev.craftv.BlockSync;
 import dev.craftv.link.Messages;
+import dev.craftv.link.Proto;
 import java.util.EnumMap;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
@@ -55,5 +56,15 @@ public final class TerrainBuilder {
 			}
 		});
 		return placed[0];
+	}
+
+	/** True when no column of the patch has ground (PROTOCOL.md §7.12 NO_GROUND everywhere). */
+	public static boolean noGround(Messages.TerrainPatch patch) {
+		for (short y : patch.groundY()) {
+			if (y != Proto.NO_GROUND) {
+				return false;
+			}
+		}
+		return true;
 	}
 }

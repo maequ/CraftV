@@ -21,12 +21,13 @@ public final class TerrainService {
 	private static final int REQUEST_EVERY_TICKS = 10;
 	private static final long BUILD_BUDGET_NS = 10_000_000L; // per tick; at least one patch is always built
 	private static final long STATS_LOG_MS = 30_000;
+	private static final long EMPTY_RETRY_MS = 60_000; // a patch with no ground at all is asked for again after this
 
 	private final CoopConfig config;
 	private final TerrainRequester requester = new TerrainRequester();
 	private int lastGeneration = -1;
 	private int nextRequestId;
-	private long built, blocks, requested, nextStatsMs;
+	private long built, blocks, requested, empty, nextStatsMs;
 
 	public TerrainService(CoopConfig config) {
 		this.config = config;
@@ -56,9 +57,9 @@ public final class TerrainService {
 		long now = Win32.tickCount();
 		if (now >= nextStatsMs) {
 			nextStatsMs = now + STATS_LOG_MS;
-			if (requested > 0 || built > 0) {
+			if (requested > 0 || built > 0 || empty > 0) {
 				CraftLog.info("terrain: " + state.size() + " chunks built in this world (" + built + " this session, " + blocks + " blocks), " + requested
-					+ " requests sent, " + requester.inFlight() + " in flight");
+					+ " requests sent, " + empty + " came back empty, " + requester.inFlight() + " in flight");
 			}
 		}
 	}
@@ -68,6 +69,13 @@ public final class TerrainService {
 		Messages.TerrainPatch patch;
 		while ((patch = link.pollTerrainPatch()) != null) {
 			requester.answered(patch.chunkX(), patch.chunkZ());
+			if (TerrainBuilder.noGround(patch)) {
+				// Not remembered as built: the host may have had no collision there yet, or an older plugin's map
+				// edge. Ask again later instead of leaving that chunk void for good.
+				requester.snooze(patch.chunkX(), patch.chunkZ(), Win32.tickCount(), EMPTY_RETRY_MS);
+				empty++;
+				continue;
+			}
 			long key = TerrainRequester.key(patch.chunkX(), patch.chunkZ());
 			if (!state.isBuilt(key)) {
 				try {

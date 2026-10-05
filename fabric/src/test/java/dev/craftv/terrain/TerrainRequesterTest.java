@@ -58,6 +58,16 @@ class TerrainRequesterTest {
 	}
 
 	@Test
+	void aSnoozedChunkIsAskedForAgainOnlyAfterTheDelay() {
+		var r = new TerrainRequester(10, 5000);
+		assertEquals(1, r.next(List.of(new Center(0, 0)), 0, k -> false, 0).size());
+		r.answered(0, 0);
+		r.snooze(0, 0, 1000, 60_000);
+		assertTrue(r.next(List.of(new Center(0, 0)), 0, k -> false, 60_999).isEmpty());
+		assertEquals(1, r.next(List.of(new Center(0, 0)), 0, k -> false, 61_000).size());
+	}
+
+	@Test
 	void resetForgetsInFlight() {
 		var r = new TerrainRequester(2, 5000);
 		r.next(List.of(new Center(0, 0)), 1, k -> false, 0);

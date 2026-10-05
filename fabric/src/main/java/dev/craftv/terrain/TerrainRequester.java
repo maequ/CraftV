@@ -91,6 +91,11 @@ public final class TerrainRequester {
 		inFlight.remove(key(chunkX, chunkZ));
 	}
 
+	/** Don't ask for this chunk again for {@code delayMs} (it came back with no ground; the host may know more later). */
+	public void snooze(int chunkX, int chunkZ, long nowMs, long delayMs) {
+		inFlight.put(key(chunkX, chunkZ), nowMs + delayMs - retryMs); // expires like an unanswered request, delayMs from now
+	}
+
 	/** The host restarted or the link came back: whatever was in flight is lost. */
 	public void reset() {
 		inFlight.clear();

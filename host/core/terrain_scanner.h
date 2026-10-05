@@ -24,8 +24,9 @@ namespace craftv::host
 		int   collisionWaitTicks = 10;  // [Terrain] CollisionWaitTicks
 		float nearDistance = 150.0f;    // [Terrain] NearDistance, metres: closer chunks are probed at once
 		int   maxAttempts = 3;          // [Terrain] MaxAttempts
-		// ASSUMPTION: GTA V's playable map lies within these bounds (metres). Chunks outside are empty.
-		float mapMinX = -4500.0f, mapMaxX = 4800.0f, mapMinY = -4500.0f, mapMaxY = 8500.0f;
+		// ASSUMPTION: GTA V's world, North Yankton (around x 5300, y -5200) included, lies within these bounds
+		// (metres). Chunks outside are answered empty. Too wide only costs a few empty scans of open sea.
+		float mapMinX = -6000.0f, mapMaxX = 7000.0f, mapMinY = -7000.0f, mapMaxY = 9000.0f;
 	};
 
 	struct TerrainStats

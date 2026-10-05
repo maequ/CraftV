@@ -462,7 +462,8 @@ Validation: `requestId != 0`, `|chunkX|, |chunkZ| <= 1,875,000`.
 MC keeps at most `TERRAIN_MAX_IN_FLIGHT = 32` requests unanswered, asks for the nearest chunks first, and asks
 again after `TERRAIN_RETRY_MS = 5000` without an answer. The host answers each request with one `TERRAIN_PATCH`
 when it can, in any order, and may skip requests it can't serve yet (MC asks again). A chunk MC has built is
-remembered in its world save and never requested again.
+remembered in its world save and never requested again. A patch with no ground in any column isn't remembered:
+MC asks for that chunk again after 60 s (the host may have lacked collision there, or used an older map edge).
 
 ### 7.12 `TERRAIN_PATCH` (12), 1296 bytes, H → M (v1.1)
 

@@ -3,8 +3,12 @@ package dev.craftv.client;
 import dev.craftv.LinkService;
 import dev.craftv.CraftLog;
 import dev.craftv.link.Messages;
+import java.util.Set;
+import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.server.level.ServerPlayer;
 
 /**
  * Phase 1/2 "puppet" mode (PROTOCOL.md §7.3): the host's PLAYER_STATE is where the Minecraft
@@ -26,6 +30,25 @@ public final class PlayerPuppet {
 	private static long lastNewStateNs;
 
 	private PlayerPuppet() {
+	}
+
+	/**
+	 * A jump must also move the player on the integrated server. The client only sends its position while the
+	 * chunk it stands in is loaded, and the server only loads chunks around where it thinks the player is, so
+	 * after a long jump (the host's first position, fast travel) neither side would ever move.
+	 */
+	private static void moveOnServer(Minecraft minecraft, LocalPlayer player, Messages.PlayerState ps) {
+		IntegratedServer server = minecraft.getSingleplayerServer();
+		if (server == null) {
+			return;
+		}
+		UUID id = player.getUUID();
+		server.execute(() -> {
+			ServerPlayer owner = server.getPlayerList().getPlayer(id);
+			if (owner != null) {
+				owner.teleportTo(owner.level(), ps.x(), ps.y(), ps.z(), Set.of(), ps.yaw(), ps.pitch(), false);
+			}
+		});
 	}
 
 	public static void tick(Minecraft minecraft) {
@@ -58,6 +81,7 @@ public final class PlayerPuppet {
 		lastPlayer = player;
 		if (snap) {
 			player.snapTo(ps.x(), ps.y(), ps.z(), ps.yaw(), ps.pitch()); // also resets the interpolation start
+			moveOnServer(minecraft, player, ps);
 			CraftLog.info(String.format("puppet: snapped to (%.2f, %.2f, %.2f)%s", ps.x(), ps.y(), ps.z(), newHost ? " for a new host session" : ""));
 		} else {
 			player.setPos(ps.x(), ps.y(), ps.z());
