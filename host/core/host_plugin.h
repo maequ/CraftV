@@ -1,13 +1,17 @@
-// The RDR2 side of CraftV, minus the natives: one object, ticked once per script frame.
+// The game side of CraftV, minus the natives: one object, ticked once per script frame.
 //   - story mode only: any sign of an online session switches it off for good (DECISIONS D-011)
 //   - owns the craftv::Endpoint (role host, PROTOCOL.md §5) and drains Minecraft's ring every tick
 //   - sends PLAYER_STATE from the player ped (PROTOCOL.md §7.3), converted by coords.h
+//   - answers TERRAIN_REQUESTs by probing the game's ground (§7.11-7.12, terrain_scanner.h)
+//   - keeps the friends Minecraft reports (§7.8-7.10) and how they join (§7.13) for the overlay
 //   - draws a debug overlay through IGame
 //   - never throws, never blocks; no heap allocation after the first tick
 #pragma once
 
 #include "config.h"
+#include "friends.h"
 #include "game_api.h"
+#include "terrain_scanner.h"
 
 #include "craftv/endpoint.h"
 
@@ -56,6 +60,10 @@ namespace craftv::host
 		const proto::PlayerStateMsg& LastSentPlayerState() const { return lastSent_; }
 		std::uint64_t                PlayerStatesSent() const { return playerStatesSent_; }
 		std::uint64_t                BlockMessagesReceived() const { return blockMessagesReceived_; }
+		const TerrainScanner&        Terrain() const { return terrain_; }
+		const Friends&               FriendsTable() const { return friends_; }
+		bool                         HasSessionInfo() const { return hasSession_; }
+		const proto::SessionInfoMsg& Session() const { return session_; }
 
 		// True while the game is in a state where the player's position means something.
 		static bool PlayerUsable(const GameSample& a_sample);
@@ -86,6 +94,11 @@ namespace craftv::host
 		proto::PlayerStateMsg     lastSent_{};
 		std::uint64_t             playerStatesSent_ = 0;
 		std::uint64_t             blockMessagesReceived_ = 0;
+		TerrainScanner            terrain_;
+		Friends                   friends_;
+		proto::SessionInfoMsg     session_{};
+		bool                      hasSession_ = false;
+		std::uint64_t             nowMs_ = 0;
 		TickCost                  cost_{};
 		std::uint64_t             nextCostReportMs_ = 0;
 	};

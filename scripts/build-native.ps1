@@ -1,4 +1,5 @@
-# Builds the native parts (protocol library, its tests, the mock host) and runs the C++ tests.
+# Builds the native parts (protocol library, host plugin core, the GTA V and RDR2 plugins when their SDKs are
+# present, the mock host) and runs the C++ tests.
 #   .\scripts\build-native.ps1            Release build + tests
 #   .\scripts\build-native.ps1 -NoTests   build only
 #   .\scripts\build-native.ps1 -Config Debug
@@ -26,9 +27,9 @@ if (-not (Test-Path $golden)) {
 if (-not $NoTests) {
     & (Join-Path $build "protocol\cpp\$Config\craftv_link_tests.exe") | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "C++ link tests failed" }
-    & (Join-Path $build "rdr2\$Config\craftv_rdr2_tests.exe") | Out-Host
-    if ($LASTEXITCODE -ne 0) { throw "RDR2 plugin tests failed" }
+    & (Join-Path $build "host\$Config\craftv_host_tests.exe") | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw "Host plugin tests failed" }
 }
-$asi = Join-Path $build "rdr2\$Config\CraftV.asi"
-if (Test-Path $asi) { Write-Host "CraftV.asi: $asi" } else { Write-Host "CraftV.asi not built (ScriptHookRDR2 SDK missing from sdk\ScriptHookRDR2_SDK)" }
+$asi = Join-Path $build "gta\$Config\CraftV.asi"
+if (Test-Path $asi) { Write-Host "CraftV.asi: $asi" } else { Write-Host "CraftV.asi not built (Script Hook V SDK missing from sdk\ScriptHookV_SDK)" }
 Write-Host "mockhost: $(Join-Path $build "tools\mockhost\$Config\mockhost.exe")"

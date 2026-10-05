@@ -2,10 +2,12 @@
 
 #include "coords.h"
 #include "host_log.h"
+#include "materials.h"
 
 #include "craftv/clock.h"
 #include "craftv/codec.h"
 
+#include <cmath>
 #include <cstdio>
 #include <exception>
 
@@ -19,15 +21,15 @@ namespace craftv::host
 		constexpr double        kTeleportDistance = 50.0;
 		constexpr double        kCostEmaWeight = 0.05;
 		constexpr std::uint64_t kCostReportPeriodMs = 30000;
-		constexpr const char*   kSoftware = "CraftV-RDR2 0.1.0";
 
 		// Overlay layout (screen fractions).
 		constexpr float kOverlayX = 0.01f;
 		constexpr float kOverlayY = 0.01f;
 		constexpr float kLineHeight = 0.022f;
 		constexpr float kTextScale = 0.28f;
-		constexpr float kPanelWidth = 0.42f;
-		constexpr int   kOverlayLines = 4;
+		constexpr float kPanelWidth = 0.46f;
+		constexpr int   kOverlayLines = 5;
+		constexpr int   kOverlayFriends = 3;  // names shown on the friends line
 		constexpr Rgba  kPanel{ 0, 0, 0, 140 };
 		constexpr Rgba  kGreen{ 90, 255, 90, 255 };
 		constexpr Rgba  kYellow{ 255, 230, 90, 255 };
@@ -50,7 +52,7 @@ namespace craftv::host
 		return "?";
 	}
 
-	HostPlugin::HostPlugin(IGame& a_game, const Config& a_config) : game_(a_game), config_(a_config)
+	HostPlugin::HostPlugin(IGame& a_game, const Config& a_config) : game_(a_game), config_(a_config), terrain_(a_config.terrain)
 	{
 	}
 
@@ -122,13 +124,14 @@ namespace craftv::host
 			c.role = Role::kHost;
 			c.mappingName = config_.mappingName.c_str();
 			c.peerTimeoutMs = config_.mcTimeoutMs;
-			c.software = kSoftware;
+			c.software = config_.software.c_str();
 			c.log = &HostLog::FromLink;
 			endpoint_ = std::make_unique<Endpoint>(c);  // the only allocation, on the first story-mode tick
 			state_ = PluginState::kActive;
-			HostLog::Info("story mode: link starting (mapping in CraftV_RDR2.ini [Link] MappingName)");
+			HostLog::Info("story mode: link starting (%s)", config_.software.c_str());
 		}
 
+		nowMs_ = a_nowMs;
 		const bool usable = PlayerUsable(sample_);
 		if (usable != inGameReported_) {
 			inGameReported_ = usable;
@@ -153,6 +156,10 @@ namespace craftv::host
 					++playerStatesSent_;
 					teleportNext_ = false;
 				}
+				// Ground for the friends: only while the player is in the world, so the game has collision loaded.
+				if (const TerrainPatchMsg* patch = terrain_.Tick(game_, config_.world, sample_.x, sample_.y, sample_.z)) {
+					endpoint_->Send(*patch);  // if the ring is full, Minecraft asks again (§7.11)
+				}
 			}
 		}
 		wasUsable_ = usable;
@@ -167,6 +174,9 @@ namespace craftv::host
 		const std::uint32_t ev = endpoint_->TakeEvents();
 		if (ev & (kEvConnected | kEvPeerRestarted)) {
 			teleportNext_ = true;  // a new Minecraft: snap its player onto ours
+			terrain_.Reset();      // its requests and friends come again (§7.10, §7.11)
+			friends_.Clear();
+			hasSession_ = false;
 		}
 	}
 
@@ -187,6 +197,57 @@ namespace craftv::host
 		case kMsgBlockPlaceRequest:
 			++blockMessagesReceived_;
 			return;
+		case kMsgTerrainRequest: {
+			TerrainRequestMsg m;
+			if (!codec::Decode(a_h, a_p, m)) {
+				endpoint_->CountMalformed();
+				return;
+			}
+			terrain_.Enqueue(m);
+			return;
+		}
+		case kMsgRemotePlayerJoin: {
+			RemotePlayerJoinMsg m;
+			if (!codec::Decode(a_h, a_p, m)) {
+				endpoint_->CountMalformed();
+				return;
+			}
+			if (friends_.Join(m)) {
+				HostLog::Info("friend joined: %.*s (#%u)", static_cast<int>(m.nameBytes), m.name, m.playerId);
+			} else {
+				HostLog::Warn("friend table full (%d): ignoring %.*s", Friends::kMax, static_cast<int>(m.nameBytes), m.name);
+			}
+			return;
+		}
+		case kMsgRemotePlayerState: {
+			RemotePlayerStateMsg m;
+			if (!codec::Decode(a_h, a_p, m)) {
+				endpoint_->CountMalformed();
+				return;
+			}
+			friends_.State(m, nowMs_);
+			return;
+		}
+		case kMsgRemotePlayerLeave: {
+			RemotePlayerLeaveMsg m;
+			if (!codec::Decode(a_h, a_p, m)) {
+				endpoint_->CountMalformed();
+				return;
+			}
+			friends_.Leave(m.playerId);
+			HostLog::Info("friend #%u left (reason %u)", m.playerId, m.reason);
+			return;
+		}
+		case kMsgSessionInfo: {
+			SessionInfoMsg m;
+			if (!codec::Decode(a_h, a_p, m)) {
+				endpoint_->CountMalformed();
+				return;
+			}
+			session_ = m;
+			hasSession_ = true;
+			return;
+		}
 		case kMsgLog: {
 			LogMsg m;
 			if (!codec::Decode(a_h, a_p, m)) {
@@ -203,23 +264,48 @@ namespace craftv::host
 
 	void HostPlugin::DrawOverlay()
 	{
-		char        lines[kOverlayLines][160];
+		char        lines[kOverlayLines][200];
 		const auto  st = endpoint_->State();
 		const auto& peer = endpoint_->Peer();
 		const auto& tx = endpoint_->TxStats();
 		const auto& rx = endpoint_->RxStats();
-		std::snprintf(lines[0], sizeof(lines[0]), "CraftV %s  link %s  ping %.1f ms  MC session %u", kPluginVersion, ToString(st),
-			peer.rttValid ? peer.rttUs / 1000.0 : 0.0, peer.session);
-		std::snprintf(lines[1], sizeof(lines[1]), "tx %llu  rx %llu  blocks %llu  dropped %llu  bad %llu  tick %.3f ms (max %.3f)",
-			static_cast<unsigned long long>(tx.produced), static_cast<unsigned long long>(rx.consumed),
-			static_cast<unsigned long long>(blockMessagesReceived_), static_cast<unsigned long long>(tx.droppedFull),
-			static_cast<unsigned long long>(rx.malformed + rx.corrupt), cost_.avgUs / 1000.0, cost_.maxUs / 1000.0);
-		const McPosition mc = ToMinecraft(sample_.x, sample_.y, sample_.z, config_.world);
-		std::snprintf(lines[2], sizeof(lines[2]), "rdr %.1f %.1f %.1f hdg %.0f above ground %.2f  ->  mc %.1f %.1f %.1f yaw %.0f", sample_.x, sample_.y,
-			sample_.z, sample_.heading, sample_.heightAboveGround, mc.x, mc.y, mc.z, HeadingToYaw(sample_.heading));
-		std::snprintf(lines[3], sizeof(lines[3]), "net game %d session %d in %d | loading %d faded %d | mount %d vehicle %d air %d swim %d",
-			sample_.networkGameInProgress, sample_.networkSessionStarted, sample_.networkInSession, sample_.loadingScreen, sample_.screenFadedOut,
-			sample_.onMount, sample_.inVehicle, sample_.inAir, sample_.swimming);
+		std::snprintf(lines[0], sizeof(lines[0]), "CraftV %s  link %s  ping %.1f ms  tx %llu rx %llu  bad %llu  tick %.3f ms (max %.3f)", kPluginVersion,
+			ToString(st), peer.rttValid ? peer.rttUs / 1000.0 : 0.0, static_cast<unsigned long long>(tx.produced),
+			static_cast<unsigned long long>(rx.consumed), static_cast<unsigned long long>(rx.malformed + rx.corrupt), cost_.avgUs / 1000.0,
+			cost_.maxUs / 1000.0);
+
+		// Friends: how many, how they join, and the first few by name with their distance.
+		int        n = 0;
+		const int  count = friends_.Count();
+		const auto me = ToMinecraft(sample_.x, sample_.y, sample_.z, config_.world);
+		if (hasSession_ && (session_.flags & kSessionOpen)) {
+			n = std::snprintf(lines[1], sizeof(lines[1]), "friends %d/%u  join: %.*s", count, session_.maxPlayers, static_cast<int>(session_.addressBytes),
+				session_.address);
+		} else {
+			n = std::snprintf(lines[1], sizeof(lines[1]), "friends %d  (not open to friends yet)", count);
+		}
+		for (int i = 0, shown = 0; i < Friends::kMax && shown < kOverlayFriends && n > 0 && n < static_cast<int>(sizeof(lines[1])); ++i) {
+			const Friend& f = friends_.Slot(i);
+			if (!f.used) {
+				continue;
+			}
+			const double dx = f.last.x - me.x, dz = f.last.z - me.z;
+			n += f.hasState ? std::snprintf(lines[1] + n, sizeof(lines[1]) - n, "  %s %.0fm", f.name, std::sqrt(dx * dx + dz * dz))
+			                : std::snprintf(lines[1] + n, sizeof(lines[1]) - n, "  %s", f.name);
+			++shown;
+		}
+
+		const auto& ts = terrain_.Stats();
+		const char* mat = MaterialName(ts.lastMaterialHash);
+		std::snprintf(lines[2], sizeof(lines[2]), "terrain sent %llu  empty %llu  retry %llu  queue %d  %s (%d,%d) %d/256  material %s",
+			static_cast<unsigned long long>(ts.served), static_cast<unsigned long long>(ts.empty), static_cast<unsigned long long>(ts.deferred),
+			terrain_.Queued(), terrain_.Scanning() ? "scanning" : "idle", terrain_.CurrentChunkX(), terrain_.CurrentChunkZ(), terrain_.Progress(),
+			mat ? mat : (ts.lastMaterialHash ? "?" : "-"));
+		std::snprintf(lines[3], sizeof(lines[3]), "game %.1f %.1f %.1f hdg %.0f above ground %.2f  ->  mc %.1f %.1f %.1f yaw %.0f", sample_.x, sample_.y,
+			sample_.z, sample_.heading, sample_.heightAboveGround, me.x, me.y, me.z, HeadingToYaw(sample_.heading));
+		std::snprintf(lines[4], sizeof(lines[4]), "net game %d session %d in %d | loading %d faded %d | vehicle %d air %d swim %d", sample_.networkGameInProgress,
+			sample_.networkSessionStarted, sample_.networkInSession, sample_.loadingScreen, sample_.screenFadedOut, sample_.inVehicle, sample_.inAir,
+			sample_.swimming);
 
 		game_.DrawBox(kOverlayX - 0.005f, kOverlayY - 0.004f, kPanelWidth, kLineHeight * kOverlayLines + 0.008f, kPanel);
 		const Rgba status = st == LinkState::kConnected ? kGreen : (st == LinkState::kStale || st == LinkState::kDetached) ? kRed : kYellow;
@@ -255,9 +341,13 @@ namespace craftv::host
 		}
 		if (a_nowMs >= nextCostReportMs_) {
 			if (nextCostReportMs_ != 0) {
-				HostLog::Info("status: %s, link %s, tick avg %.1f us max %.1f us (ever %.1f us), %llu PLAYER_STATEs, %llu block msgs", ToString(state_),
-					endpoint_ ? ToString(endpoint_->State()) : "-", cost_.avgUs, cost_.maxUs, cost_.maxEverUs,
-					static_cast<unsigned long long>(playerStatesSent_), static_cast<unsigned long long>(blockMessagesReceived_));
+				const auto& ts = terrain_.Stats();
+				HostLog::Info("status: %s, link %s, tick avg %.1f us max %.1f us (ever %.1f us), %llu PLAYER_STATEs, %llu block msgs, %d friends, "
+							  "terrain %llu sent %llu empty %llu retried %llu probes",
+					ToString(state_), endpoint_ ? ToString(endpoint_->State()) : "-", cost_.avgUs, cost_.maxUs, cost_.maxEverUs,
+					static_cast<unsigned long long>(playerStatesSent_), static_cast<unsigned long long>(blockMessagesReceived_), friends_.Count(),
+					static_cast<unsigned long long>(ts.served), static_cast<unsigned long long>(ts.empty), static_cast<unsigned long long>(ts.deferred),
+					static_cast<unsigned long long>(ts.probes));
 			}
 			nextCostReportMs_ = a_nowMs + kCostReportPeriodMs;
 			cost_.maxUs = 0;

@@ -1,24 +1,7 @@
-# CraftV for RDR2: the host plugin.
-#   craftv_host_core  game-agnostic plugin logic (link, story-mode gate, coords, overlay, config)
-#   craftv_rdr2_tests tests of the core against a fake game (no RDR2 needed)
-#   CraftV_RDR2.asi   the ScriptHookRDR2 plugin; built only when the SDK is present (not in git:
+# CraftV for RDR2 (parked since 2026-10-05, DECISIONS D-014): the ScriptHookRDR2 plugin on top of the
+# shared host core (host/).
+#   CraftV_RDR2.asi   built only when the SDK is present (not in git:
 #                       its readme forbids redistribution; get it from https://www.dev-c.com/rdr2/scripthookrdr2/)
-
-add_library(craftv_host_core STATIC
-	src/core/config.cpp
-	src/core/host_log.cpp
-	src/core/host_plugin.cpp
-)
-target_include_directories(craftv_host_core PUBLIC src)
-target_link_libraries(craftv_host_core PUBLIC craftv_link)
-
-add_executable(craftv_rdr2_tests
-	tests/test_host_plugin.cpp
-	${CMAKE_SOURCE_DIR}/protocol/cpp/tests/test_main.cpp
-)
-target_include_directories(craftv_rdr2_tests PRIVATE ${CMAKE_SOURCE_DIR}/protocol/cpp/tests)
-target_link_libraries(craftv_rdr2_tests PRIVATE craftv_host_core)
-add_test(NAME craftv_rdr2_tests COMMAND craftv_rdr2_tests)
 
 set(CRAFTV_RDR2_SDK "${CMAKE_SOURCE_DIR}/sdk/ScriptHookRDR2_SDK" CACHE PATH "ScriptHookRDR2 SDK folder (with inc/ and lib/)")
 if(EXISTS "${CRAFTV_RDR2_SDK}/inc/natives.h" AND EXISTS "${CRAFTV_RDR2_SDK}/lib/ScriptHookRDR2.lib")

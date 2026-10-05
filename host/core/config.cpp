@@ -48,6 +48,15 @@ namespace craftv::host
 		world.feetOffset = ReadDouble(L"World", L"FeetOffset", world.feetOffset, a_iniPath);
 		world.yOffset = ReadDouble(L"World", L"YOffset", world.yOffset, a_iniPath);
 
+		const double probes = ReadDouble(L"Terrain", L"ProbesPerTick", terrain.probesPerTick, a_iniPath);
+		terrain.probesPerTick = probes >= 1 && probes <= 1024 ? static_cast<int>(probes) : TerrainConfig{}.probesPerTick;
+		const double wait = ReadDouble(L"Terrain", L"CollisionWaitTicks", terrain.collisionWaitTicks, a_iniPath);
+		terrain.collisionWaitTicks = wait >= 0 && wait <= 600 ? static_cast<int>(wait) : TerrainConfig{}.collisionWaitTicks;
+		const double nearM = ReadDouble(L"Terrain", L"NearDistance", terrain.nearDistance, a_iniPath);
+		terrain.nearDistance = nearM >= 0 && nearM <= 5000 ? static_cast<float>(nearM) : TerrainConfig{}.nearDistance;
+		const double attempts = ReadDouble(L"Terrain", L"MaxAttempts", terrain.maxAttempts, a_iniPath);
+		terrain.maxAttempts = attempts >= 1 && attempts <= 100 ? static_cast<int>(attempts) : TerrainConfig{}.maxAttempts;
+
 		debugOverlay = ReadBool(L"Debug", L"Overlay", debugOverlay, a_iniPath);
 		logEveryTickCost = ReadBool(L"Debug", L"LogTickCost", logEveryTickCost, a_iniPath);
 		return exists;

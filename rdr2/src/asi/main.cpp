@@ -3,9 +3,9 @@
 //
 // Safety (brief §6): a C++ exception in a tick is caught inside HostPlugin; a hardware fault (access
 // violation) is caught here by SEH. Either way CraftV switches itself off and the game keeps running.
-#include "../core/config.h"
-#include "../core/host_log.h"
-#include "../core/host_plugin.h"
+#include "core/config.h"
+#include "core/host_log.h"
+#include "core/host_plugin.h"
 #include "rdr2_game.h"
 
 #include "craftv/clock.h"
@@ -61,6 +61,7 @@ namespace
 	{
 		craftv::host::HostLog::Open(GameDir() + L"CraftV_RDR2.log");
 		craftv::host::Config config;
+		config.software = "CraftV-RDR2 0.1.0";
 		const std::wstring     ini = ModuleDir() + L"CraftV_RDR2.ini";
 		const bool             found = config.Load(ini);
 		craftv::host::HostLog::Info("CraftV %s loaded (protocol %u.%u); config %s", craftv::host::kPluginVersion, craftv::proto::kVersionMajor,

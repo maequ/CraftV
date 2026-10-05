@@ -10,7 +10,7 @@
 |---|---|---|
 | C++ `craftv_link_tests` | Layout, golden vectors for all 13 messages, spec-literal encodings, validation and direction rules, ring wrap/full/stale/corrupt, mapping create/open/validate, endpoint connect/stale/resume/restart, **1,000,000 records through each ring at once** | 35 |
 | Java `gradlew test` | The same golden vectors (C++ and Java agree byte for byte), ring and endpoint behaviour, 1,000,000 records through each ring, terrain column building, the terrain request planner (nearest first, cap, retry), friend tracking (join/state/leave, velocity, swing, resync) | 37 |
-| C++ `craftv_rdr2_tests` | The parked RDR2 plugin's game-agnostic core with a fake game, including zero heap allocations per tick | 14 |
+| C++ `craftv_host_tests` | The plugin core shared by GTA V and RDR2, with a fake game: coordinates, story-mode gate, PLAYER_STATE end to end, terrain requests answered (near and far chunks, misses, map edge, materials), friends and session info, faults, overlay, config, zero heap allocations per tick | 24 |
 | `gradlew integrationTest` | Real `mockhost.exe` against the real Java link in separate processes: start orders, crashes, restarts, timeouts, block messages, terrain requests answered (and a host that answers none), a friend joining/moving/leaving, SESSION_INFO, **1,000,000 records each way** | 11 |
 
 Done on 2026-10-05 with the mock host, the hidden Minecraft and a stand-in friend (a second dev
