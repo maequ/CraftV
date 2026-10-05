@@ -14,7 +14,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,11 +42,12 @@ public final class CoopServer {
 	private static final int SESSION_INFO_EVERY_TICKS = 20;
 	private static final double SPAWN_OFFSET = 2.0; // friends appear this many blocks east of the owner
 	private static final float FACE_WEST = 90.0F;
+	private static final int UNDERGROUND_MARGIN = 2; // blocks below the built ground before a friend is lifted
 
 	private static CoopConfig config;
 	private static TerrainService terrain;
 	private static FriendTracker tracker;
-	private static final Set<UUID> hovering = new HashSet<>();
+	private static final Map<UUID, Boolean> hovering = new HashMap<>(); // friend -> whether we lifted them
 	private static int lastGeneration = -1;
 	private static Messages.SessionInfo lastInfo;
 	private static volatile String address = "";
@@ -189,16 +189,41 @@ public final class CoopServer {
 		boolean built = terrain.isBuilt(server, p.chunkPosition());
 		UUID id = p.getUUID();
 		Abilities a = p.getAbilities();
-		if (!built && hovering.add(id)) {
-			if (!a.flying) {
+		if (!built && !hovering.containsKey(id)) {
+			boolean forced = !a.flying;
+			hovering.put(id, forced);
+			if (forced) {
 				a.mayfly = true;
 				a.flying = true;
 				p.onUpdateAbilities();
 			}
 			CraftLog.limited("hover", 2000, p.getGameProfile().name() + " hovers until the ground at chunk " + p.chunkPosition() + " arrives");
-		} else if (built && hovering.remove(id)) {
+		} else if (built && hovering.containsKey(id)) {
+			boolean forced = hovering.remove(id);
 			p.gameMode.getGameModeForPlayer().updatePlayerAbilities(a); // back to what the game mode allows
+			if (forced) {
+				a.flying = false; // we lifted them: put them down on the new ground (creative keeps mayfly)
+			}
 			p.onUpdateAbilities();
+			CraftLog.limited("hover-end", 2000, p.getGameProfile().name() + " has ground under them again");
+		}
+		if (built) {
+			liftIfUnderground(p);
+		}
+	}
+
+	/**
+	 * Host ground is only a few blocks thick, with void under it. A friend below it (the ground arrived above
+	 * them, or they dug through the bottom) is put back on the surface instead of falling forever.
+	 */
+	private static void liftIfUnderground(ServerPlayer p) {
+		ServerLevel level = p.level();
+		int x = (int) Math.floor(p.getX()), z = (int) Math.floor(p.getZ());
+		int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z); // the first free block above the ground
+		if (top > level.getMinY() && p.getY() < top - config.terrainDepth - UNDERGROUND_MARGIN) {
+			p.teleportTo(level, p.getX(), top, p.getZ(), Set.of(), p.getYRot(), p.getXRot(), false);
+			p.resetFallDistance();
+			CraftLog.info(p.getGameProfile().name() + " was below the ground at " + x + ", " + z + "; lifted to y " + top);
 		}
 	}
 

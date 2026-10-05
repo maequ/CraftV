@@ -288,12 +288,12 @@ namespace
 				std::string arg;
 				in >> arg;
 				if (arg == "on" || arg == "off") {
-					options_.terrain = arg == "on";
-					if (!options_.terrain) {
+					answerTerrain_ = arg == "on";  // the walking player keeps following the fake ground either way
+					if (!answerTerrain_) {
 						terrainQueue_.clear();
 					}
 				}
-				Out("terrain %s (served %llu patches)", options_.terrain ? "on" : "off (requests are ignored; Minecraft asks again)",
+				Out("terrain %s (served %llu patches)", answerTerrain_ ? "on" : "off (requests are ignored; Minecraft asks again)",
 					static_cast<unsigned long long>(terrainServed_));
 			} else if (cmd == "setblock") {
 				BlockSetMsg m{};
@@ -522,7 +522,7 @@ namespace
 					TerrainRequestMsg m;
 					if (!codec::Decode(h, p, m)) break;
 					++terrainRequests_;
-					if (options_.terrain) {
+					if (options_.terrain && answerTerrain_) {
 						terrainQueue_.push_back(m);
 					}
 					return;
@@ -641,6 +641,7 @@ namespace
 		std::uint64_t             stressReceived_ = 0;
 		std::uint64_t             stressErrors_ = 0;
 		bool                      stressDone_ = false;
+		bool                            answerTerrain_ = true;  // 'terrain on|off'
 		std::map<std::uint32_t, Friend> friends_;
 		std::deque<TerrainRequestMsg>   terrainQueue_;
 		std::uint64_t                   friendStates_ = 0;
