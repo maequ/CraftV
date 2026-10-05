@@ -437,12 +437,16 @@ Validation: as `PLAYER_STATE` (§7.3) for the floats and ranges, `playerId != 0`
 | 0 | 4 | u32 | `playerId` | from §7.8 |
 | 4 | 4 | u32 | `reason` | 0 `LEFT` (disconnected), 1 `OTHER_DIMENSION` (left the mirror world), 2 `RESET` (MC's world is closing) |
 
-**Friend tracking rules (§7.8–7.10).** MC sends `REMOTE_PLAYER_JOIN` before any state for that id. When the link
-becomes `CONNECTED`, and again when the host restarts (new host session), MC re-sends `REMOTE_PLAYER_JOIN` for
-every friend currently in the mirror world, because the host forgot them. A `REMOTE_PLAYER_STATE` for an id the host
-doesn't know is ignored (normal during that race). A `REMOTE_PLAYER_JOIN` for a known id replaces it. Before its
-world closes, MC sends `REMOTE_PLAYER_LEAVE` with `RESET` for every friend. The host's own player (the integrated
-server's owner, driven by `PLAYER_STATE`) is never reported.
+**Friend tracking rules (§7.8–7.10).** MC sends `REMOTE_PLAYER_JOIN` before any state for that id. Every time the
+link becomes `CONNECTED` (first contact, back from `STALE`, or a new host session), MC re-sends `REMOTE_PLAYER_JOIN`
+for every friend currently in the mirror world: while the link is stale MC drops its messages, so the host may have
+missed joins and leaves. (GTA stalls the link whenever it pauses its scripts, for example on losing focus.) A
+`REMOTE_PLAYER_STATE` for an id the host doesn't know is ignored (normal during that race). A `REMOTE_PLAYER_JOIN`
+for a known id replaces it. MC sends every friend's state every server tick, so the host forgets a friend it hasn't
+heard from for 5 s while connected, counting from when the link last recovered or the host last resumed from a
+pause; that clears friends whose `LEAVE` was dropped. Before its world closes, MC sends `REMOTE_PLAYER_LEAVE` with
+`RESET` for every friend. The host's own player (the integrated server's owner, driven by `PLAYER_STATE`) is never
+reported.
 
 ### 7.11 `TERRAIN_REQUEST` (11), 16 bytes, M → H (v1.1)
 

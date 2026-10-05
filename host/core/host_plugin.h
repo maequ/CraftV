@@ -80,6 +80,7 @@ namespace craftv::host
 		void DrawOverlay();
 		void Fault(const char* a_what);
 		void MeasureTick(std::uint64_t a_startUs, std::uint64_t a_nowMs);
+		void ExpireSilentFriends(std::uint64_t a_nowMs, std::uint64_t a_gapMs);
 
 		IGame&                    game_;
 		Config                    config_;
@@ -99,6 +100,7 @@ namespace craftv::host
 		proto::SessionInfoMsg     session_{};
 		bool                      hasSession_ = false;
 		std::uint64_t             nowMs_ = 0;
+		std::uint64_t             silenceBaseMs_ = 0;  // friends' silence counts from here at the earliest
 		TickCost                  cost_{};
 		std::uint64_t             nextCostReportMs_ = 0;
 	};

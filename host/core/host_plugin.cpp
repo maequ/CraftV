@@ -21,6 +21,10 @@ namespace craftv::host
 		constexpr double        kTeleportDistance = 50.0;
 		constexpr double        kCostEmaWeight = 0.05;
 		constexpr std::uint64_t kCostReportPeriodMs = 30000;
+		// Minecraft sends every friend's state every tick (§7.9). One silent this long while the link is up has
+		// left without its LEAVE reaching us. A gap this long between our own ticks means the game was paused.
+		constexpr std::uint64_t kFriendSilenceMs = 5000;
+		constexpr std::uint64_t kPauseGapMs = 1000;
 
 		// Overlay layout (screen fractions).
 		constexpr float kOverlayMargin = 0.01f;
@@ -134,6 +138,7 @@ namespace craftv::host
 			HostLog::Info("story mode: link starting (%s)", config_.software.c_str());
 		}
 
+		const std::uint64_t gapMs = nowMs_ != 0 && a_nowMs > nowMs_ ? a_nowMs - nowMs_ : 0;
 		nowMs_ = a_nowMs;
 		const bool usable = PlayerUsable(sample_);
 		if (usable != inGameReported_) {
@@ -143,6 +148,7 @@ namespace craftv::host
 		endpoint_->Tick(a_nowMs, a_nowUs);
 		HandleEvents();
 		endpoint_->Drain(a_nowUs, kMaxDrainBytesPerTick, [this](const RecordHeader& h, const std::uint8_t* p) { OnMessage(h, p); });
+		ExpireSilentFriends(a_nowMs, gapMs);
 
 		if (usable) {
 			const double dx = sample_.x - lastX_, dy = sample_.y - lastY_, dz = sample_.z - lastZ_;
@@ -183,6 +189,24 @@ namespace craftv::host
 		}
 	}
 
+	// While the link is stale (Minecraft gone quiet, or this game paused so we stopped reading), Minecraft drops
+	// its messages, LEAVEs included. A friend still there is announced again when the link recovers (§7.10); one
+	// that stays silent afterwards left meanwhile, so the table forgets it.
+	void HostPlugin::ExpireSilentFriends(std::uint64_t a_nowMs, std::uint64_t a_gapMs)
+	{
+		if (!endpoint_->Connected() || a_gapMs > kPauseGapMs) {
+			silenceBaseMs_ = a_nowMs;
+		}
+		for (int i = 0; i < Friends::kMax; ++i) {
+			const Friend&       f = friends_.Slot(i);
+			const std::uint64_t since = f.lastUpdateMs > silenceBaseMs_ ? f.lastUpdateMs : silenceBaseMs_;
+			if (f.used && a_nowMs > since && a_nowMs - since > kFriendSilenceMs) {
+				HostLog::Info("friend %s (#%u) went silent; forgetting them", f.name, f.id);
+				friends_.Leave(f.id);
+			}
+		}
+	}
+
 	void HostPlugin::OnMessage(const RecordHeader& a_h, const std::uint8_t* a_p)
 	{
 		// Phase 2 only counts and logs these; Phase 4 turns BLOCK_SET into props.
@@ -215,8 +239,11 @@ namespace craftv::host
 				endpoint_->CountMalformed();
 				return;
 			}
-			if (friends_.Join(m)) {
-				HostLog::Info("friend joined: %.*s (#%u)", static_cast<int>(m.nameBytes), m.name, m.playerId);
+			const bool known = friends_.Has(m.playerId);  // Minecraft re-announces everyone after a stall (§7.10)
+			if (friends_.Join(m, nowMs_)) {
+				if (!known) {
+					HostLog::Info("friend joined: %.*s (#%u)", static_cast<int>(m.nameBytes), m.name, m.playerId);
+				}
 			} else {
 				HostLog::Warn("friend table full (%d): ignoring %.*s", Friends::kMax, static_cast<int>(m.nameBytes), m.name);
 			}

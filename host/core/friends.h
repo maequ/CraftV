@@ -25,7 +25,7 @@ namespace craftv::host
 		static constexpr int kMax = 16;
 
 		// §7.8: a JOIN for a known id replaces it. False when the table is full.
-		bool Join(const proto::RemotePlayerJoinMsg& a_msg)
+		bool Join(const proto::RemotePlayerJoinMsg& a_msg, std::uint64_t a_nowMs = 0)
 		{
 			Friend* f = Find(a_msg.playerId);
 			if (!f) {
@@ -40,7 +40,18 @@ namespace craftv::host
 			const std::size_t n = a_msg.nameBytes <= proto::kPlayerNameMaxBytes ? a_msg.nameBytes : proto::kPlayerNameMaxBytes;
 			std::memcpy(f->name, a_msg.name, n);
 			f->name[n] = '\0';
+			f->lastUpdateMs = a_nowMs;
 			return true;
+		}
+
+		bool Has(std::uint32_t a_id) const
+		{
+			for (const auto& f : slots_) {
+				if (f.used && f.id == a_id) {
+					return true;
+				}
+			}
+			return false;
 		}
 
 		// §7.10: a state for an unknown id is ignored (normal right after a restart).

@@ -536,7 +536,7 @@ TEST_CASE("host plugin: friends and session info from Minecraft show on the over
 	REQUIRE(rig.mc->Send(join));
 	rig.Tick(2);
 	CHECK_EQ(rig.plugin->FriendsTable().Count(), 1);
-	// Minecraft restarts: a new session, which re-announces its friends itself (§7.10).
+	// Minecraft restarts: a new session, which re-announces its friends itself (Â§7.10).
 	rig.mc.reset();
 	EndpointConfig c;
 	c.role = Role::kMc;
@@ -547,6 +547,38 @@ TEST_CASE("host plugin: friends and session info from Minecraft show on the over
 	rig.Tick(20);
 	CHECK_EQ(rig.plugin->FriendsTable().Count(), 0);
 	CHECK(!rig.plugin->HasSessionInfo());
+}
+
+TEST_CASE("host plugin: a game pause keeps friends; a friend silent for 5 s while linked is forgotten")
+{
+	Rig rig(L"silent");
+	rig.game.sample = StoryPlayer(0, 0, 50, 0);
+	rig.Tick(10);
+	REQUIRE(rig.mc->Connected());
+	RemotePlayerJoinMsg join{};
+	join.playerId = 4;
+	codec::SetPlayerName(join, "Steve");
+	REQUIRE(rig.mc->Send(join));
+	RemotePlayerStateMsg st{};
+	st.playerId = 4;
+	st.y = 49.0;
+	REQUIRE(rig.mc->Send(st));
+	rig.Tick(2);
+	REQUIRE(rig.plugin->FriendsTable().Count() == 1);
+
+	// The game pauses for 20 s (scripts stop), then carries on while Minecraft keeps sending the friend.
+	rig.ms += 20000;
+	for (int i = 0; i < 400; ++i) {  // 6.4 s
+		rig.mc->Send(st);
+		rig.Tick(1);
+	}
+	CHECK_EQ(rig.plugin->FriendsTable().Count(), 1);
+
+	// The friend's LEAVE was lost: no more states. Gone a little after 5 s, not before.
+	rig.Tick(250);  // 4 s
+	CHECK_EQ(rig.plugin->FriendsTable().Count(), 1);
+	rig.Tick(100);  // 5.6 s in all
+	CHECK_EQ(rig.plugin->FriendsTable().Count(), 0);
 }
 
 TEST_CASE("host plugin: messages only Minecraft may send are refused from a host, and v1.1 garbage is malformed")

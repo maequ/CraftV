@@ -49,6 +49,7 @@ public final class CoopServer {
 	private static FriendTracker tracker;
 	private static final Map<UUID, Boolean> hovering = new HashMap<>(); // friend -> whether we lifted them
 	private static int lastGeneration = -1;
+	private static boolean wasConnected;
 	private static Messages.SessionInfo lastInfo;
 	private static volatile String address = "";
 	private static volatile int friendsOnline;
@@ -140,11 +141,15 @@ public final class CoopServer {
 		try {
 			terrain.tick(server);
 			LinkService link = LinkService.get();
-			if (link.peerGeneration() != lastGeneration) {
+			// A new host, or the link back from STALE (GTA pauses its scripts when it loses focus, and while the
+			// link is stale every message for it is dropped, JOINs included): announce every friend again (§7.10).
+			boolean connected = link.connected();
+			if (link.peerGeneration() != lastGeneration || (connected && !wasConnected)) {
 				lastGeneration = link.peerGeneration();
-				tracker.resync(); // a new host: announce every friend again (§7.10)
+				tracker.resync();
 				lastInfo = null;
 			}
+			wasConnected = connected;
 			ServerLevel mirror = TerrainService.mirror(server);
 			List<FriendTracker.Sample> present = new ArrayList<>();
 			Map<Integer, Integer> gone = new HashMap<>();
