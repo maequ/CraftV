@@ -1,4 +1,4 @@
-// CraftV shared-memory protocol v1.0: constants and byte layouts.
+// CraftV shared-memory protocol v1.1: constants and byte layouts.
 //
 // Source of truth: docs/PROTOCOL.md. Every struct here mirrors a table in that file, and the
 // static_asserts below pin each size and offset to it. The Java mirror is
@@ -18,7 +18,7 @@ namespace craftv::proto
 	// ---- identity (PROTOCOL.md §2, §3) --------------------------------------------------------
 	inline constexpr std::uint32_t kMagic = 0x56465243;  // bytes 43 52 46 56 = "CRFV"
 	inline constexpr std::uint16_t kVersionMajor = 1;
-	inline constexpr std::uint16_t kVersionMinor = 0;
+	inline constexpr std::uint16_t kVersionMinor = 1;
 	inline constexpr wchar_t       kDefaultMappingName[] = L"Local\\CraftV_Shared_v1";
 
 	enum class Role : std::uint32_t
@@ -173,6 +173,12 @@ namespace craftv::proto
 		kMsgBlockBreakRequest = 5,
 		kMsgBlockPlaceRequest = 6,
 		kMsgLog = 7,
+		kMsgRemotePlayerJoin = 8,
+		kMsgRemotePlayerState = 9,
+		kMsgRemotePlayerLeave = 10,
+		kMsgTerrainRequest = 11,
+		kMsgTerrainPatch = 12,
+		kMsgSessionInfo = 13,
 		kMsgTestPattern = 0x7F00,
 	};
 	inline constexpr std::uint16_t kTypeVersion1 = 1;
@@ -322,7 +328,163 @@ namespace craftv::proto
 	static_assert(offsetof(LogMsg, textBytes) == 2);
 	static_assert(offsetof(LogMsg, text) == 8);
 
-	// §7.7 (test only)
+	// §7.8 (v1.1)
+	inline constexpr std::uint32_t kPlayerNameMaxBytes = 32;
+	inline constexpr std::uint32_t kUuidBytes = 16;
+	struct RemotePlayerJoinMsg
+	{
+		static constexpr MsgType kType = kMsgRemotePlayerJoin;
+		std::uint32_t playerId;
+		std::uint32_t flags;
+		std::uint8_t  uuid[kUuidBytes];  // most significant byte first
+		std::uint16_t nameBytes;
+		std::uint8_t  reserved0[6];
+		char          name[kPlayerNameMaxBytes];
+	};
+	static_assert(sizeof(RemotePlayerJoinMsg) == 64);
+	static_assert(offsetof(RemotePlayerJoinMsg, flags) == 4);
+	static_assert(offsetof(RemotePlayerJoinMsg, uuid) == 8);
+	static_assert(offsetof(RemotePlayerJoinMsg, nameBytes) == 24);
+	static_assert(offsetof(RemotePlayerJoinMsg, name) == 32);
+
+	// §7.9 (v1.1)
+	enum RemotePlayerFlags : std::uint32_t
+	{
+		kRemoteOnGround = 1u << 0,
+		kRemoteCrouching = 1u << 1,
+		kRemoteSprinting = 1u << 2,
+		kRemoteSwimming = 1u << 3,
+		kRemoteGliding = 1u << 4,
+		kRemoteFlying = 1u << 5,
+		kRemoteInWater = 1u << 6,
+		kRemoteSwing = 1u << 7,
+		kRemoteSleeping = 1u << 8,
+		kRemoteRiding = 1u << 9,
+	};
+	inline constexpr std::uint32_t kRemoteKnownFlags = (1u << 10) - 1;
+	inline constexpr std::uint8_t  kGameModeMax = 3;  // 0 survival, 1 creative, 2 adventure, 3 spectator
+	struct RemotePlayerStateMsg
+	{
+		static constexpr MsgType kType = kMsgRemotePlayerState;
+		std::uint32_t playerId;
+		std::uint32_t flags;
+		double        x, y, z;
+		float         vx, vy, vz;
+		float         yaw, pitch, bodyYaw;
+		std::uint32_t tick;
+		std::uint8_t  gameMode;
+		std::uint8_t  health;
+		std::uint8_t  reserved0[2];
+	};
+	static_assert(sizeof(RemotePlayerStateMsg) == 64);
+	static_assert(offsetof(RemotePlayerStateMsg, x) == 8);
+	static_assert(offsetof(RemotePlayerStateMsg, vx) == 32);
+	static_assert(offsetof(RemotePlayerStateMsg, yaw) == 44);
+	static_assert(offsetof(RemotePlayerStateMsg, pitch) == 48);
+	static_assert(offsetof(RemotePlayerStateMsg, bodyYaw) == 52);
+	static_assert(offsetof(RemotePlayerStateMsg, tick) == 56);
+	static_assert(offsetof(RemotePlayerStateMsg, gameMode) == 60);
+	static_assert(offsetof(RemotePlayerStateMsg, health) == 61);
+
+	// §7.10 (v1.1)
+	enum LeaveReason : std::uint32_t
+	{
+		kLeaveLeft = 0,
+		kLeaveOtherDimension = 1,
+		kLeaveReset = 2,
+	};
+	struct RemotePlayerLeaveMsg
+	{
+		static constexpr MsgType kType = kMsgRemotePlayerLeave;
+		std::uint32_t playerId;
+		std::uint32_t reason;  // LeaveReason
+	};
+	static_assert(sizeof(RemotePlayerLeaveMsg) == 8);
+
+	// §7.11 (v1.1)
+	inline constexpr std::int32_t  kMaxChunkCoord = 1875000;  // kMaxHorizontalCoord / 16
+	inline constexpr std::uint32_t kTerrainMaxInFlight = 32;
+	inline constexpr std::uint64_t kTerrainRetryMs = 5000;
+	struct TerrainRequestMsg
+	{
+		static constexpr MsgType kType = kMsgTerrainRequest;
+		std::int32_t  chunkX, chunkZ;
+		std::uint32_t requestId;
+		std::uint16_t distance;
+		std::uint16_t reserved0;
+	};
+	static_assert(sizeof(TerrainRequestMsg) == 16);
+	static_assert(offsetof(TerrainRequestMsg, requestId) == 8);
+	static_assert(offsetof(TerrainRequestMsg, distance) == 12);
+
+	// §7.12 (v1.1)
+	inline constexpr std::uint32_t kChunkColumns = 256;  // 16 x 16, index = localZ * 16 + localX
+	inline constexpr std::int16_t  kNoGround = -32768;
+	inline constexpr std::int16_t  kNoWater = -32768;
+	enum TerrainMaterial : std::uint8_t
+	{
+		kMatUnknown = 0,
+		kMatGrass = 1,
+		kMatDirt = 2,
+		kMatSand = 3,
+		kMatRock = 4,
+		kMatRoad = 5,
+		kMatPavement = 6,
+		kMatGravel = 7,
+		kMatSnow = 8,
+		kMatWood = 9,
+		kMatMetal = 10,
+		kMatBuilding = 11,
+		kMatMud = 12,
+	};
+	struct TerrainPatchMsg
+	{
+		static constexpr MsgType kType = kMsgTerrainPatch;
+		std::int32_t  chunkX, chunkZ;
+		std::uint32_t requestId;  // 0 = unsolicited
+		std::uint32_t flags;
+		std::int16_t  groundY[kChunkColumns];
+		std::int16_t  waterY[kChunkColumns];
+		std::uint8_t  material[kChunkColumns];
+	};
+	static_assert(sizeof(TerrainPatchMsg) == 1296);
+	static_assert(offsetof(TerrainPatchMsg, requestId) == 8);
+	static_assert(offsetof(TerrainPatchMsg, groundY) == 16);
+	static_assert(offsetof(TerrainPatchMsg, waterY) == 528);
+	static_assert(offsetof(TerrainPatchMsg, material) == 1040);
+
+	// §7.13 (v1.1)
+	enum SessionFlags : std::uint32_t
+	{
+		kSessionOpen = 1u << 0,
+		kSessionAuth = 1u << 1,
+		kSessionWhitelist = 1u << 2,
+	};
+	inline constexpr std::uint32_t kSessionKnownFlags = kSessionOpen | kSessionAuth | kSessionWhitelist;
+	inline constexpr std::uint32_t kAddressMaxBytes = 64;
+	struct SessionInfoMsg
+	{
+		static constexpr MsgType kType = kMsgSessionInfo;
+		std::uint32_t flags;
+		std::uint16_t port;
+		std::uint16_t friends;
+		std::uint16_t maxPlayers;
+		std::uint8_t  gameMode;
+		std::uint8_t  reserved0;
+		std::uint16_t addressBytes;
+		std::uint16_t reserved1;
+		char          address[kAddressMaxBytes];
+		std::uint8_t  reserved2[16];
+	};
+	static_assert(sizeof(SessionInfoMsg) == 96);
+	static_assert(offsetof(SessionInfoMsg, port) == 4);
+	static_assert(offsetof(SessionInfoMsg, friends) == 6);
+	static_assert(offsetof(SessionInfoMsg, maxPlayers) == 8);
+	static_assert(offsetof(SessionInfoMsg, gameMode) == 10);
+	static_assert(offsetof(SessionInfoMsg, addressBytes) == 12);
+	static_assert(offsetof(SessionInfoMsg, address) == 16);
+
+	// §7.14 (test only)
 	inline constexpr std::uint32_t kTestPatternFixedBytes = 16;
 	inline constexpr std::uint32_t kTestPatternMaxFill = 256;
 	inline constexpr std::uint32_t kTestPatternFillModulus = kTestPatternMaxFill + 1;

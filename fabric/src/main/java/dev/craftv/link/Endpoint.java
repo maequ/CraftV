@@ -338,14 +338,15 @@ public final class Endpoint {
 			return;
 		}
 		Ring.DrainStatus status = rx.drain(theirBlock + SB_SESSION, maxBytes, rxStats, (type, typeVersion, payloadBytes, seq, s, off) -> {
-			if (type == MSG_PLAYER_STATE && peerRole != ROLE_HOST) {
-				rxStats.malformed++; // MC -> host PLAYER_STATE is reserved (§7.3)
+			if (!allowedFrom(type, peerRole)) {
+				rxStats.malformed++; // wrong direction (§7 table)
 				return;
 			}
 			switch (type) {
 				case MSG_HELLO -> handleHello(payloadBytes, s, off);
 				case MSG_HEARTBEAT -> handleHeartbeat(payloadBytes, s, off, nowUs);
-				case MSG_PLAYER_STATE, MSG_BLOCK_SET, MSG_BLOCK_BREAK_REQUEST, MSG_BLOCK_PLACE_REQUEST, MSG_LOG, MSG_TEST_PATTERN -> {
+				case MSG_PLAYER_STATE, MSG_BLOCK_SET, MSG_BLOCK_BREAK_REQUEST, MSG_BLOCK_PLACE_REQUEST, MSG_LOG, MSG_REMOTE_PLAYER_JOIN, MSG_REMOTE_PLAYER_STATE,
+					MSG_REMOTE_PLAYER_LEAVE, MSG_TERRAIN_REQUEST, MSG_TERRAIN_PATCH, MSG_SESSION_INFO, MSG_TEST_PATTERN -> {
 					if (!versionMismatch) {
 						sink.accept(type, payloadBytes, s, off);
 					}

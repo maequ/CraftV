@@ -264,3 +264,181 @@ TEST_CASE("codec: direction rules")
 	CHECK(codec::AllowedFrom(kMsgBlockSet, Role::kHost));
 	CHECK(!codec::AllowedFrom(kMsgLog, Role::kNone));
 }
+
+TEST_CASE("codec: v1.1 direction rules (PROTOCOL.md §7 table)")
+{
+	for (auto type : { kMsgRemotePlayerJoin, kMsgRemotePlayerState, kMsgRemotePlayerLeave, kMsgTerrainRequest, kMsgSessionInfo }) {
+		CHECK(codec::AllowedFrom(type, Role::kMc));
+		CHECK(!codec::AllowedFrom(type, Role::kHost));
+	}
+	CHECK(codec::AllowedFrom(kMsgTerrainPatch, Role::kHost));
+	CHECK(!codec::AllowedFrom(kMsgTerrainPatch, Role::kMc));
+	CHECK_EQ(codec::FixedPayloadBytes(kMsgTerrainPatch), std::uint32_t(1296));
+	CHECK_EQ(codec::FixedPayloadBytes(kMsgRemotePlayerLeave), std::uint32_t(8));
+}
+
+TEST_CASE("codec: REMOTE_PLAYER_STATE and TERRAIN_REQUEST built literally from PROTOCOL.md")
+{
+	Bytes st;
+	st.U16(9);
+	st.U16(1);
+	st.U32(64);
+	st.U32(0x11223344);
+	st.U32(7);
+	st.U32(117);                // playerId
+	st.U32(1u | 4u | 128u);     // ON_GROUND | SPRINTING | SWING
+	st.F64(100.5);
+	st.F64(71.0);
+	st.F64(-250.25);
+	st.F32(5.5f);
+	st.F32(0.0f);
+	st.F32(-1.25f);
+	st.F32(-45.5f);             // yaw
+	st.F32(12.25f);             // pitch
+	st.F32(-40.0f);             // bodyYaw
+	st.U32(9001);               // tick
+	st.U8(1);                   // creative
+	st.U8(20);                  // health
+	st.Zeros(2);
+	st.PadTo16();
+	CHECK_EQ(st.b.size(), std::size_t(80));
+
+	Bytes rq;
+	rq.U16(11);
+	rq.U16(1);
+	rq.U32(16);
+	rq.U32(0x11223344);
+	rq.U32(7);
+	rq.I32(-3);
+	rq.I32(7);
+	rq.U32(42);
+	rq.U16(2);
+	rq.Zeros(2);
+	rq.PadTo16();
+
+	Bytes patch;  // just the fixed part and the first column of each array
+	patch.U16(12);
+	patch.U16(1);
+	patch.U32(1296);
+	patch.U32(0x11223344);
+	patch.U32(7);
+	patch.I32(-3);
+	patch.I32(7);
+	patch.U32(42);
+	patch.U32(0);
+	patch.U16(60);  // groundY[0]
+
+	for (const auto& v : golden::AllVectors()) {
+		if (v.name == "REMOTE_PLAYER_STATE") {
+			CHECK(v.record == st.b);
+		}
+		if (v.name == "TERRAIN_REQUEST") {
+			CHECK(v.record == rq.b);
+		}
+		if (v.name == "TERRAIN_PATCH") {
+			REQUIRE(v.record.size() == RecordBytes(1296));
+			CHECK(std::memcmp(v.record.data(), patch.b.data(), patch.b.size()) == 0);
+			const std::size_t water0 = kRecordHeaderBytes + 528, material1 = kRecordHeaderBytes + 1040 + 1;
+			CHECK(v.record[water0] == 75 && v.record[water0 + 1] == 0);
+			CHECK(v.record[material1] == 1);
+			const std::size_t lastGround = kRecordHeaderBytes + 16 + 2 * 255;
+			CHECK(v.record[lastGround] == 0x00 && v.record[lastGround + 1] == 0x80);  // NO_GROUND = -32768
+		}
+	}
+}
+
+TEST_CASE("codec: v1.1 goldens decode back to the documented fields")
+{
+	for (const auto& v : golden::AllVectors()) {
+		RecordHeader h;
+		std::memcpy(&h, v.record.data(), sizeof(h));
+		const std::uint8_t* p = v.record.data() + kRecordHeaderBytes;
+		if (v.name == "REMOTE_PLAYER_JOIN") {
+			RemotePlayerJoinMsg m;
+			REQUIRE(codec::Decode(h, p, m));
+			CHECK_EQ(m.playerId, std::uint32_t(117));
+			CHECK_EQ(m.nameBytes, std::uint16_t(12));
+			CHECK(std::memcmp(m.name, "Steve_Friend", 12) == 0);
+			CHECK(m.uuid[0] == 0 && m.uuid[15] == 15);
+		} else if (v.name == "REMOTE_PLAYER_STATE") {
+			RemotePlayerStateMsg m;
+			REQUIRE(codec::Decode(h, p, m));
+			CHECK(m.x == 100.5 && m.y == 71.0 && m.z == -250.25);
+			CHECK(m.bodyYaw == -40.0f && m.gameMode == 1 && m.health == 20);
+		} else if (v.name == "REMOTE_PLAYER_LEAVE") {
+			RemotePlayerLeaveMsg m;
+			REQUIRE(codec::Decode(h, p, m));
+			CHECK_EQ(m.playerId, std::uint32_t(117));
+		} else if (v.name == "TERRAIN_PATCH") {
+			TerrainPatchMsg m;
+			REQUIRE(codec::Decode(h, p, m));
+			CHECK_EQ(m.groundY[codec::TerrainColumn(15, 0)], std::int16_t(75));
+			CHECK_EQ(m.groundY[codec::TerrainColumn(0, 15)], std::int16_t(45));
+			CHECK_EQ(m.groundY[255], kNoGround);
+			CHECK_EQ(m.waterY[16], kNoWater);
+			CHECK_EQ(m.material[14], std::uint8_t(1));
+		} else if (v.name == "SESSION_INFO") {
+			SessionInfoMsg m;
+			REQUIRE(codec::Decode(h, p, m));
+			CHECK_EQ(m.port, std::uint16_t(25565));
+			CHECK_EQ(m.addressBytes, std::uint16_t(18));
+			CHECK(std::memcmp(m.address, "192.168.1.23:25565", 18) == 0);
+		}
+	}
+}
+
+TEST_CASE("codec: v1.1 validation rejects bad values")
+{
+	auto st = golden::RemotePlayerState();
+	CHECK(codec::Valid(st));
+	auto bad = st;
+	bad.playerId = 0;
+	CHECK(!codec::Valid(bad));
+	bad = st;
+	bad.bodyYaw = std::numeric_limits<float>::infinity();
+	CHECK(!codec::Valid(bad));
+	bad = st;
+	bad.flags = 1u << 10;
+	CHECK(!codec::Valid(bad));
+	bad = st;
+	bad.gameMode = 4;
+	CHECK(!codec::Valid(bad));
+	bad = st;
+	bad.y = -3000.0;
+	CHECK(!codec::Valid(bad));
+
+	auto join = golden::RemotePlayerJoin();
+	CHECK(codec::Valid(join));
+	join.nameBytes = 0;
+	CHECK(!codec::Valid(join));
+	join.nameBytes = 33;
+	CHECK(!codec::Valid(join));
+
+	CHECK(!codec::Valid(RemotePlayerLeaveMsg{ 117, 3 }));
+	CHECK(!codec::Valid(RemotePlayerLeaveMsg{ 0, 0 }));
+
+	auto rq = golden::TerrainRequest();
+	rq.chunkX = kMaxChunkCoord + 1;
+	CHECK(!codec::Valid(rq));
+	rq = golden::TerrainRequest();
+	rq.requestId = 0;
+	CHECK(!codec::Valid(rq));
+
+	auto patch = golden::TerrainPatch();
+	CHECK(codec::Valid(patch));
+	patch.material[3] = 200;  // unknown material: still valid (§7.12)
+	CHECK(codec::Valid(patch));
+	patch.groundY[100] = 5000;
+	CHECK(!codec::Valid(patch));
+	patch = golden::TerrainPatch();
+	patch.waterY[7] = -2049;
+	CHECK(!codec::Valid(patch));
+
+	auto info = golden::SessionInfo();
+	CHECK(codec::Valid(info));
+	info.flags = 8;
+	CHECK(!codec::Valid(info));
+	info = golden::SessionInfo();
+	info.addressBytes = 65;
+	CHECK(!codec::Valid(info));
+}

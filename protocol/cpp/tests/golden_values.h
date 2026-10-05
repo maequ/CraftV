@@ -27,6 +27,12 @@ namespace craftv::golden
 	proto::BlockBreakRequestMsg BlockBreakRequest();
 	proto::BlockPlaceRequestMsg BlockPlaceRequest();
 	proto::LogMsg               Log();
+	proto::RemotePlayerJoinMsg  RemotePlayerJoin();
+	proto::RemotePlayerStateMsg RemotePlayerState();
+	proto::RemotePlayerLeaveMsg RemotePlayerLeave();
+	proto::TerrainRequestMsg    TerrainRequest();
+	proto::TerrainPatchMsg      TerrainPatch();
+	proto::SessionInfoMsg       SessionInfo();
 
 	// Every golden record, in file order, encoded with the C++ codec.
 	std::vector<Vector> AllVectors();

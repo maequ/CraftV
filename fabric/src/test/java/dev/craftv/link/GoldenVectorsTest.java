@@ -39,6 +39,24 @@ class GoldenVectorsTest {
 		}
 	}
 
+	// v1.1 values, identical to golden_values.cpp (UUID 00010203-0405-0607-0809-0a0b0c0d0e0f).
+	static final Messages.RemotePlayerJoin JOIN = new Messages.RemotePlayerJoin(117, 0, 0x0001020304050607L, 0x08090A0B0C0D0E0FL, "Steve_Friend");
+	static final Messages.RemotePlayerState STATE = new Messages.RemotePlayerState(117, REMOTE_ON_GROUND | REMOTE_SPRINTING | REMOTE_SWING, 100.5, 71.0,
+		-250.25, 5.5F, 0.0F, -1.25F, -45.5F, 12.25F, -40.0F, 9001, 1, 20);
+
+	static Messages.TerrainPatch terrainPatch() {
+		short[] ground = new short[CHUNK_COLUMNS];
+		short[] water = new short[CHUNK_COLUMNS];
+		byte[] material = new byte[CHUNK_COLUMNS];
+		for (int i = 0; i < CHUNK_COLUMNS; i++) {
+			ground[i] = (short) (60 + (i & 15) - (i >> 4));
+			water[i] = i < 16 ? 75 : NO_WATER;
+			material[i] = (byte) (i % 13);
+		}
+		ground[255] = NO_GROUND;
+		return new Messages.TerrainPatch(-3, 7, 42, 0, ground, water, material);
+	}
+
 	static Map<String, Messages.Payload> documented() {
 		Map<String, Messages.Payload> m = new LinkedHashMap<>();
 		m.put("HELLO", Messages.Hello.of(ROLE_HOST, 4242, SESSION, "CraftV-Golden"));
@@ -48,6 +66,12 @@ class GoldenVectorsTest {
 		m.put("BLOCK_BREAK_REQUEST", new Messages.BlockBreakRequest(3, 10, -61, -20, 1, 0));
 		m.put("BLOCK_PLACE_REQUEST", new Messages.BlockPlaceRequest(4, 10, -61, -20, 1, 1));
 		m.put("LOG", new Messages.Log(LOG_INFO, "hello from golden ✓"));
+		m.put("REMOTE_PLAYER_JOIN", JOIN);
+		m.put("REMOTE_PLAYER_STATE", STATE);
+		m.put("REMOTE_PLAYER_LEAVE", new Messages.RemotePlayerLeave(117, LEAVE_LEFT));
+		m.put("TERRAIN_REQUEST", new Messages.TerrainRequest(-3, 7, 42, 2));
+		m.put("TERRAIN_PATCH", terrainPatch());
+		m.put("SESSION_INFO", new Messages.SessionInfo(SESSION_OPEN | SESSION_AUTH, 25565, 2, 8, 1, "192.168.1.23:25565"));
 		m.put("TEST_PATTERN", new Messages.TestPattern(5));
 		return m;
 	}
@@ -104,6 +128,36 @@ class GoldenVectorsTest {
 				case "LOG" -> assertEquals("hello from golden ✓", Messages.Log.read(s, p).text());
 				case "HEARTBEAT" -> assertEquals(new Messages.Heartbeat(1_000_000L, 999_000L, 250L, 77), Messages.Heartbeat.read(s, p));
 				case "TEST_PATTERN" -> assertEquals(5, Messages.TestPattern.check(s, p, bytes));
+				case "REMOTE_PLAYER_JOIN" -> {
+					var m = Messages.RemotePlayerJoin.read(s, p);
+					assertTrue(m.valid());
+					assertEquals(JOIN, m);
+					assertEquals("00010203-0405-0607-0809-0a0b0c0d0e0f", new java.util.UUID(m.uuidMsb(), m.uuidLsb()).toString());
+				}
+				case "REMOTE_PLAYER_STATE" -> {
+					var m = Messages.RemotePlayerState.read(s, p);
+					assertTrue(m.valid());
+					assertEquals(STATE, m);
+				}
+				case "REMOTE_PLAYER_LEAVE" -> assertEquals(new Messages.RemotePlayerLeave(117, LEAVE_LEFT), Messages.RemotePlayerLeave.read(s, p));
+				case "TERRAIN_REQUEST" -> assertEquals(new Messages.TerrainRequest(-3, 7, 42, 2), Messages.TerrainRequest.read(s, p));
+				case "TERRAIN_PATCH" -> {
+					var m = Messages.TerrainPatch.read(s, p);
+					assertTrue(m.valid());
+					var doc = terrainPatch();
+					assertEquals(-3, m.chunkX());
+					assertEquals(42, m.requestId());
+					assertArrayEquals(doc.groundY(), m.groundY());
+					assertArrayEquals(doc.waterY(), m.waterY());
+					assertArrayEquals(doc.material(), m.material());
+					assertEquals(75, m.groundY()[Messages.TerrainPatch.column(15, 0)]);
+				}
+				case "SESSION_INFO" -> {
+					var m = Messages.SessionInfo.read(s, p);
+					assertTrue(m.valid());
+					assertEquals("192.168.1.23:25565", m.address());
+					assertEquals(25565, m.port());
+				}
 				default -> fail("unexpected golden " + e.getKey());
 			}
 		}
@@ -122,6 +176,29 @@ class GoldenVectorsTest {
 		assertTrue(new Messages.BlockBreakRequest(1, 0, 0, 0, FACE_UNKNOWN, 0).valid());
 		assertFalse(new Messages.BlockBreakRequest(0, 0, 0, 0, 1, 0).valid());
 		assertFalse(new Messages.BlockSet(0, 0, 0, 1, 2, 0).valid());
+	}
+
+	@Test
+	void v11ValidationAndDirections() {
+		assertFalse(new Messages.RemotePlayerState(0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20).valid());
+		assertFalse(new Messages.RemotePlayerState(1, 1 << 10, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20).valid());
+		assertFalse(new Messages.RemotePlayerState(1, 0, 0, 64, 0, 0, 0, 0, 0, 0, Float.NaN, 0, 0, 20).valid());
+		assertFalse(new Messages.RemotePlayerState(1, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 4, 20).valid());
+		assertFalse(new Messages.RemotePlayerLeave(117, 3).valid());
+		assertFalse(new Messages.TerrainRequest(MAX_CHUNK_COORD + 1, 0, 1, 0).valid());
+		assertFalse(new Messages.TerrainRequest(0, 0, 0, 0).valid());
+		var patch = terrainPatch();
+		patch.material()[3] = (byte) 200;
+		assertTrue(patch.valid(), "unknown materials are not malformed");
+		assertEquals(MAT_UNKNOWN, patch.materialAt(3));
+		patch.groundY()[100] = 5000;
+		assertFalse(patch.valid());
+		assertFalse(new Messages.SessionInfo(8, 0, 0, 0, 0, "").valid());
+		assertTrue(allowedFrom(MSG_TERRAIN_PATCH, ROLE_HOST));
+		assertFalse(allowedFrom(MSG_TERRAIN_PATCH, ROLE_MC));
+		assertTrue(allowedFrom(MSG_REMOTE_PLAYER_STATE, ROLE_MC));
+		assertFalse(allowedFrom(MSG_REMOTE_PLAYER_STATE, ROLE_HOST));
+		assertFalse(allowedFrom(MSG_PLAYER_STATE, ROLE_MC));
 	}
 
 	@Test

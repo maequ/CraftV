@@ -99,6 +99,12 @@ namespace craftv
 				case proto::kMsgBlockBreakRequest:
 				case proto::kMsgBlockPlaceRequest:
 				case proto::kMsgLog:
+				case proto::kMsgRemotePlayerJoin:
+				case proto::kMsgRemotePlayerState:
+				case proto::kMsgRemotePlayerLeave:
+				case proto::kMsgTerrainRequest:
+				case proto::kMsgTerrainPatch:
+				case proto::kMsgSessionInfo:
 				case proto::kMsgTestPattern:
 					if (!versionMismatch_) {
 						a_onMessage(a_header, a_payload);

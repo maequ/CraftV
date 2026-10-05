@@ -5,7 +5,7 @@ import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
 
 /**
- * Constants and byte offsets of the CraftV shared-memory protocol v1.0.
+ * Constants and byte offsets of the CraftV shared-memory protocol v1.1.
  *
  * <p>Source of truth: docs/PROTOCOL.md. C++ mirror: protocol/cpp/include/craftv/protocol.h.
  * {@code ProtoLayoutTest} pins these against the documented offsets; the golden vectors pin the
@@ -22,6 +22,8 @@ public final class Proto {
 	public static final ValueLayout.OfLong I64 = ValueLayout.JAVA_LONG_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
 	public static final ValueLayout.OfFloat F32 = ValueLayout.JAVA_FLOAT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
 	public static final ValueLayout.OfDouble F64 = ValueLayout.JAVA_DOUBLE_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
+	/** Big-endian u64: only for the UUID halves in REMOTE_PLAYER_JOIN (§7.8, most significant byte first). */
+	public static final ValueLayout.OfLong BE64 = ValueLayout.JAVA_LONG_UNALIGNED.withOrder(ByteOrder.BIG_ENDIAN);
 	/** Aligned u32/u64 handles for the acquire/release fields (PROTOCOL.md §6). */
 	public static final VarHandle ATOMIC_INT = ValueLayout.JAVA_INT.withOrder(ByteOrder.LITTLE_ENDIAN).varHandle();
 	public static final VarHandle ATOMIC_LONG = ValueLayout.JAVA_LONG.withOrder(ByteOrder.LITTLE_ENDIAN).varHandle();
@@ -29,7 +31,7 @@ public final class Proto {
 	// ---- identity (§2, §3) ----------------------------------------------------------------------
 	public static final int MAGIC = 0x56465243; // bytes 43 52 46 56 = "CRFV"
 	public static final int VERSION_MAJOR = 1;
-	public static final int VERSION_MINOR = 0;
+	public static final int VERSION_MINOR = 1;
 	public static final String DEFAULT_MAPPING_NAME = "Local\\CraftV_Shared_v1";
 
 	public static final int ROLE_NONE = 0;
@@ -98,6 +100,18 @@ public final class Proto {
 	public static final long RH_SESSION = 8;
 	public static final long RH_SEQ = 12;
 
+	/** May a side with this role send this message type? (§7 "Dir" column; unknown types pass and are skipped later.) */
+	public static boolean allowedFrom(int type, int senderRole) {
+		if (senderRole != ROLE_HOST && senderRole != ROLE_MC) {
+			return false;
+		}
+		return switch (type) {
+			case MSG_PLAYER_STATE, MSG_TERRAIN_PATCH -> senderRole == ROLE_HOST; // §7.3: MC -> host is reserved
+			case MSG_REMOTE_PLAYER_JOIN, MSG_REMOTE_PLAYER_STATE, MSG_REMOTE_PLAYER_LEAVE, MSG_TERRAIN_REQUEST, MSG_SESSION_INFO -> senderRole == ROLE_MC;
+			default -> true;
+		};
+	}
+
 	public static long recordBytes(long payloadBytes) {
 		return (RECORD_HEADER_BYTES + payloadBytes + (RECORD_ALIGN - 1)) & ~(long) (RECORD_ALIGN - 1);
 	}
@@ -111,6 +125,12 @@ public final class Proto {
 	public static final int MSG_BLOCK_BREAK_REQUEST = 5;
 	public static final int MSG_BLOCK_PLACE_REQUEST = 6;
 	public static final int MSG_LOG = 7;
+	public static final int MSG_REMOTE_PLAYER_JOIN = 8; // v1.1 (§7.8-7.13)
+	public static final int MSG_REMOTE_PLAYER_STATE = 9;
+	public static final int MSG_REMOTE_PLAYER_LEAVE = 10;
+	public static final int MSG_TERRAIN_REQUEST = 11;
+	public static final int MSG_TERRAIN_PATCH = 12;
+	public static final int MSG_SESSION_INFO = 13;
 	public static final int MSG_TEST_PATTERN = 0x7F00;
 	public static final int TYPE_VERSION_1 = 1;
 
@@ -120,6 +140,12 @@ public final class Proto {
 	public static final int BLOCK_SET_BYTES = 24;
 	public static final int BLOCK_REQUEST_BYTES = 24;
 	public static final int LOG_BYTES = 264;
+	public static final int REMOTE_PLAYER_JOIN_BYTES = 64;
+	public static final int REMOTE_PLAYER_STATE_BYTES = 64;
+	public static final int REMOTE_PLAYER_LEAVE_BYTES = 8;
+	public static final int TERRAIN_REQUEST_BYTES = 16;
+	public static final int TERRAIN_PATCH_BYTES = 1296;
+	public static final int SESSION_INFO_BYTES = 96;
 
 	public static final int SOFTWARE_MAX_BYTES = 40;
 	public static final int PLAYER_ON_GROUND = 1;
@@ -135,6 +161,29 @@ public final class Proto {
 	public static final int FACE_UNKNOWN = 0xFF;
 	public static final int LOG_TRACE = 0, LOG_DEBUG = 1, LOG_INFO = 2, LOG_WARN = 3, LOG_ERROR = 4;
 	public static final int LOG_TEXT_MAX_BYTES = 256;
+
+	// §7.8-7.10 friends
+	public static final int PLAYER_NAME_MAX_BYTES = 32;
+	public static final int UUID_BYTES = 16;
+	public static final int REMOTE_ON_GROUND = 1, REMOTE_CROUCHING = 1 << 1, REMOTE_SPRINTING = 1 << 2, REMOTE_SWIMMING = 1 << 3, REMOTE_GLIDING = 1 << 4,
+		REMOTE_FLYING = 1 << 5, REMOTE_IN_WATER = 1 << 6, REMOTE_SWING = 1 << 7, REMOTE_SLEEPING = 1 << 8, REMOTE_RIDING = 1 << 9;
+	public static final int REMOTE_KNOWN_FLAGS = (1 << 10) - 1;
+	public static final int GAME_MODE_MAX = 3; // 0 survival, 1 creative, 2 adventure, 3 spectator
+	public static final int LEAVE_LEFT = 0, LEAVE_OTHER_DIMENSION = 1, LEAVE_RESET = 2;
+	// §7.11-7.12 terrain
+	public static final int MAX_CHUNK_COORD = 1_875_000;
+	public static final int TERRAIN_MAX_IN_FLIGHT = 32;
+	public static final long TERRAIN_RETRY_MS = 5_000;
+	public static final int CHUNK_COLUMNS = 256; // index = localZ * 16 + localX
+	public static final short NO_GROUND = Short.MIN_VALUE;
+	public static final short NO_WATER = Short.MIN_VALUE;
+	public static final int MAT_UNKNOWN = 0, MAT_GRASS = 1, MAT_DIRT = 2, MAT_SAND = 3, MAT_ROCK = 4, MAT_ROAD = 5, MAT_PAVEMENT = 6, MAT_GRAVEL = 7,
+		MAT_SNOW = 8, MAT_WOOD = 9, MAT_METAL = 10, MAT_BUILDING = 11, MAT_MUD = 12;
+	public static final int MAT_COUNT = 13;
+	// §7.13 session
+	public static final int SESSION_OPEN = 1, SESSION_AUTH = 1 << 1, SESSION_WHITELIST = 1 << 2;
+	public static final int SESSION_KNOWN_FLAGS = SESSION_OPEN | SESSION_AUTH | SESSION_WHITELIST;
+	public static final int ADDRESS_MAX_BYTES = 64;
 
 	public static final int TEST_PATTERN_FIXED_BYTES = 16;
 	public static final int TEST_PATTERN_MAX_FILL = 256;

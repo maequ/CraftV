@@ -6,7 +6,7 @@ import java.lang.foreign.MemorySegment;
 import java.nio.charset.StandardCharsets;
 
 /**
- * The v1.0 message payloads (PROTOCOL.md §7) as records that read themselves from and write
+ * The v1.1 message payloads (PROTOCOL.md §7) as records that read themselves from and write
  * themselves to a {@link MemorySegment}. Every {@code read} takes each field exactly once into a
  * local, so a misbehaving peer can't change a value between validation and use.
  */
@@ -294,7 +294,264 @@ public final class Messages {
 		}
 	}
 
-	// ---- §7.7 TEST_PATTERN (test only) ----------------------------------------------------------
+	private static boolean positionOk(double x, double y, double z) {
+		return Double.isFinite(x) && Double.isFinite(y) && Double.isFinite(z) && Math.abs(x) <= MAX_HORIZONTAL_COORD && Math.abs(z) <= MAX_HORIZONTAL_COORD
+			&& y >= MIN_Y && y <= MAX_Y;
+	}
+
+	private static boolean chunkOk(int chunkX, int chunkZ) {
+		return chunkX >= -MAX_CHUNK_COORD && chunkX <= MAX_CHUNK_COORD && chunkZ >= -MAX_CHUNK_COORD && chunkZ <= MAX_CHUNK_COORD;
+	}
+
+	private static boolean heightOk(short y, short sentinel) {
+		return y == sentinel || (y >= (int) MIN_Y && y <= (int) MAX_Y);
+	}
+
+	// ---- §7.8 REMOTE_PLAYER_JOIN (v1.1) ----------------------------------------------------------
+	/** {@code uuidMsb}/{@code uuidLsb} are {@link java.util.UUID}'s two halves, written most significant byte first. */
+	public record RemotePlayerJoin(int playerId, int flags, long uuidMsb, long uuidLsb, String name) implements Payload {
+		@Override
+		public int type() {
+			return MSG_REMOTE_PLAYER_JOIN;
+		}
+
+		@Override
+		public int payloadBytes() {
+			return REMOTE_PLAYER_JOIN_BYTES;
+		}
+
+		@Override
+		public void write(MemorySegment s, long off) {
+			s.asSlice(off, REMOTE_PLAYER_JOIN_BYTES).fill((byte) 0);
+			s.set(I32, off, playerId);
+			s.set(I32, off + 4, flags);
+			s.set(BE64, off + 8, uuidMsb);
+			s.set(BE64, off + 16, uuidLsb);
+			byte[] text = Text.truncateUtf8(name, PLAYER_NAME_MAX_BYTES);
+			s.set(I16, off + 24, (short) text.length);
+			MemorySegment.copy(MemorySegment.ofArray(text), 0, s, off + 32, text.length);
+		}
+
+		public static RemotePlayerJoin read(MemorySegment s, long off) {
+			int nameBytes = Short.toUnsignedInt(s.get(I16, off + 24));
+			String name = nameBytes >= 1 && nameBytes <= PLAYER_NAME_MAX_BYTES ? Text.readUtf8(s, off + 32, nameBytes) : null;
+			return new RemotePlayerJoin(s.get(I32, off), s.get(I32, off + 4), s.get(BE64, off + 8), s.get(BE64, off + 16), name);
+		}
+
+		public boolean valid() {
+			return playerId != 0 && name != null;
+		}
+	}
+
+	// ---- §7.9 REMOTE_PLAYER_STATE (v1.1) ---------------------------------------------------------
+	public record RemotePlayerState(int playerId, int flags, double x, double y, double z, float vx, float vy, float vz, float yaw, float pitch,
+		float bodyYaw, int tick, int gameMode, int health) implements Payload {
+		@Override
+		public int type() {
+			return MSG_REMOTE_PLAYER_STATE;
+		}
+
+		@Override
+		public int payloadBytes() {
+			return REMOTE_PLAYER_STATE_BYTES;
+		}
+
+		@Override
+		public void write(MemorySegment s, long off) {
+			s.set(I32, off, playerId);
+			s.set(I32, off + 4, flags);
+			s.set(F64, off + 8, x);
+			s.set(F64, off + 16, y);
+			s.set(F64, off + 24, z);
+			s.set(F32, off + 32, vx);
+			s.set(F32, off + 36, vy);
+			s.set(F32, off + 40, vz);
+			s.set(F32, off + 44, yaw);
+			s.set(F32, off + 48, pitch);
+			s.set(F32, off + 52, bodyYaw);
+			s.set(I32, off + 56, tick);
+			s.set(U8, off + 60, (byte) gameMode);
+			s.set(U8, off + 61, (byte) health);
+			s.set(I16, off + 62, (short) 0);
+		}
+
+		public static RemotePlayerState read(MemorySegment s, long off) {
+			return new RemotePlayerState(s.get(I32, off), s.get(I32, off + 4), s.get(F64, off + 8), s.get(F64, off + 16), s.get(F64, off + 24),
+				s.get(F32, off + 32), s.get(F32, off + 36), s.get(F32, off + 40), s.get(F32, off + 44), s.get(F32, off + 48), s.get(F32, off + 52),
+				s.get(I32, off + 56), Byte.toUnsignedInt(s.get(U8, off + 60)), Byte.toUnsignedInt(s.get(U8, off + 61)));
+		}
+
+		public boolean valid() {
+			if (playerId == 0 || !positionOk(x, y, z)) {
+				return false;
+			}
+			if (!Float.isFinite(vx) || !Float.isFinite(vy) || !Float.isFinite(vz) || !Float.isFinite(yaw) || !Float.isFinite(pitch) || !Float.isFinite(bodyYaw)) {
+				return false;
+			}
+			float speed2 = vx * vx + vy * vy + vz * vz;
+			return pitch >= -90.0F && pitch <= 90.0F && speed2 <= MAX_SPEED * MAX_SPEED && (flags & ~REMOTE_KNOWN_FLAGS) == 0 && gameMode <= GAME_MODE_MAX;
+		}
+	}
+
+	// ---- §7.10 REMOTE_PLAYER_LEAVE (v1.1) --------------------------------------------------------
+	public record RemotePlayerLeave(int playerId, int reason) implements Payload {
+		@Override
+		public int type() {
+			return MSG_REMOTE_PLAYER_LEAVE;
+		}
+
+		@Override
+		public int payloadBytes() {
+			return REMOTE_PLAYER_LEAVE_BYTES;
+		}
+
+		@Override
+		public void write(MemorySegment s, long off) {
+			s.set(I32, off, playerId);
+			s.set(I32, off + 4, reason);
+		}
+
+		public static RemotePlayerLeave read(MemorySegment s, long off) {
+			return new RemotePlayerLeave(s.get(I32, off), s.get(I32, off + 4));
+		}
+
+		public boolean valid() {
+			return playerId != 0 && reason >= LEAVE_LEFT && reason <= LEAVE_RESET;
+		}
+	}
+
+	// ---- §7.11 TERRAIN_REQUEST (v1.1) ------------------------------------------------------------
+	public record TerrainRequest(int chunkX, int chunkZ, int requestId, int distance) implements Payload {
+		@Override
+		public int type() {
+			return MSG_TERRAIN_REQUEST;
+		}
+
+		@Override
+		public int payloadBytes() {
+			return TERRAIN_REQUEST_BYTES;
+		}
+
+		@Override
+		public void write(MemorySegment s, long off) {
+			s.set(I32, off, chunkX);
+			s.set(I32, off + 4, chunkZ);
+			s.set(I32, off + 8, requestId);
+			s.set(I16, off + 12, (short) distance);
+			s.set(I16, off + 14, (short) 0);
+		}
+
+		public static TerrainRequest read(MemorySegment s, long off) {
+			return new TerrainRequest(s.get(I32, off), s.get(I32, off + 4), s.get(I32, off + 8), Short.toUnsignedInt(s.get(I16, off + 12)));
+		}
+
+		public boolean valid() {
+			return requestId != 0 && chunkOk(chunkX, chunkZ);
+		}
+	}
+
+	// ---- §7.12 TERRAIN_PATCH (v1.1) --------------------------------------------------------------
+	/**
+	 * One chunk column of host ground. Arrays have {@link Proto#CHUNK_COLUMNS} entries, index
+	 * {@code localZ * 16 + localX}. Records compare arrays by reference, so tests compare fields.
+	 */
+	public record TerrainPatch(int chunkX, int chunkZ, int requestId, int flags, short[] groundY, short[] waterY, byte[] material) implements Payload {
+		private static final long GROUND_OFF = 16, WATER_OFF = 528, MATERIAL_OFF = 1040;
+
+		public static int column(int localX, int localZ) {
+			return localZ * 16 + localX;
+		}
+
+		@Override
+		public int type() {
+			return MSG_TERRAIN_PATCH;
+		}
+
+		@Override
+		public int payloadBytes() {
+			return TERRAIN_PATCH_BYTES;
+		}
+
+		@Override
+		public void write(MemorySegment s, long off) {
+			s.set(I32, off, chunkX);
+			s.set(I32, off + 4, chunkZ);
+			s.set(I32, off + 8, requestId);
+			s.set(I32, off + 12, flags);
+			for (int i = 0; i < CHUNK_COLUMNS; i++) {
+				s.set(I16, off + GROUND_OFF + 2L * i, groundY[i]);
+				s.set(I16, off + WATER_OFF + 2L * i, waterY[i]);
+				s.set(U8, off + MATERIAL_OFF + i, material[i]);
+			}
+		}
+
+		public static TerrainPatch read(MemorySegment s, long off) {
+			short[] ground = new short[CHUNK_COLUMNS];
+			short[] water = new short[CHUNK_COLUMNS];
+			byte[] material = new byte[CHUNK_COLUMNS];
+			MemorySegment.copy(s, I16, off + GROUND_OFF, ground, 0, CHUNK_COLUMNS);
+			MemorySegment.copy(s, I16, off + WATER_OFF, water, 0, CHUNK_COLUMNS);
+			MemorySegment.copy(s, U8, off + MATERIAL_OFF, material, 0, CHUNK_COLUMNS);
+			return new TerrainPatch(s.get(I32, off), s.get(I32, off + 4), s.get(I32, off + 8), s.get(I32, off + 12), ground, water, material);
+		}
+
+		/** Surface material of a column; values this version doesn't know read as {@link Proto#MAT_UNKNOWN} (§7.12). */
+		public int materialAt(int column) {
+			int m = Byte.toUnsignedInt(material[column]);
+			return m < MAT_COUNT ? m : MAT_UNKNOWN;
+		}
+
+		public boolean valid() {
+			if (!chunkOk(chunkX, chunkZ) || groundY.length != CHUNK_COLUMNS || waterY.length != CHUNK_COLUMNS || material.length != CHUNK_COLUMNS) {
+				return false;
+			}
+			for (int i = 0; i < CHUNK_COLUMNS; i++) {
+				if (!heightOk(groundY[i], NO_GROUND) || !heightOk(waterY[i], NO_WATER)) {
+					return false;
+				}
+			}
+			return true;
+		}
+	}
+
+	// ---- §7.13 SESSION_INFO (v1.1) ---------------------------------------------------------------
+	public record SessionInfo(int flags, int port, int friends, int maxPlayers, int gameMode, String address) implements Payload {
+		@Override
+		public int type() {
+			return MSG_SESSION_INFO;
+		}
+
+		@Override
+		public int payloadBytes() {
+			return SESSION_INFO_BYTES;
+		}
+
+		@Override
+		public void write(MemorySegment s, long off) {
+			s.asSlice(off, SESSION_INFO_BYTES).fill((byte) 0);
+			s.set(I32, off, flags);
+			s.set(I16, off + 4, (short) port);
+			s.set(I16, off + 6, (short) friends);
+			s.set(I16, off + 8, (short) maxPlayers);
+			s.set(U8, off + 10, (byte) gameMode);
+			byte[] text = Text.truncateUtf8(address, ADDRESS_MAX_BYTES);
+			s.set(I16, off + 12, (short) text.length);
+			MemorySegment.copy(MemorySegment.ofArray(text), 0, s, off + 16, text.length);
+		}
+
+		public static SessionInfo read(MemorySegment s, long off) {
+			int addressBytes = Short.toUnsignedInt(s.get(I16, off + 12));
+			String address = addressBytes <= ADDRESS_MAX_BYTES ? Text.readUtf8(s, off + 16, addressBytes) : null;
+			return new SessionInfo(s.get(I32, off), Short.toUnsignedInt(s.get(I16, off + 4)), Short.toUnsignedInt(s.get(I16, off + 6)),
+				Short.toUnsignedInt(s.get(I16, off + 8)), Byte.toUnsignedInt(s.get(U8, off + 10)), address);
+		}
+
+		public boolean valid() {
+			return (flags & ~SESSION_KNOWN_FLAGS) == 0 && gameMode <= GAME_MODE_MAX && address != null;
+		}
+	}
+
+	// ---- §7.14 TEST_PATTERN (test only) ----------------------------------------------------------
 	public record TestPattern(long index) implements Payload {
 		private static final int INDEX_MUL = 31;
 

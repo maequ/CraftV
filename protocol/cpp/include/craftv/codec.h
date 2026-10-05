@@ -28,6 +28,12 @@ namespace craftv::codec
 	bool Valid(const BlockBreakRequestMsg& a_msg);
 	bool Valid(const BlockPlaceRequestMsg& a_msg);
 	bool Valid(const LogMsg& a_msg);
+	bool Valid(const RemotePlayerJoinMsg& a_msg);
+	bool Valid(const RemotePlayerStateMsg& a_msg);
+	bool Valid(const RemotePlayerLeaveMsg& a_msg);
+	bool Valid(const TerrainRequestMsg& a_msg);
+	bool Valid(const TerrainPatchMsg& a_msg);
+	bool Valid(const SessionInfoMsg& a_msg);
 
 	// Copies the known prefix of a payload into a_out and validates it. Shorter payloads are malformed;
 	// longer ones are accepted (forward compatibility, §9). The payload pointer may point into shared
@@ -45,8 +51,15 @@ namespace craftv::codec
 	// ---- builders --------------------------------------------------------------------------------
 	HelloMsg MakeHello(Role a_role, std::uint32_t a_pid, std::uint32_t a_session, const char* a_software);
 	LogMsg   MakeLog(LogLevel a_level, const char* a_text);
+	// Fills name/nameBytes (cut on a UTF-8 boundary). (§7.8)
+	void SetPlayerName(RemotePlayerJoinMsg& a_msg, const char* a_name);
+	// Fills address/addressBytes (cut on a UTF-8 boundary). (§7.13)
+	void SetAddress(SessionInfoMsg& a_msg, const char* a_address);
 
-	// ---- TEST_PATTERN (§7.7) ---------------------------------------------------------------------
+	// Column index inside a TERRAIN_PATCH for local block coordinates 0..15. (§7.12)
+	constexpr std::uint32_t TerrainColumn(std::uint32_t a_localX, std::uint32_t a_localZ) { return a_localZ * 16 + a_localX; }
+
+	// ---- TEST_PATTERN (§7.14) ---------------------------------------------------------------------
 	std::uint32_t Fnv1a32(const std::uint8_t* a_data, std::size_t a_bytes);
 	// Payload size the stress sender uses for this index.
 	std::uint32_t TestPatternPayloadBytes(std::uint64_t a_index);

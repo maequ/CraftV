@@ -1,7 +1,7 @@
-# CraftV shared-memory protocol, version 1.0
+# CraftV shared-memory protocol, version 1.1
 
-This document is the **source of truth** for the bytes shared between the RDR2 host (the ASI
-plugin, or the mock host) and the Minecraft guest (the Fabric mod). The code mirrors it in:
+This document is the **source of truth** for the bytes shared between the host (the GTA V ASI
+plugin, the parked RDR2 plugin, or the mock host) and the Minecraft guest (the Fabric mod). The code mirrors it in:
 
 - C++: `protocol/cpp/include/craftv/protocol.h` (constants, structs, `static_assert`s on every size/offset)
 - Java: `fabric/src/main/java/dev/craftv/link/Proto.java`
@@ -22,10 +22,11 @@ rings, symmetric create-or-open, and per-message session tags are new (see `DECI
 | Floats | IEEE-754 binary32 (`f32`) and binary64 (`f64`) |
 | Strings | UTF-8, length given by an explicit field, not NUL-terminated (unused bytes are zero) |
 | Alignment | Every struct field is naturally aligned. Sections are 4 KiB aligned. Ring records are 16-byte aligned |
-| Coordinates | **Minecraft space** everywhere: X east, Y up, Z south, 1 unit = 1 block. The host converts at its edge (RDR2, like GTA V, is Z-up in metres: 1 block = 1 m, `mc.x = rdr.x`, `mc.y = rdr.z`, `mc.z = -rdr.y`. `// ASSUMPTION:` verified in game in Phase 2) |
+| Coordinates | **Minecraft space** everywhere: X east, Y up, Z south, 1 unit = 1 block. The host converts at its edge (GTA V and RDR2 are Z-up in metres: 1 block = 1 m, `mc.x = gta.x`, `mc.y = gta.z`, `mc.z = -gta.y`, as in the GTA V reference project. `// ASSUMPTION:` verified in game in Phase 2) |
 | Angles | Minecraft degrees: yaw 0 looks along +Z (south), yaw 90 along -X (west). Pitch positive looks down, range [-90, 90] |
 | Time | Heartbeat liveness uses each reader's own monotonic clock (§6). Timestamps in messages are microseconds of `QueryPerformanceCounter`, which is one system-wide clock on a given PC |
-| "Host" / "MC" | Host = RDR2 plugin or mock host (role `1`). MC = the Minecraft guest (role `2`) |
+| "Host" / "MC" | Host = the game plugin or the mock host (role `1`). MC = the Minecraft guest (role `2`), which is also the Minecraft server friends join |
+| "Friend" | A player in MC's world other than the host's own player (the integrated server's owner) |
 
 ## 2. The mapping
 
@@ -261,7 +262,7 @@ compiler and the JIT, and for ARM64 if it is ever a target.
 
 ## 7. Messages
 
-Type ranges: `1–0xFF` core (v1.0), `0x100–0x7EFF` reserved for later phases, `0x7F00–0x7FFF`
+Type ranges: `1–0xFF` core (`1–7` since v1.0, `8–13` since v1.1), `0x100–0x7EFF` reserved for later phases, `0x7F00–0x7FFF`
 test/debug only. Every core payload has a **fixed size**. "Dir" says who may send it: H = host, M = MC.
 A message received from a side that may not send it is counted as malformed and ignored.
 
@@ -275,6 +276,12 @@ A message received from a side that may not send it is counted as malformed and 
 | `5` | `BLOCK_BREAK_REQUEST` | H, M | 24 |
 | `6` | `BLOCK_PLACE_REQUEST` | H, M | 24 |
 | `7` | `LOG` | H, M | 264 |
+| `8` | `REMOTE_PLAYER_JOIN` | M | 64 (v1.1) |
+| `9` | `REMOTE_PLAYER_STATE` | M | 64 (v1.1) |
+| `10` | `REMOTE_PLAYER_LEAVE` | M | 8 (v1.1) |
+| `11` | `TERRAIN_REQUEST` | M | 16 (v1.1) |
+| `12` | `TERRAIN_PATCH` | H | 1296 (v1.1) |
+| `13` | `SESSION_INFO` | M | 96 (v1.1) |
 | `0x7F00` | `TEST_PATTERN` | H, M | 16–272 (variable, test only) |
 
 ### 7.1 `HELLO` (1), 64 bytes
@@ -284,7 +291,7 @@ Sent right after attach and again whenever a new peer session is seen.
 | Offset | Size | Type | Field | Notes |
 |---|---|---|---|---|
 | 0 | 2 | u16 | `versionMajor` | `1` |
-| 2 | 2 | u16 | `versionMinor` | `0` |
+| 2 | 2 | u16 | `versionMinor` | `1` (v1.1) |
 | 4 | 4 | u32 | `role` | `1` host, `2` MC |
 | 8 | 4 | u32 | `pid` | |
 | 12 | 4 | u32 | `session` | same as the record header's |
@@ -386,7 +393,132 @@ block is replaceable (grass, snow layer), in which case it is the clicked block 
 
 Receivers print it into their own log, prefixed with the peer's role. Senders rate-limit.
 
-### 7.7 `TEST_PATTERN` (0x7F00), 16 + n bytes (n ≤ 256), test only
+### 7.8 `REMOTE_PLAYER_JOIN` (8), 64 bytes, M → H (v1.1)
+
+A friend is now in the mirror world (joined the server, or came back from another dimension).
+
+| Offset | Size | Type | Field | Notes |
+|---|---|---|---|---|
+| 0 | 4 | u32 | `playerId` | non-zero. MC's entity id: unique while that MC process runs. Used by §7.9 and §7.10 |
+| 4 | 4 | u32 | `flags` | `0` in v1.1 |
+| 8 | 16 | u8[16] | `uuid` | the Minecraft account UUID, most significant byte first |
+| 24 | 2 | u16 | `nameBytes` | 1–32 |
+| 26 | 6 | | reserved | |
+| 32 | 32 | u8[32] | `name` | UTF-8 player name (Minecraft names are at most 16 ASCII characters) |
+
+### 7.9 `REMOTE_PLAYER_STATE` (9), 64 bytes, M → H (v1.1)
+
+One per friend per MC server tick (20 Hz) while the link is `CONNECTED`.
+
+| Offset | Size | Type | Field | Notes |
+|---|---|---|---|---|
+| 0 | 4 | u32 | `playerId` | from §7.8 |
+| 4 | 4 | u32 | `flags` | bit 0 `ON_GROUND`, 1 `CROUCHING`, 2 `SPRINTING`, 3 `SWIMMING`, 4 `GLIDING` (elytra), 5 `FLYING` (creative flight), 6 `IN_WATER`, 7 `SWING` (an arm swing started since the previous state), 8 `SLEEPING`, 9 `RIDING`. Other bits 0 |
+| 8 | 8 | f64 | `x` | feet position, MC blocks |
+| 16 | 8 | f64 | `y` | |
+| 24 | 8 | f64 | `z` | |
+| 32 | 4 | f32 | `vx` | blocks per second, from the change in position since the previous tick |
+| 36 | 4 | f32 | `vy` | |
+| 40 | 4 | f32 | `vz` | |
+| 44 | 4 | f32 | `yaw` | head yaw, MC degrees |
+| 48 | 4 | f32 | `pitch` | MC degrees |
+| 52 | 4 | f32 | `bodyYaw` | MC degrees |
+| 56 | 4 | u32 | `tick` | MC server tick counter |
+| 60 | 1 | u8 | `gameMode` | 0 survival, 1 creative, 2 adventure, 3 spectator |
+| 61 | 1 | u8 | `health` | health rounded up, clamped to 0–255 (20 = full) |
+| 62 | 2 | | reserved | |
+
+Validation: as `PLAYER_STATE` (§7.3) for the floats and ranges, `playerId != 0`, `gameMode <= 3`, no unknown flags.
+
+### 7.10 `REMOTE_PLAYER_LEAVE` (10), 8 bytes, M → H (v1.1)
+
+| Offset | Size | Type | Field | Notes |
+|---|---|---|---|---|
+| 0 | 4 | u32 | `playerId` | from §7.8 |
+| 4 | 4 | u32 | `reason` | 0 `LEFT` (disconnected), 1 `OTHER_DIMENSION` (left the mirror world), 2 `RESET` (MC's world is closing) |
+
+**Friend tracking rules (§7.8–7.10).** MC sends `REMOTE_PLAYER_JOIN` before any state for that id. When the link
+becomes `CONNECTED`, and again when the host restarts (new host session), MC re-sends `REMOTE_PLAYER_JOIN` for
+every friend currently in the mirror world, because the host forgot them. A `REMOTE_PLAYER_STATE` for an id the host
+doesn't know is ignored (normal during that race). A `REMOTE_PLAYER_JOIN` for a known id replaces it. Before its
+world closes, MC sends `REMOTE_PLAYER_LEAVE` with `RESET` for every friend. The host's own player (the integrated
+server's owner, driven by `PLAYER_STATE`) is never reported.
+
+### 7.11 `TERRAIN_REQUEST` (11), 16 bytes, M → H (v1.1)
+
+"I need the ground of chunk column `(chunkX, chunkZ)`." Terrain is pulled by MC, so the host scans wherever any
+player is, not only around its own player.
+
+| Offset | Size | Type | Field | Notes |
+|---|---|---|---|---|
+| 0 | 4 | i32 | `chunkX` | `blockX >> 4` |
+| 4 | 4 | i32 | `chunkZ` | `blockZ >> 4` |
+| 8 | 4 | u32 | `requestId` | non-zero, increasing per MC session |
+| 12 | 2 | u16 | `distance` | chunk distance (Chebyshev) to the nearest player when requested; lower = more urgent |
+| 14 | 2 | | reserved | |
+
+Validation: `requestId != 0`, `|chunkX|, |chunkZ| <= 1,875,000`.
+
+MC keeps at most `TERRAIN_MAX_IN_FLIGHT = 32` requests unanswered, asks for the nearest chunks first, and asks
+again after `TERRAIN_RETRY_MS = 5000` without an answer. The host answers each request with one `TERRAIN_PATCH`
+when it can, in any order, and may skip requests it can't serve yet (MC asks again). A chunk MC has built is
+remembered in its world save and never requested again.
+
+### 7.12 `TERRAIN_PATCH` (12), 1296 bytes, H → M (v1.1)
+
+The ground of one 16 × 16 chunk column. Column `i` is block `(chunkX·16 + (i & 15), chunkZ·16 + (i >> 4))`, so
+`i = localZ · 16 + localX`.
+
+| Offset | Size | Type | Field | Notes |
+|---|---|---|---|---|
+| 0 | 4 | i32 | `chunkX` | |
+| 4 | 4 | i32 | `chunkZ` | |
+| 8 | 4 | u32 | `requestId` | the `TERRAIN_REQUEST` it answers, `0` = unsolicited |
+| 12 | 4 | u32 | `flags` | `0` in v1.1 |
+| 16 | 512 | i16[256] | `groundY` | MC Y of the top solid block (the one you stand on), or `NO_GROUND = -32768` |
+| 528 | 512 | i16[256] | `waterY` | MC Y of the top water block, or `NO_WATER = -32768`. Water fills `groundY + 1 … waterY`; ignored unless `waterY > groundY` and the column has ground |
+| 1040 | 256 | u8[256] | `material` | surface material (table below) |
+
+Validation: chunk coordinates as in §7.11; every `groundY` and `waterY` is the sentinel or within `[-2048, 4096]`.
+Unknown material values are not malformed: they are treated as `UNKNOWN`. MC skips blocks outside its world's height.
+
+| Material | Value | Meaning (MC picks the blocks: `fabric/.../terrain/TerrainBlocks.java`) |
+|---|---|---|
+| `UNKNOWN` | 0 | not classified |
+| `GRASS` | 1 | grass, lawns, fields |
+| `DIRT` | 2 | dirt, trails |
+| `SAND` | 3 | beaches, desert |
+| `ROCK` | 4 | rock, cliffs |
+| `ROAD` | 5 | asphalt |
+| `PAVEMENT` | 6 | sidewalks, concrete, plazas |
+| `GRAVEL` | 7 | gravel |
+| `SNOW` | 8 | snow |
+| `WOOD` | 9 | wooden decks, piers |
+| `METAL` | 10 | metal surfaces |
+| `BUILDING` | 11 | roofs and building tops |
+| `MUD` | 12 | mud, swamp |
+
+### 7.13 `SESSION_INFO` (13), 96 bytes, M → H (v1.1)
+
+How friends can join, for the host's overlay. Sent when the link becomes `CONNECTED`, when the host restarts, and
+whenever a field changes (at most once a second).
+
+| Offset | Size | Type | Field | Notes |
+|---|---|---|---|---|
+| 0 | 4 | u32 | `flags` | bit 0 `OPEN` (friends can join), bit 1 `AUTH` (Minecraft accounts are verified), bit 2 `WHITELIST`. Other bits 0 |
+| 4 | 2 | u16 | `port` | TCP port friends connect to, `0` when not open |
+| 6 | 2 | u16 | `friends` | friends connected now |
+| 8 | 2 | u16 | `maxPlayers` | |
+| 10 | 1 | u8 | `gameMode` | friends' game mode (as §7.9) |
+| 11 | 1 | | reserved | |
+| 12 | 2 | u16 | `addressBytes` | ≤ 64 |
+| 14 | 2 | | reserved | |
+| 16 | 64 | u8[64] | `address` | UTF-8, best effort, e.g. `192.168.1.23:25565` |
+| 80 | 16 | | reserved | |
+
+Validation: no unknown flags, `gameMode <= 3`, `addressBytes <= 64`.
+
+### 7.14 `TEST_PATTERN` (0x7F00), 16 + n bytes (n ≤ 256), test only
 
 Used by the stress and chaos tests. Normal builds ignore it unless a test mode is on.
 
@@ -406,7 +538,7 @@ The stress sender uses `n = index mod 257`, so record sizes vary and wrap-around
 - Never block: a full ring drops the message and counts it. The host's per-tick drain is bounded
   (`MAX_DRAIN_BYTES_PER_TICK = 256 KiB`).
 - Validate every decoded value (§7.3 ranges, `face <= 5` or `0xFF`, `textBytes <= 256`,
-  `softwareBytes <= 40`) and treat out-of-range values as malformed.
+  `softwareBytes <= 40`, the §7.8–7.13 rules) and treat out-of-range values as malformed.
 - Messages from the wrong direction are malformed.
 - Count everything (sent, received, dropped-full, stale, unknown, malformed, corrupt) and expose the
   counts in logs and the debug overlay.
@@ -420,6 +552,8 @@ The stress sender uses `n = index mod 257`, so record sizes vary and wrap-around
   fields **appended** to a payload (with its `typeVersion` bumped). Readers ignore what they don't know
   and read known prefixes.
 - Every change updates this file, both mirrors, the goldens, and gets an entry in `DECISIONS.md`.
+- **History:** v1.0 (2026-10-02) core messages 1–7. v1.1 (2026-10-05) co-op messages 8–13 (`DECISIONS.md`
+  D-016). A v1.0 peer skips them as unknown types, so v1.0 and v1.1 still link up.
 
 ## 10. Golden vectors
 

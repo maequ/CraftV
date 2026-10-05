@@ -73,6 +73,80 @@ namespace craftv::golden
 		return codec::MakeLog(kLogInfo, reinterpret_cast<const char*>(u8"hello from golden ✓"));
 	}
 
+	// v1.1 (PROTOCOL.md §7.8-7.13)
+	RemotePlayerJoinMsg RemotePlayerJoin()
+	{
+		RemotePlayerJoinMsg m{};
+		m.playerId = 117;
+		for (std::uint8_t i = 0; i < kUuidBytes; ++i) {
+			m.uuid[i] = i;  // 00010203-0405-0607-0809-0a0b0c0d0e0f
+		}
+		codec::SetPlayerName(m, "Steve_Friend");
+		return m;
+	}
+
+	RemotePlayerStateMsg RemotePlayerState()
+	{
+		RemotePlayerStateMsg m{};
+		m.playerId = 117;
+		m.flags = kRemoteOnGround | kRemoteSprinting | kRemoteSwing;
+		m.x = 100.5;
+		m.y = 71.0;
+		m.z = -250.25;
+		m.vx = 5.5f;
+		m.vy = 0.0f;
+		m.vz = -1.25f;
+		m.yaw = -45.5f;
+		m.pitch = 12.25f;
+		m.bodyYaw = -40.0f;
+		m.tick = 9001;
+		m.gameMode = 1;
+		m.health = 20;
+		return m;
+	}
+
+	RemotePlayerLeaveMsg RemotePlayerLeave()
+	{
+		return RemotePlayerLeaveMsg{ 117, kLeaveLeft };
+	}
+
+	TerrainRequestMsg TerrainRequest()
+	{
+		TerrainRequestMsg m{};
+		m.chunkX = -3;
+		m.chunkZ = 7;
+		m.requestId = 42;
+		m.distance = 2;
+		return m;
+	}
+
+	TerrainPatchMsg TerrainPatch()
+	{
+		TerrainPatchMsg m{};
+		m.chunkX = -3;
+		m.chunkZ = 7;
+		m.requestId = 42;
+		for (std::uint32_t i = 0; i < kChunkColumns; ++i) {
+			m.groundY[i] = static_cast<std::int16_t>(60 + static_cast<int>(i & 15) - static_cast<int>(i >> 4));
+			m.waterY[i] = i < 16 ? std::int16_t(75) : kNoWater;
+			m.material[i] = static_cast<std::uint8_t>(i % 13);
+		}
+		m.groundY[255] = kNoGround;
+		return m;
+	}
+
+	SessionInfoMsg SessionInfo()
+	{
+		SessionInfoMsg m{};
+		m.flags = kSessionOpen | kSessionAuth;
+		m.port = 25565;
+		m.friends = 2;
+		m.maxPlayers = 8;
+		m.gameMode = 1;
+		codec::SetAddress(m, "192.168.1.23:25565");
+		return m;
+	}
+
 	namespace
 	{
 		template <class T>
@@ -94,6 +168,12 @@ namespace craftv::golden
 		all.push_back(Make("BLOCK_BREAK_REQUEST", BlockBreakRequest()));
 		all.push_back(Make("BLOCK_PLACE_REQUEST", BlockPlaceRequest()));
 		all.push_back(Make("LOG", Log()));
+		all.push_back(Make("REMOTE_PLAYER_JOIN", RemotePlayerJoin()));
+		all.push_back(Make("REMOTE_PLAYER_STATE", RemotePlayerState()));
+		all.push_back(Make("REMOTE_PLAYER_LEAVE", RemotePlayerLeave()));
+		all.push_back(Make("TERRAIN_REQUEST", TerrainRequest()));
+		all.push_back(Make("TERRAIN_PATCH", TerrainPatch()));
+		all.push_back(Make("SESSION_INFO", SessionInfo()));
 
 		std::uint8_t        payload[kTestPatternFixedBytes + kTestPatternMaxFill];
 		const std::uint32_t bytes = codec::BuildTestPattern(kTestPatternIndex, payload);

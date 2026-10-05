@@ -65,6 +65,18 @@ namespace craftv::codec
 			return sizeof(BlockPlaceRequestMsg);
 		case kMsgLog:
 			return sizeof(LogMsg);
+		case kMsgRemotePlayerJoin:
+			return sizeof(RemotePlayerJoinMsg);
+		case kMsgRemotePlayerState:
+			return sizeof(RemotePlayerStateMsg);
+		case kMsgRemotePlayerLeave:
+			return sizeof(RemotePlayerLeaveMsg);
+		case kMsgTerrainRequest:
+			return sizeof(TerrainRequestMsg);
+		case kMsgTerrainPatch:
+			return sizeof(TerrainPatchMsg);
+		case kMsgSessionInfo:
+			return sizeof(SessionInfoMsg);
 		default:
 			return 0;
 		}
@@ -84,6 +96,14 @@ namespace craftv::codec
 		case kMsgLog:
 		case kMsgTestPattern:
 			return true;
+		case kMsgRemotePlayerJoin:
+		case kMsgRemotePlayerState:
+		case kMsgRemotePlayerLeave:
+		case kMsgTerrainRequest:
+		case kMsgSessionInfo:
+			return a_sender == Role::kMc;  // §7.8-7.11, §7.13
+		case kMsgTerrainPatch:
+			return a_sender == Role::kHost;  // §7.12
 		case kMsgPlayerState:
 			// MC -> host is reserved for Phase 3 (PROTOCOL.md §7.3); a v1.0 receiver only takes the host's.
 			return a_sender == Role::kHost;
@@ -145,6 +165,81 @@ namespace craftv::codec
 	bool Valid(const LogMsg& a_msg)
 	{
 		return a_msg.level <= kLogError && a_msg.textBytes <= kLogTextMaxBytes;
+	}
+
+	namespace
+	{
+		bool PositionOk(double a_x, double a_y, double a_z)
+		{
+			return Finite(a_x) && Finite(a_y) && Finite(a_z) && std::fabs(a_x) <= kMaxHorizontalCoord && std::fabs(a_z) <= kMaxHorizontalCoord &&
+			       a_y >= kMinY && a_y <= kMaxY;
+		}
+
+		bool ChunkOk(std::int32_t a_chunkX, std::int32_t a_chunkZ)
+		{
+			return a_chunkX >= -kMaxChunkCoord && a_chunkX <= kMaxChunkCoord && a_chunkZ >= -kMaxChunkCoord && a_chunkZ <= kMaxChunkCoord;
+		}
+
+		bool HeightOk(std::int16_t a_y, std::int16_t a_sentinel)
+		{
+			return a_y == a_sentinel || (a_y >= static_cast<std::int16_t>(kMinY) && a_y <= static_cast<std::int16_t>(kMaxY));
+		}
+	}
+
+	bool Valid(const RemotePlayerJoinMsg& a_msg)
+	{
+		return a_msg.playerId != 0 && a_msg.nameBytes >= 1 && a_msg.nameBytes <= kPlayerNameMaxBytes;
+	}
+
+	bool Valid(const RemotePlayerStateMsg& a_msg)
+	{
+		if (a_msg.playerId == 0 || !PositionOk(a_msg.x, a_msg.y, a_msg.z)) {
+			return false;
+		}
+		if (!Finite(a_msg.vx) || !Finite(a_msg.vy) || !Finite(a_msg.vz) || !Finite(a_msg.yaw) || !Finite(a_msg.pitch) || !Finite(a_msg.bodyYaw)) {
+			return false;
+		}
+		const float speed2 = a_msg.vx * a_msg.vx + a_msg.vy * a_msg.vy + a_msg.vz * a_msg.vz;
+		return a_msg.pitch >= -90.0f && a_msg.pitch <= 90.0f && speed2 <= kMaxSpeed * kMaxSpeed && (a_msg.flags & ~kRemoteKnownFlags) == 0 &&
+		       a_msg.gameMode <= kGameModeMax;
+	}
+
+	bool Valid(const RemotePlayerLeaveMsg& a_msg)
+	{
+		return a_msg.playerId != 0 && a_msg.reason <= kLeaveReset;
+	}
+
+	bool Valid(const TerrainRequestMsg& a_msg)
+	{
+		return a_msg.requestId != 0 && ChunkOk(a_msg.chunkX, a_msg.chunkZ);
+	}
+
+	bool Valid(const TerrainPatchMsg& a_msg)
+	{
+		if (!ChunkOk(a_msg.chunkX, a_msg.chunkZ)) {
+			return false;
+		}
+		for (std::uint32_t i = 0; i < kChunkColumns; ++i) {
+			if (!HeightOk(a_msg.groundY[i], kNoGround) || !HeightOk(a_msg.waterY[i], kNoWater)) {
+				return false;
+			}
+		}
+		return true;  // unknown materials read as UNKNOWN (§7.12)
+	}
+
+	bool Valid(const SessionInfoMsg& a_msg)
+	{
+		return (a_msg.flags & ~kSessionKnownFlags) == 0 && a_msg.gameMode <= kGameModeMax && a_msg.addressBytes <= kAddressMaxBytes;
+	}
+
+	void SetPlayerName(RemotePlayerJoinMsg& a_msg, const char* a_name)
+	{
+		CopyText(a_msg.name, sizeof(a_msg.name), a_name, a_msg.nameBytes);
+	}
+
+	void SetAddress(SessionInfoMsg& a_msg, const char* a_address)
+	{
+		CopyText(a_msg.address, sizeof(a_msg.address), a_address, a_msg.addressBytes);
 	}
 
 	HelloMsg MakeHello(Role a_role, std::uint32_t a_pid, std::uint32_t a_session, const char* a_software)
