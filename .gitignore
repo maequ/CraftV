@@ -27,3 +27,4 @@ fabric/out/
 /sdk/
 *.env
 secrets.*
+/dist/
