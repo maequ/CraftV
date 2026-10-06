@@ -33,18 +33,22 @@ public final class TerrainState extends SavedData {
 
 	private static final Codec<TerrainState> CODEC = RecordCodecBuilder.create(i -> i.group(
 		Codec.LONG_STREAM.optionalFieldOf("built_chunks").forGetter(s -> Optional.empty()),
-		Entry.CODEC.listOf().optionalFieldOf("chunks", List.of()).forGetter(TerrainState::entries)).apply(i, TerrainState::new));
+		Entry.CODEC.listOf().optionalFieldOf("chunks", List.of()).forGetter(TerrainState::entries),
+		Codec.STRING.optionalFieldOf("source", "").forGetter(s -> s.source)).apply(i, TerrainState::new));
 	// ASSUMPTION: a null DataFixTypes is accepted for mod data (no vanilla data fixer applies to it).
 	private static final SavedDataType<TerrainState> TYPE = new SavedDataType<>(Identifier.fromNamespaceAndPath("craftv", "terrain"), TerrainState::new, CODEC,
 		null);
 
 	private final LongOpenHashSet built = new LongOpenHashSet();
 	private final Long2ObjectOpenHashMap<byte[]> columns = new Long2ObjectOpenHashMap<>();
+	/** Where this world's ground comes from: "game" (GTA) or "test" (the mock host, hostsim); empty until the first patch. */
+	private String source = "";
 
 	public TerrainState() {
 	}
 
-	private TerrainState(Optional<LongStream> legacy, List<Entry> entries) {
+	private TerrainState(Optional<LongStream> legacy, List<Entry> entries, String source) {
+		this.source = source;
 		for (Entry e : entries) {
 			byte[] bytes = new byte[e.columns().remaining()];
 			e.columns().duplicate().get(bytes);
@@ -85,6 +89,29 @@ public final class TerrainState extends SavedData {
 		columns.put(chunkKey, c.encode());
 		built.add(chunkKey);
 		setDirty();
+	}
+
+	/**
+	 * Whether ground from a host with this software may be built here. A world takes the kind of its first ground
+	 * patch and keeps it: the mock host's fake terrain once ended up in Sary's GTA world (a fake sea 450 blocks deep
+	 * around Franklin's house), and GTA ground in a test world would be just as wrong.
+	 */
+	public boolean acceptsSource(String software) {
+		String kind = sourceKind(software);
+		if (source.isEmpty()) {
+			source = kind;
+			setDirty();
+			CraftLog.info("terrain: this world's ground comes from " + (kind.equals("test") ? "a test host (" + software + ")" : "the game (" + software + ")"));
+		}
+		return source.equals(kind);
+	}
+
+	public String source() {
+		return source;
+	}
+
+	static String sourceKind(String software) {
+		return software.contains("MockHost") || software.contains("HostSim") ? "test" : "game";
 	}
 
 	public int size() {

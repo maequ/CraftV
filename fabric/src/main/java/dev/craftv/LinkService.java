@@ -282,6 +282,11 @@ public final class LinkService {
 		outbox.add(payload);
 	}
 
+	/** The host's software name from its HELLO ("CraftV-GTA5 0.1.0", "CraftV-MockHost 0.1.0"), or empty. */
+	public String peerSoftware() {
+		return peerSoftware;
+	}
+
 	public boolean connected() {
 		return state == Endpoint.State.CONNECTED;
 	}

@@ -129,6 +129,12 @@ public final class TerrainService {
 		Messages.TerrainPatch patch;
 		while ((patch = nextPatch(link)) != null) {
 			requester.answered(patch.chunkX(), patch.chunkZ());
+			if (fromLink && !state.acceptsSource(link.peerSoftware())) {
+				CraftLog.limited("wrongsource", 10_000, "terrain: ignoring ground from '" + link.peerSoftware() + "': this world's ground came from "
+					+ (state.source().equals("test") ? "a test host" : "the game") + ", and the two must never mix");
+				requester.snooze(patch.chunkX(), patch.chunkZ(), Win32.tickCount(), EMPTY_RETRY_MS);
+				continue;
+			}
 			if (TerrainBuilder.noGround(patch)) {
 				// Not remembered as built: the host may have had no collision there yet, or an older plugin's map
 				// edge. Ask again later instead of leaving that chunk void for good.
@@ -153,8 +159,11 @@ public final class TerrainService {
 	}
 
 	/** The owner's GTA's patches first, then the guests' (they're built the same way). */
-	private static Messages.TerrainPatch nextPatch(LinkService link) {
+	private boolean fromLink;
+
+	private Messages.TerrainPatch nextPatch(LinkService link) {
 		Messages.TerrainPatch p = link.pollTerrainPatch();
+		fromLink = p != null;
 		return p != null ? p : dev.craftv.coop.GuestSync.pollPatch();
 	}
 
