@@ -29,6 +29,9 @@ namespace craftv::host
 		void Melee(float a_damage) override;
 		void Notify(const char* a_text) override;
 
+		// Phase 4 research, once per session: logs the size of candidate box props (CraftV.log), one model at a time.
+		void MeasurePropCandidates();
+
 	private:
 		void Count(bool a_ready, bool a_hit, std::uint32_t a_material);
 
@@ -39,5 +42,7 @@ namespace craftv::host
 
 		ProbeStats stats_{};
 		bool       playerHidden_ = false;
+		int        propCandidate_ = 0;
+		int        propWaitFrames_ = 0;
 	};
 }

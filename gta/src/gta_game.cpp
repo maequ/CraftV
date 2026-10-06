@@ -5,6 +5,7 @@
 
 #include "compositor.h"
 #include "core/host_log.h"
+#include "core/materials.h"
 
 #pragma warning(push, 0)
 #include "natives.h"
@@ -76,6 +77,12 @@ namespace craftv::host
 		constexpr int   kMaxWorldEntities = 512;
 		constexpr float kDegToRad = 3.14159265f / 180.0f;
 		char            g_notificationEntry[] = "STRING";
+
+		// Phase 4 (blocks solid in GTA): box props that might stand in for a 1 m block. Invalid names are skipped.
+		constexpr const char* kPropCandidates[] = { "prop_box_wood01a", "prop_box_wood02a", "prop_box_wood03a", "prop_box_wood04a",
+			"prop_box_wood05a", "prop_box_wood06a", "prop_box_wood07a", "prop_box_wood08a", "prop_crate_01a", "prop_crate_11e",
+			"prop_mb_crate_01a", "prop_cs_cardbox_01", "prop_ld_crate_01", "prop_cons_crate", "prop_boxpile_07d", "prop_rub_boxpile_04" };
+		constexpr int kPropLoadFrames = 120;
 
 		// _ADD_TEXT_COMPONENT_STRING takes at most 99 characters; longer lines go in as several components.
 		constexpr std::size_t kTextComponentChars = 90;
@@ -295,6 +302,32 @@ namespace craftv::host
 		if (hit > 0) {
 			HostLog::Info("melee: %d %s hit for %.0f", hit, hit == 1 ? "person" : "people", a_damage);
 		}
+	}
+
+	void GtaGame::MeasurePropCandidates()
+	{
+		constexpr int kCount = static_cast<int>(sizeof(kPropCandidates) / sizeof(kPropCandidates[0]));
+		if (propCandidate_ >= kCount) {
+			return;
+		}
+		const char* name = kPropCandidates[propCandidate_];
+		const Hash  model = Joaat(name);
+		if (!STREAMING::IS_MODEL_VALID(model)) {
+			HostLog::Info("prop candidate %s: not a model in this game", name);
+			++propCandidate_;
+			return;
+		}
+		STREAMING::REQUEST_MODEL(model);
+		if (!STREAMING::HAS_MODEL_LOADED(model) && ++propWaitFrames_ < kPropLoadFrames) {
+			return;
+		}
+		Vector3 mn{}, mx{};
+		GAMEPLAY::GET_MODEL_DIMENSIONS(model, &mn, &mx);
+		HostLog::Info("prop candidate %s: %.3f x %.3f x %.3f m (min %.3f %.3f %.3f)%s", name, mx.x - mn.x, mx.y - mn.y, mx.z - mn.z, mn.x, mn.y, mn.z,
+			propWaitFrames_ >= kPropLoadFrames ? " (didn't stream in)" : "");
+		STREAMING::SET_MODEL_AS_NO_LONGER_NEEDED(model);
+		propWaitFrames_ = 0;
+		++propCandidate_;
 	}
 
 	void GtaGame::Notify(const char* a_text)
