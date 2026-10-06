@@ -119,6 +119,19 @@ namespace
 		void CompositorPose(float, float, float, float, double, double, double, float, float) override { ++poses; }
 		void Melee(float a_damage) override { melee.push_back(a_damage); }
 		void Notify(const char* a_text) override { notes.emplace_back(a_text); }
+
+		// the settings menu
+		MenuInput                nextMenu{};
+		std::vector<std::string> menuTexts;
+		int                      sounds = 0, sprites = 0;
+		void DrawMenuText(float, float, const TextStyle&, const char* a_text) override { menuTexts.emplace_back(a_text); }
+		void DrawSprite(const char*, const char*, float, float, float, float, Rgba) override { ++sprites; }
+		void PlayMenuSound(const char*) override { ++sounds; }
+		void TakeMenuInput(MenuInput& a_out) override
+		{
+			a_out = nextMenu;
+			nextMenu = MenuInput{};
+		}
 	};
 
 	std::wstring UniqueName(const wchar_t* a_tag)
@@ -768,5 +781,60 @@ TEST_CASE("host passthrough: buttons become INPUT; an attack is a melee hit once
 	rig.game.nextInput.attackPressed = true;
 	rig.Tick(2);
 	CHECK(rig.game.melee.size() == 1);
+}
+
+TEST_CASE("host settings menu: F8 opens it in the game's style; arrows change settings at once; Backspace closes it")
+{
+	Rig rig(L"menu");
+	rig.game.sample = StoryPlayer(0, 0, 50, 0);
+	rig.Tick(5);
+	CHECK(!rig.plugin->MenuOpen());
+	CHECK(rig.game.menuTexts.empty());
+
+	rig.plugin->RequestMenuToggle();
+	rig.Tick(1);
+	REQUIRE(rig.plugin->MenuOpen());
+	auto has = [&](const char* s) {
+		for (const auto& t : rig.game.menuTexts) {
+			if (t == s) return true;
+		}
+		return false;
+	};
+	CHECK(has("CraftV"));
+	CHECK(has("Minecraft view"));
+	CHECK(has("Hit strength"));
+	CHECK(rig.game.sprites >= 3);  // banner, row background, highlight
+	CHECK(rig.game.sounds == 1);
+
+	// down three times to "Hit strength", right: Normal (10) -> Strong (20)
+	for (int i = 0; i < 3; ++i) {
+		rig.game.nextMenu.down = true;
+		rig.Tick(1);
+	}
+	rig.game.nextMenu.right = true;
+	rig.Tick(1);
+	CHECK(std::abs(rig.plugin->CurrentConfig().passthrough.meleeDamagePerHalfHeart - 20.0) < 1e-9);
+	// left twice: Strong -> Normal -> Weak (5)
+	rig.game.nextMenu.left = true;
+	rig.Tick(1);
+	rig.game.nextMenu.left = true;
+	rig.Tick(1);
+	CHECK(std::abs(rig.plugin->CurrentConfig().passthrough.meleeDamagePerHalfHeart - 5.0) < 1e-9);
+
+	// up to "Minecraft view", Enter: off
+	for (int i = 0; i < 3; ++i) {
+		rig.game.nextMenu.up = true;
+		rig.Tick(1);
+	}
+	rig.game.nextMenu.accept = true;
+	rig.Tick(1);
+	CHECK(rig.plugin->CurrentConfig().passthrough.mode == PassthroughMode::kOff);
+
+	rig.game.nextMenu.back = true;
+	rig.Tick(1);
+	CHECK(!rig.plugin->MenuOpen());
+	rig.game.menuTexts.clear();
+	rig.Tick(2);
+	CHECK(rig.game.menuTexts.empty());
 }
 

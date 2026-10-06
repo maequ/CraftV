@@ -51,5 +51,8 @@ namespace craftv::host
 
 		// Reads a_iniPath; missing keys keep their defaults. Returns false if the file doesn't exist.
 		bool Load(const std::wstring& a_iniPath);
+		// Writes what the settings menu changes back to the file Load read (no-op without one).
+		bool Save() const;
+		std::wstring iniPath;
 	};
 }

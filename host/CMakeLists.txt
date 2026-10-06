@@ -8,6 +8,7 @@ add_library(craftv_host_core STATIC
 	core/host_log.cpp
 	core/host_plugin.cpp
 	core/materials.cpp
+	core/settings_menu.cpp
 	core/terrain_scanner.cpp
 )
 target_include_directories(craftv_host_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

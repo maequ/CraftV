@@ -5,6 +5,7 @@
 #include <Windows.h>
 
 #include <cwchar>
+#include <string>
 
 namespace craftv::host
 {
@@ -38,6 +39,7 @@ namespace craftv::host
 
 	bool Config::Load(const std::wstring& a_iniPath)
 	{
+		iniPath = a_iniPath;
 		const bool exists = ::GetFileAttributesW(a_iniPath.c_str()) != INVALID_FILE_ATTRIBUTES;
 		mappingName = ReadString(L"Link", L"MappingName", mappingName, a_iniPath);
 		const double timeout = ReadDouble(L"Link", L"McTimeoutMs", static_cast<double>(mcTimeoutMs), a_iniPath);
@@ -71,5 +73,30 @@ namespace craftv::host
 		overlayDetails = ReadBool(L"Debug", L"OverlayDetails", overlayDetails, a_iniPath);
 		logEveryTickCost = ReadBool(L"Debug", L"LogTickCost", logEveryTickCost, a_iniPath);
 		return exists;
+	}
+
+	namespace
+	{
+		bool Write(const wchar_t* a_section, const wchar_t* a_key, const std::wstring& a_value, const std::wstring& a_path)
+		{
+			return ::WritePrivateProfileStringW(a_section, a_key, a_value.c_str(), a_path.c_str()) != FALSE;
+		}
+	}
+
+	bool Config::Save() const
+	{
+		if (iniPath.empty()) {
+			return false;
+		}
+		bool ok = Write(L"Passthrough", L"Mode", passthrough.mode == PassthroughMode::kOff ? L"Off" : L"Auto", iniPath);
+		ok = Write(L"Passthrough", L"MaxPixels", std::to_wstring(passthrough.maxPixels), iniPath) && ok;
+		ok = Write(L"Passthrough", L"HideGtaHud", passthrough.hideGtaHud ? L"1" : L"0", iniPath) && ok;
+		ok = Write(L"Passthrough", L"MeleeDamagePerHalfHeart", std::to_wstring(static_cast<int>(passthrough.meleeDamagePerHalfHeart)), iniPath) && ok;
+		ok = Write(L"Terrain", L"ProbesPerTick", std::to_wstring(terrain.probesPerTick), iniPath) && ok;
+		ok = Write(L"Terrain", L"ProbeBudgetUs", std::to_wstring(terrain.probeBudgetUs), iniPath) && ok;
+		ok = Write(L"Debug", L"Overlay", debugOverlay ? L"1" : L"0", iniPath) && ok;
+		ok = Write(L"Debug", L"OverlayCorner", overlayCorner == OverlayCorner::kTopLeft ? L"TopLeft" : L"TopRight", iniPath) && ok;
+		ok = Write(L"Debug", L"OverlayDetails", overlayDetails ? L"1" : L"0", iniPath) && ok;
+		return ok;
 	}
 }

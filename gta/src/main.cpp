@@ -53,11 +53,16 @@ namespace
 		}
 	}
 
-	// F7 turns the Minecraft view on and off (Script Hook V calls this on the game's window thread).
+	// F7: the Minecraft view on/off. F8: CraftV's settings menu. (Script Hook V calls this on the game's window thread.)
 	void OnKeyboard(DWORD a_key, WORD, BYTE, BOOL, BOOL, BOOL a_wasDownBefore, BOOL a_isUpNow)
 	{
-		if (a_key == VK_F7 && !a_wasDownBefore && !a_isUpNow && g_plugin) {
+		if (a_wasDownBefore || a_isUpNow || !g_plugin) {
+			return;
+		}
+		if (a_key == VK_F7) {
 			g_plugin->RequestPassthroughToggle();
+		} else if (a_key == VK_F8) {
+			g_plugin->RequestMenuToggle();  // CraftV's settings, in the game's own menu style
 		}
 	}
 

@@ -29,6 +29,14 @@ namespace craftv::host
 		void Melee(float a_damage) override;
 		void Notify(const char* a_text) override;
 
+		// the settings menu (F8), drawn with the game's own fonts, textures and sounds
+		void  DrawMenuText(float a_x, float a_y, const TextStyle& a_style, const char* a_text) override;
+		float TextWidth(const TextStyle& a_style, const char* a_text) override;
+		void  DrawSprite(const char* a_dict, const char* a_name, float a_x, float a_y, float a_w, float a_h, Rgba a_color) override;
+		bool  SpritesReady(const char* a_dict) override;
+		void  PlayMenuSound(const char* a_name) override;
+		void  TakeMenuInput(MenuInput& a_out) override;
+
 		// Phase 4 research, once per session: logs the size of candidate box props (CraftV.log), one model at a time.
 		void MeasurePropCandidates();
 

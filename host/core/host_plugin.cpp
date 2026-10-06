@@ -8,6 +8,7 @@
 #include "craftv/codec.h"
 
 #include <cmath>
+#include <iterator>
 #include <cstdio>
 #include <exception>
 
@@ -211,7 +212,10 @@ namespace craftv::host
 			}
 		}
 		PassthroughInput in;
-		game_.TakePassthroughInput(in);
+		game_.TakePassthroughInput(in);  // also keeps GTA's weapon controls off
+		if (menu_.Open()) {
+			in = PassthroughInput{};
+		}
 		auto button = [&](bool a_pressed, bool a_released, std::uint8_t a_button) {
 			if (a_pressed) {
 				endpoint_->Send(InputMsg{ kInputButton, a_button, 1, 0, 0 });
@@ -237,6 +241,131 @@ namespace craftv::host
 		}
 		if (config_.passthrough.hideGtaHud) {
 			game_.HideHudThisFrame();
+		}
+	}
+
+	namespace
+	{
+		struct Step
+		{
+			const char*   name;
+			std::uint64_t value;
+		};
+		// The menu's choices (and what they write to CraftV.ini).
+		constexpr Step kQuality[] = { { "Low", 960ull * 540 }, { "Medium", 1280ull * 720 }, { "High", 1600ull * 900 }, { "Very high", 1920ull * 1080 },
+			{ "Max", 2560ull * 1440 } };
+		constexpr Step kHits[] = { { "Weak", 5 }, { "Normal", 10 }, { "Strong", 20 }, { "Brutal", 40 } };
+		struct ScanStep
+		{
+			const char* name;
+			int         perTick, budgetUs;
+		};
+		constexpr ScanStep kScan[] = { { "Smooth", 32, 800 }, { "Normal", 64, 1500 }, { "Fast", 128, 3000 } };
+
+		template <class T, std::size_t N, class F>
+		int Nearest(const T (&a_steps)[N], F a_distance)
+		{
+			int best = 0;
+			for (int i = 1; i < static_cast<int>(N); ++i) {
+				if (a_distance(a_steps[i]) < a_distance(a_steps[best])) {
+					best = i;
+				}
+			}
+			return best;
+		}
+
+		template <std::size_t N>
+		int Wrap(int a_index, int a_direction)
+		{
+			return (a_index + a_direction + static_cast<int>(N)) % static_cast<int>(N);
+		}
+
+		double Distance(double a, double b) { return a > b ? a - b : b - a; }
+	}
+
+	// The settings menu (F8): rows built from the live settings each frame, changes applied at once and saved.
+	void HostPlugin::TickMenu()
+	{
+		if (menuToggleRequested_.exchange(false, std::memory_order_relaxed)) {
+			menu_.Toggle(game_);
+		}
+		if (!menu_.Open()) {
+			return;
+		}
+		const int quality = Nearest(kQuality, [&](const Step& s) { return Distance(static_cast<double>(s.value), static_cast<double>(config_.passthrough.maxPixels)); });
+		const int hits = Nearest(kHits, [&](const Step& s) { return Distance(static_cast<double>(s.value), config_.passthrough.meleeDamagePerHalfHeart); });
+		const int scan = Nearest(kScan, [&](const ScanStep& s) { return Distance(s.budgetUs, config_.terrain.probeBudgetUs); });
+		const char* overlay = !config_.debugOverlay ? "Off" : config_.overlayCorner == OverlayCorner::kTopLeft ? "Top left" : "Top right";
+		static char address[kAddressMaxBytes + 1];
+		if (hasSession_ && (session_.flags & kSessionOpen)) {
+			std::snprintf(address, sizeof(address), "%.*s", static_cast<int>(session_.addressBytes), session_.address);
+		} else {
+			std::snprintf(address, sizeof(address), "%s", "not open yet");
+		}
+		const MenuRow rows[] = {
+			{ "Minecraft view", passthroughWanted_ ? "On" : "Off", "Minecraft drawn into GTA. F7 also switches it.", true },
+			{ "Minecraft quality", kQuality[quality].name, "How sharp Minecraft looks. Lower runs faster.", true },
+			{ "Hide GTA HUD", config_.passthrough.hideGtaHud ? "On" : "Off", "Hide GTA's minimap and HUD in the Minecraft view.", true },
+			{ "Hit strength", kHits[hits].name, "How hard your Minecraft hits are on people and cars.", true },
+			{ "CraftV overlay", overlay, "The small CraftV status box.", true },
+			{ "Overlay details", config_.overlayDetails ? "On" : "Off", "Extra numbers in the status box, for bug reports.", true },
+			{ "Ground scanning", kScan[scan].name, "Copying GTA's ground for friends. Smooth costs least.", true },
+			{ "Friends join at", address, "In Minecraft: Multiplayer, Direct Connect.", false },
+		};
+		constexpr int count = static_cast<int>(sizeof(rows) / sizeof(rows[0]));
+		int             row = 0;
+		const MenuAction action = menu_.Input(game_, count, row);
+		if (action != MenuAction::kNone && rows[row].choice) {
+			ApplyMenu(row, action == MenuAction::kPrevious ? -1 : 1);
+			config_.Save();
+		}
+		int w = 0, h = 0;
+		const float aspect = game_.ScreenSize(w, h) && h > 0 ? static_cast<float>(w) / static_cast<float>(h) : 16.0f / 9.0f;
+		menu_.Draw(game_, rows, count, aspect);
+	}
+
+	void HostPlugin::ApplyMenu(int a_row, int a_direction)
+	{
+		switch (a_row) {
+		case 0:
+			passthroughWanted_ = !passthroughWanted_;
+			config_.passthrough.mode = passthroughWanted_ ? PassthroughMode::kAuto : PassthroughMode::kOff;
+			break;
+		case 1: {
+			const int i = Nearest(kQuality, [&](const Step& s) { return Distance(static_cast<double>(s.value), static_cast<double>(config_.passthrough.maxPixels)); });
+			config_.passthrough.maxPixels = kQuality[Wrap<std::size(kQuality)>(i, a_direction)].value;
+			viewSent_ = ViewMsg{};  // Minecraft's window is sized again
+			break;
+		}
+		case 2:
+			config_.passthrough.hideGtaHud = !config_.passthrough.hideGtaHud;
+			break;
+		case 3: {
+			const int i = Nearest(kHits, [&](const Step& s) { return Distance(static_cast<double>(s.value), config_.passthrough.meleeDamagePerHalfHeart); });
+			config_.passthrough.meleeDamagePerHalfHeart = static_cast<double>(kHits[Wrap<std::size(kHits)>(i, a_direction)].value);
+			break;
+		}
+		case 4: {
+			// Top right -> Top left -> Off -> Top right (or back)
+			const int i = !config_.debugOverlay ? 2 : config_.overlayCorner == OverlayCorner::kTopLeft ? 1 : 0;
+			const int n = (i + a_direction + 3) % 3;
+			config_.debugOverlay = n != 2;
+			config_.overlayCorner = n == 1 ? OverlayCorner::kTopLeft : OverlayCorner::kTopRight;
+			break;
+		}
+		case 5:
+			config_.overlayDetails = !config_.overlayDetails;
+			break;
+		case 6: {
+			const int i = Nearest(kScan, [&](const ScanStep& s) { return Distance(s.budgetUs, config_.terrain.probeBudgetUs); });
+			const ScanStep& s = kScan[Wrap<std::size(kScan)>(i, a_direction)];
+			config_.terrain.probesPerTick = s.perTick;
+			config_.terrain.probeBudgetUs = s.budgetUs;
+			terrain_.SetProbeLimits(s.perTick, s.budgetUs);
+			break;
+		}
+		default:
+			break;
 		}
 	}
 
@@ -322,6 +451,7 @@ namespace craftv::host
 		if (config_.debugOverlay) {
 			DrawOverlay();
 		}
+		TickMenu();
 	}
 
 	void HostPlugin::HandleEvents()

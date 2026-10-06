@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstring>
 
 namespace craftv::host
 {
@@ -62,6 +63,28 @@ namespace craftv::host
 		bool  firstPerson = false;               // the follow cam's view mode is first person
 	};
 
+	// Text drawn the way the game's menus draw it. font: the game's (0 Chalet London, 1 HouseScript).
+	enum class TextAlign
+	{
+		kLeft,
+		kCenter,
+		kRight,  // x is the right edge
+	};
+	struct TextStyle
+	{
+		int       font = 0;
+		float     scale = 0.35f;
+		Rgba      color{ 255, 255, 255, 255 };
+		TextAlign align = TextAlign::kLeft;
+		float     wrapLeft = 0.0f, wrapRight = 1.0f;  // screen fractions
+	};
+
+	// The settings menu's keys this frame (the game ignores them while the menu is open).
+	struct MenuInput
+	{
+		bool up = false, down = false, left = false, right = false, accept = false, back = false;
+	};
+
 	// The owner's Minecraft buttons this frame while the passthrough has them (PROTOCOL.md §7.17).
 	struct PassthroughInput
 	{
@@ -112,5 +135,18 @@ namespace craftv::host
 		virtual void Melee(float /*damage*/) {}
 		// A short on-screen message (the game's notification feed).
 		virtual void Notify(const char* /*text*/) {}
+
+		// ---- the settings menu (F8). Defaults: no menu.
+		virtual void DrawMenuText(float /*x*/, float /*y*/, const TextStyle& /*style*/, const char* /*text*/) {}
+		virtual float TextWidth(const TextStyle& a_style, const char* a_text)
+		{
+			return static_cast<float>(std::strlen(a_text)) * 0.0055f * a_style.scale / 0.35f;  // rough; the game measures it
+		}
+		// A texture from a game texture dictionary, top-left corner and size in screen fractions.
+		virtual void DrawSprite(const char* /*dict*/, const char* /*name*/, float /*x*/, float /*y*/, float /*w*/, float /*h*/, Rgba /*color*/) {}
+		// Streams a texture dictionary in; true once it can be drawn.
+		virtual bool SpritesReady(const char* /*dict*/) { return true; }
+		virtual void PlayMenuSound(const char* /*name*/) {}
+		virtual void TakeMenuInput(MenuInput& a_out) { a_out = MenuInput{}; }
 	};
 }

@@ -12,6 +12,7 @@
 
 #include "config.h"
 #include "friends.h"
+#include "settings_menu.h"
 #include "game_api.h"
 #include "terrain_scanner.h"
 
@@ -70,6 +71,10 @@ namespace craftv::host
 		bool                         PassthroughActive() const { return passthroughActive_; }
 		// F7: any thread (the game's keyboard hook). Applied on the next tick.
 		void RequestPassthroughToggle() { toggleRequested_.store(true, std::memory_order_relaxed); }
+		// F8: the settings menu, any thread.
+		void RequestMenuToggle() { menuToggleRequested_.store(true, std::memory_order_relaxed); }
+		bool MenuOpen() const { return menu_.Open(); }
+		const Config& CurrentConfig() const { return config_; }
 
 		// True while the game is in a state where the player's position means something.
 		static bool PlayerUsable(const GameSample& a_sample);
@@ -96,6 +101,8 @@ namespace craftv::host
 		void ExpireSilentFriends(std::uint64_t a_nowMs, std::uint64_t a_gapMs);
 		void TickPassthrough(bool a_linked, std::uint64_t a_nowUs);
 		void SetPassthrough(bool a_on);
+		void TickMenu();
+		void ApplyMenu(int a_row, int a_direction);
 
 		IGame&                    game_;
 		Config                    config_;
@@ -116,6 +123,9 @@ namespace craftv::host
 		bool                      hasSession_ = false;
 		std::uint64_t             nowMs_ = 0;
 		std::uint64_t             silenceBaseMs_ = 0;  // friends' silence counts from here at the earliest
+		// the settings menu
+		SettingsMenu              menu_;
+		std::atomic<bool>         menuToggleRequested_{ false };
 		// the passthrough
 		std::atomic<bool>         toggleRequested_{ false };
 		bool                      passthroughWanted_ = true;   // Mode=Auto, flipped by F7

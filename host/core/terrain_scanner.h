@@ -45,6 +45,12 @@ namespace craftv::host
 	class TerrainScanner
 	{
 	public:
+		// The settings menu's "Ground scanning" (applies from the next frame).
+		void SetProbeLimits(int a_perTick, int a_budgetUs)
+		{
+			config_.probesPerTick = a_perTick;
+			config_.probeBudgetUs = a_budgetUs;
+		}
 		static constexpr int kQueueCapacity = 128;
 		static constexpr int kAttemptSlots = 64;
 

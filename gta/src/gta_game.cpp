@@ -88,6 +88,13 @@ namespace craftv::host
 			"prop_mb_crate_01a", "prop_cs_cardbox_01", "prop_ld_crate_01", "prop_cons_crate", "prop_boxpile_07d", "prop_rub_boxpile_04" };
 		constexpr int kPropLoadFrames = 120;
 
+		// The settings menu: the frontend controls the game's own menus use (arrows, Enter, Backspace/Esc), turned off for
+		// the game while the menu is open, with the phone, weapon and radio wheels and attacks.
+		constexpr int kMenuUp = 172, kMenuDown = 173, kMenuLeft = 174, kMenuRight = 175, kMenuAccept = 201, kMenuSelect = 176;
+		constexpr int kMenuBack = 202, kMenuPhoneBack = 177, kMenuPause = 199, kMenuPauseAlt = 200;
+		constexpr int kMenuBlocked[] = { 27, 172, 173, 174, 175, 176, 177, 178, 199, 200, 201, 202, 19, 20, 37, 85, 24, 25, 140, 141, 142, 143, 257, 263, 264 };
+		char g_soundSet[] = "HUD_FRONTEND_DEFAULT_SOUNDSET";
+
 		// _ADD_TEXT_COMPONENT_STRING takes at most 99 characters; longer lines go in as several components.
 		constexpr std::size_t kTextComponentChars = 90;
 		constexpr int         kFontChaletLondon = 0;
@@ -351,6 +358,90 @@ namespace craftv::host
 		STREAMING::SET_MODEL_AS_NO_LONGER_NEEDED(model);
 		propWaitFrames_ = 0;
 		++propCandidate_;
+	}
+
+	namespace
+	{
+		void AddText(const char* a_text)
+		{
+			char        part[kTextComponentChars + 1];
+			std::size_t left = std::strlen(a_text);
+			for (const char* p = a_text; left > 0;) {
+				const std::size_t n = left < kTextComponentChars ? left : kTextComponentChars;
+				std::memcpy(part, p, n);
+				part[n] = '\0';
+				UI::_ADD_TEXT_COMPONENT_STRING(part);
+				p += n;
+				left -= n;
+			}
+		}
+	}
+
+	void GtaGame::DrawMenuText(float a_x, float a_y, const TextStyle& a_style, const char* a_text)
+	{
+		UI::SET_TEXT_FONT(a_style.font);
+		UI::SET_TEXT_SCALE(0.0f, a_style.scale);
+		UI::SET_TEXT_COLOUR(a_style.color.r, a_style.color.g, a_style.color.b, a_style.color.a);
+		UI::SET_TEXT_DROPSHADOW(0, 0, 0, 0, 0);
+		UI::SET_TEXT_EDGE(0, 0, 0, 0, 0);
+		switch (a_style.align) {
+		case TextAlign::kCenter:
+			UI::SET_TEXT_CENTRE(TRUE);
+			break;
+		case TextAlign::kRight:
+			UI::SET_TEXT_RIGHT_JUSTIFY(TRUE);
+			UI::SET_TEXT_WRAP(0.0f, a_style.wrapRight);
+			break;
+		default:
+			UI::SET_TEXT_WRAP(a_style.wrapLeft, a_style.wrapRight);
+			break;
+		}
+		UI::_SET_TEXT_ENTRY(g_textEntry);
+		AddText(a_text);
+		UI::_DRAW_TEXT(a_x, a_y);
+	}
+
+	float GtaGame::TextWidth(const TextStyle& a_style, const char* a_text)
+	{
+		UI::_SET_TEXT_ENTRY_FOR_WIDTH(g_textEntry);
+		AddText(a_text);
+		UI::SET_TEXT_FONT(a_style.font);
+		UI::SET_TEXT_SCALE(0.0f, a_style.scale);
+		return UI::_GET_TEXT_SCREEN_WIDTH(TRUE);
+	}
+
+	void GtaGame::DrawSprite(const char* a_dict, const char* a_name, float a_x, float a_y, float a_w, float a_h, Rgba a_color)
+	{
+		// ASSUMPTION: DRAW_SPRITE's modern signature has a 12th argument (p11, false), as the reference project's era of
+		// natives lists it; the 2016 SDK's wrapper stops at alpha. DRAW_SPRITE takes the centre.
+		invoke<Void>(0xE7FFAE5EBF23D890, const_cast<char*>(a_dict), const_cast<char*>(a_name), a_x + a_w * 0.5f, a_y + a_h * 0.5f, a_w, a_h, 0.0f,
+			static_cast<int>(a_color.r), static_cast<int>(a_color.g), static_cast<int>(a_color.b), static_cast<int>(a_color.a), FALSE);
+	}
+
+	bool GtaGame::SpritesReady(const char* a_dict)
+	{
+		GRAPHICS::REQUEST_STREAMED_TEXTURE_DICT(const_cast<char*>(a_dict), FALSE);
+		return GRAPHICS::HAS_STREAMED_TEXTURE_DICT_LOADED(const_cast<char*>(a_dict)) != FALSE;
+	}
+
+	void GtaGame::PlayMenuSound(const char* a_name)
+	{
+		AUDIO::PLAY_SOUND_FRONTEND(-1, const_cast<char*>(a_name), g_soundSet, TRUE);
+	}
+
+	void GtaGame::TakeMenuInput(MenuInput& a_out)
+	{
+		a_out = MenuInput{};
+		for (int control : kMenuBlocked) {
+			CONTROLS::DISABLE_CONTROL_ACTION(0, control, TRUE);
+		}
+		auto pressed = [](int c) { return CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, c) != FALSE; };
+		a_out.up = pressed(kMenuUp);
+		a_out.down = pressed(kMenuDown);
+		a_out.left = pressed(kMenuLeft);
+		a_out.right = pressed(kMenuRight);
+		a_out.accept = pressed(kMenuAccept) || pressed(kMenuSelect);
+		a_out.back = pressed(kMenuBack) || pressed(kMenuPhoneBack) || pressed(kMenuPause) || pressed(kMenuPauseAlt);
 	}
 
 	void GtaGame::Notify(const char* a_text)
