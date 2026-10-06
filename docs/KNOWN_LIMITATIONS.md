@@ -89,8 +89,9 @@ As of Phase 2 (2026-10-05). "Planned" names the phase expected to fix it.
   Loss off (Minecraft runs in its own window next to GTA). Two games render at once, so expect a lower frame rate.
 - **Blocks have no collision in GTA yet.** You, people and cars pass through what you build until Phase 4 (invisible
   collision props).
-- **Heights can be off by up to half a block.** CraftV's terrain stores GTA's ground in whole blocks, so a block placed
-  on a sloped street can sink into it or float above it a little. Friends' feet have the same offset.
+- **Heights: half a block off away from you.** CraftV's terrain stores GTA's ground in whole blocks. Around you, Minecraft's
+  view is lifted so its ground meets GTA's (blocks you place sit on the street); further away, on slopes, blocks and
+  friends can still sink in or float up to half a block.
 - **Indoors and under bridges** you stand inside CraftV's terrain (the ground is probed from above). Minecraft treats it
   as air in your view and never suffocates you, but blocks you place there land on the roof or deck terrain.
 - **In a vehicle** GTA shows its own driver and Minecraft doesn't draw yours (it has no car to seat you in). The hand
@@ -102,3 +103,5 @@ As of Phase 2 (2026-10-05). "Planned" names the phase expected to fix it.
 - **GTA's HUD stays** by default (`[Passthrough] HideGtaHud=1` hides it). Its minimap sits left of Minecraft's hotbar.
 - Worlds from before protocol v1.2 rebuild their terrain chunks once (the save didn't keep their columns).
 
+- **No inventory screen yet** (it needs the mouse inside Minecraft's window). The hotbar, wheel and 1-9 work.
+- **Breaking the floor** breaks the hidden terrain block: in your view nothing changes (the floor is GTA's). Phase 4 decides what digging does.

@@ -25,6 +25,9 @@ namespace craftv::host
 		// left without its LEAVE reaching us. A gap this long between our own ticks means the game was paused.
 		constexpr std::uint64_t kFriendSilenceMs = 5000;
 		constexpr std::uint64_t kPauseGapMs = 1000;
+		// The passthrough's view lift: re-measured every few frames, eased in so stepping between columns doesn't pop.
+		constexpr std::uint32_t kLiftProbeEvery = 4;
+		constexpr double        kLiftEase = 0.15;
 
 		// Overlay layout (screen fractions).
 		constexpr float kOverlayMargin = 0.01f;
@@ -178,10 +181,23 @@ namespace craftv::host
 		if (!passthroughActive_) {
 			return;
 		}
+		// CraftV's terrain holds the game's ground in whole blocks, so its top is up to half a block off the real ground.
+		// Lift Minecraft's camera (and the owner's drawn feet) by that offset at the player: Minecraft's world, blocks
+		// placed on it included, then meets the game's ground where the player is. The server never sees the lift.
+		if (++liftProbeTick_ % kLiftProbeEvery == 0) {
+			GroundProbe ground;
+			if (game_.ProbeGround(sample_.x, sample_.y, ground) && ground.hit) {
+				const double groundMc = ground.groundZ * config_.world.blocksPerMetre + config_.world.yOffset;
+				viewLiftTarget_ = (TerrainScanner::HeightToBlockY(ground.groundZ, config_.world) + 1.0) - groundMc;
+			}
+		}
+		viewLift_ += (viewLiftTarget_ - viewLift_) * kLiftEase;
 		CameraSample cam;
 		game_.SampleCamera(cam);
 		if (cam.valid) {
-			const CameraMsg m = MakeCamera(cam, sample_, config_.world, ++cameraFrame_, a_nowUs);
+			CameraMsg m = MakeCamera(cam, sample_, config_.world, ++cameraFrame_, a_nowUs);
+			m.y += viewLift_;
+			m.feetY += viewLift_;
 			if (endpoint_->Send(m)) {
 				++camerasSent_;
 			}

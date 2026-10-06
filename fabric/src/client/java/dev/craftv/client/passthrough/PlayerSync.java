@@ -31,12 +31,16 @@ public final class PlayerSync {
 		if (c == null || player == null) {
 			return;
 		}
-		player.setYRot(c.yaw());
-		player.setXRot(c.pitch());
-		player.yRotO = c.yaw();
-		player.xRotO = c.pitch();
-		player.yHeadRot = player.yHeadRotO = c.yaw();
-		player.yBodyRot = player.yBodyRotO = c.firstPerson() ? c.yaw() : c.bodyYaw();
+		// First person looks where the camera looks. Third person: the host camera orbits freely, so the head follows the
+		// body (the host's player faces where they walk), not the camera; it twisted round otherwise.
+		float yaw = c.firstPerson() ? c.yaw() : c.bodyYaw();
+		float pitch = c.firstPerson() ? c.pitch() : 0.0F;
+		player.setYRot(yaw);
+		player.setXRot(pitch);
+		player.yRotO = yaw;
+		player.xRotO = pitch;
+		player.yHeadRot = player.yHeadRotO = yaw;
+		player.yBodyRot = player.yBodyRotO = yaw;
 		double x = c.firstPerson() ? c.x() : c.feetX();
 		double y = c.firstPerson() ? c.y() - player.getEyeHeight() : c.feetY();
 		double z = c.firstPerson() ? c.z() : c.feetZ();

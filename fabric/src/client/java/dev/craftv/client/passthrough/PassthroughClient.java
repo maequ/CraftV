@@ -29,6 +29,9 @@ public final class PassthroughClient {
 	private static final int RESPAWN_DELAY_TICKS = 40;
 	/** The terrain stays hidden this long after the last camera: a pause menu shouldn't re-mesh every chunk twice. */
 	private static final long HIDE_TERRAIN_FOR_NANOS = 60_000_000_000L;
+	/** Frames per second while the host composites (it re-projects to its own rate), and while it's paused (its menu). */
+	private static final int FPS_COMPOSITING = 60, FPS_HOST_PAUSED = 10;
+	private static int fpsApplied;
 
 	private static boolean optionsConfigured;
 	private static Messages.View appliedView;
@@ -63,6 +66,13 @@ public final class PassthroughClient {
 			ClientInput.tick(minecraft);
 			applyView(minecraft);
 		}
+		// Don't compete with the host for the GPU: the host re-projects Minecraft's frames to its own frame rate, and
+		// while it's paused (GTA's pause and settings menus stop its scripts) nobody sees Minecraft at all.
+		int fps = on ? FPS_COMPOSITING : hide ? FPS_HOST_PAUSED : 0;
+		if (fps != 0 && fps != fpsApplied) {
+			fpsApplied = fps;
+			minecraft.options.framerateLimit().set(fps);
+		}
 		PlayerSync.tick();
 	}
 
@@ -95,9 +105,9 @@ public final class PassthroughClient {
 		options.damageTiltStrength().set(0.0);
 		options.menuBackgroundBlurriness().set(0);
 		options.enableVsync().set(false);
-		options.framerateLimit().set(120); // the host shows ~60-120 fps: rendering faster only competes with it for the GPU
+		options.framerateLimit().set(FPS_COMPOSITING);
 		options.save();
-		CraftLog.info("passthrough: options set for compositing (no clouds, no bobbing, 120 fps cap, runs unfocused)");
+		CraftLog.info("passthrough: options set for compositing (no clouds, no bobbing, 60 fps cap, runs unfocused)");
 	}
 
 	/** Minecraft's window = the host's picture (scaled down by the host to at most VIEW_MAX_PIXELS). */

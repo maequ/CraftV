@@ -1,9 +1,11 @@
 package dev.craftv.terrain;
 
 import dev.craftv.link.Messages;
+import dev.craftv.link.Proto;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
@@ -55,6 +57,20 @@ public final class TerrainIndex {
 			return new Columns(ground, water, material, Byte.toUnsignedInt(b.get(DEPTH_OFF)), Byte.toUnsignedInt(b.get(BUILDING_DEPTH_OFF)));
 		}
 
+		/** The lowest and highest block y the terrain builder may have used in this chunk, or null if no column has ground. */
+		public int[] yRange() {
+			int lo = Integer.MAX_VALUE, hi = Integer.MIN_VALUE;
+			for (int i = 0; i < 256; i++) {
+				if (groundY[i] == Proto.NO_GROUND) {
+					continue;
+				}
+				int layers = (material[i] & 0xFF) == Proto.MAT_BUILDING ? buildingDepth : depth;
+				lo = Math.min(lo, groundY[i] - layers);
+				hi = Math.max(hi, Math.max(groundY[i], waterY[i] == Proto.NO_WATER ? groundY[i] : waterY[i]));
+			}
+			return lo > hi ? null : new int[] { lo, hi };
+		}
+
 		/** What the terrain builder put at (local x, y, local z), or null. */
 		public TerrainColumns.Kind kindAt(int localX, int y, int localZ) {
 			int column = Messages.TerrainPatch.column(localX, localZ);
@@ -63,12 +79,31 @@ public final class TerrainIndex {
 	}
 
 	private static final ConcurrentHashMap<Long, Columns> CHUNKS = new ConcurrentHashMap<>();
+	/**
+	 * Called (server thread) whenever a chunk's columns are added. The client re-meshes that chunk: rebuilding a chunk
+	 * with the blocks it already had changes no block, so without this its mesh would keep showing the terrain.
+	 */
+	private static volatile BiConsumer<Long, Columns> onPut;
+
+	public static void setOnPut(BiConsumer<Long, Columns> listener) {
+		onPut = listener;
+	}
 
 	private TerrainIndex() {
 	}
 
 	static void put(long chunkKey, Columns columns) {
 		CHUNKS.put(chunkKey, columns);
+		BiConsumer<Long, Columns> listener = onPut;
+		if (listener != null) {
+			listener.accept(chunkKey, columns);
+		}
+	}
+
+	/** Whether (x, y, z) is part of terrain water (a terrain lake or sea). */
+	public static boolean isTerrainWater(int x, int y, int z) {
+		Columns c = CHUNKS.get(TerrainRequester.key(x >> 4, z >> 4));
+		return c != null && c.kindAt(x & 15, y, z & 15) == TerrainColumns.Kind.WATER;
 	}
 
 	public static Columns get(int chunkX, int chunkZ) {

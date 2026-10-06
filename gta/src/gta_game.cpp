@@ -72,8 +72,12 @@ namespace craftv::host
 		// Melee reach and knock-back. ASSUMPTION: tuned by eye in the reference; to check in game.
 		constexpr float kMeleeReach = 3.5f, kMeleeHeight = 2.5f, kMeleeCone = 0.3f;  // cos of the half angle
 		constexpr float kCarReach = 5.5f, kCarHeight = 3.0f, kCarCone = 0.2f;
-		constexpr float kPushPerDamage = 0.12f, kPushUp = 2.0f, kCarPushPerDamage = 0.08f;
-		constexpr int   kRagdollMs = 1500;
+		// A hit stumbles the person back a little (Minecraft's knock-back); only a strong hit knocks them down. Then
+		// most run, some fight back. Cars dent where they're hit and get shoved; their driver drives off.
+		constexpr float kPushPerDamage = 0.06f, kPushUp = 1.5f, kCarPushPerDamage = 0.35f, kCarDentPerDamage = 6.0f;
+		constexpr float kKnockDownDamage = 35.0f;  // a charged sword hit or more
+		constexpr int   kStumbleMs = 350, kKnockDownMs = 2500;
+		constexpr int   kFightBackPercent = 35;
 		constexpr int   kMaxWorldEntities = 512;
 		constexpr float kDegToRad = 3.14159265f / 180.0f;
 		char            g_notificationEntry[] = "STRING";
@@ -284,9 +288,19 @@ namespace craftv::host
 			if (d > kMeleeReach || std::fabs(o.z - at.z) > kMeleeHeight || (d > 0.3f && (dx * fx + dy * fy) / d < kMeleeCone)) {
 				continue;
 			}
-			PED::SET_PED_TO_RAGDOLL(q, kRagdollMs, kRagdollMs, 0, FALSE, FALSE, FALSE);
+			const bool down = a_damage >= kKnockDownDamage;
+			const int  ms = down ? kKnockDownMs : kStumbleMs;
+			PED::SET_PED_TO_RAGDOLL(q, ms, ms, 0, FALSE, FALSE, FALSE);
 			ApplyDamageToPed(q, static_cast<int>(a_damage + 0.5f));
-			ApplyForce(q, fx * a_damage * kPushPerDamage, fy * a_damage * kPushPerDamage, kPushUp);
+			const float push = 2.0f + a_damage * kPushPerDamage;
+			ApplyForce(q, fx * push, fy * push, kPushUp);
+			if (!ENTITY::IS_ENTITY_DEAD(q) && !PED::IS_PED_IN_ANY_VEHICLE(q, FALSE)) {
+				if (GAMEPLAY::GET_RANDOM_INT_IN_RANGE(0, 100) < kFightBackPercent) {
+					AI::TASK_COMBAT_PED(q, me, 0, 16);
+				} else {
+					AI::TASK_SMART_FLEE_PED(q, me, 100.0f, static_cast<Any>(-1), FALSE, FALSE);  // -1: no time limit
+				}
+			}
 			++hit;
 		}
 		const int cars = worldGetAllVehicles(handles, kMaxWorldEntities);
@@ -297,10 +311,19 @@ namespace craftv::host
 			if (d > kCarReach || std::fabs(o.z - at.z) > kCarHeight || (d > 0.5f && (dx * fx + dy * fy) / d < kCarCone)) {
 				continue;
 			}
+			const Vector3 local = ENTITY::GET_OFFSET_FROM_ENTITY_GIVEN_WORLD_COORDS(v, at.x, at.y, at.z);  // the side facing the player
+			const float   len = std::sqrt(local.x * local.x + local.y * local.y);
+			const float   dentX = len > 0.01f ? local.x / len : 0.0f, dentY = len > 0.01f ? local.y / len : 0.0f;
+			VEHICLE::SET_VEHICLE_DAMAGE(v, dentX, dentY, 0.2f, a_damage * kCarDentPerDamage, 0.8f, TRUE);
 			ApplyForce(v, fx * a_damage * kCarPushPerDamage, fy * a_damage * kCarPushPerDamage, 0.0f);
+			const Ped driver = VEHICLE::GET_PED_IN_VEHICLE_SEAT(v, -1);
+			if (driver != 0 && driver != me && !ENTITY::IS_ENTITY_DEAD(driver)) {
+				AI::TASK_SMART_FLEE_PED(driver, me, 200.0f, static_cast<Any>(-1), FALSE, FALSE);
+			}
+			++hit;
 		}
 		if (hit > 0) {
-			HostLog::Info("melee: %d %s hit for %.0f", hit, hit == 1 ? "person" : "people", a_damage);
+			HostLog::Info("melee: %d hit (people and cars) for %.0f", hit, a_damage);
 		}
 	}
 

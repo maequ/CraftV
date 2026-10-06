@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -66,6 +67,7 @@ public final class CoopServer {
 		terrain = new TerrainService(config);
 		tracker = new FriendTracker(LinkService.get()::send);
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> publishTried = false);
+		ServerLifecycleEvents.SERVER_STOPPED.register(server -> dev.craftv.terrain.TerrainIndex.clear()); // the next world has its own
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
 			tracker.resetAll(); // §7.10: everyone is gone when the world closes
 			hovering.clear();
@@ -73,6 +75,13 @@ public final class CoopServer {
 			friendsOnline = 0;
 		});
 		ServerTickEvents.END_SERVER_TICK.register(CoopServer::tick);
+		ServerChunkEvents.CHUNK_LOAD.register((level, chunk, generated) -> {
+			if (level == TerrainService.mirror(level.getServer())) {
+				// Load the terrain index before the first chunk is meshed: the owner's view hides terrain by it.
+				dev.craftv.terrain.TerrainState.of(level);
+				TerrainService.removeSpilledWater(level, chunk);
+			}
+		});
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> server.execute(() -> onJoin(server, handler.player)));
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> hovering.remove(handler.player.getUUID()));
 	}

@@ -26,7 +26,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(Camera.class)
 abstract class CameraMixin {
 	private static final float DEG = (float) (Math.PI / 180.0);
-	private static final double INSIDE_HEAD = 0.8; // the host pulled its camera into the head (against a wall)
+	// The host pulled its camera into the head (against a wall): hide the model. Hysteresis so it doesn't flicker.
+	private static final double INSIDE_HEAD = 0.6, OUTSIDE_HEAD = 1.0;
+	private static boolean craftv$inside;
 	@Shadow @Final private static Vector3fc FORWARDS;
 	@Shadow @Final private static Vector3fc UP;
 	@Shadow @Final private static Vector3fc LEFT;
@@ -64,8 +66,9 @@ abstract class CameraMixin {
 		this.matrixPropertiesDirty |= 3;
 		this.setPosition(c.x(), c.y(), c.z());
 		Entity player = Minecraft.getInstance().player;
-		boolean inside = player != null && player.getEyePosition(partialTicks).distanceToSqr(c.x(), c.y(), c.z()) < INSIDE_HEAD * INSIDE_HEAD;
-		this.detached = !c.firstPerson() && !inside;
+		double d2 = player != null ? player.getEyePosition(partialTicks).distanceToSqr(c.x(), c.y(), c.z()) : 1e9;
+		craftv$inside = craftv$inside ? d2 < OUTSIDE_HEAD * OUTSIDE_HEAD : d2 < INSIDE_HEAD * INSIDE_HEAD;
+		this.detached = !c.firstPerson() && !craftv$inside;
 	}
 
 	@Inject(method = "calculateFov", at = @At("HEAD"), cancellable = true)

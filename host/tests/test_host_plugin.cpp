@@ -694,7 +694,7 @@ TEST_CASE("host passthrough: off without the compositor; with it, CAMERA every t
 	CHECK(rig.cameras.size() >= 4);
 	CHECK(rig.game.poses >= 4);
 	REQUIRE(rig.views.size() == 1);
-	CHECK(rig.views[0].width == 1920 && rig.views[0].height == 1080);
+	CHECK(rig.views[0].width == 1600 && rig.views[0].height == 900);
 	CHECK((rig.cameras.back().flags & kCameraPassthrough) != 0);
 
 	rig.game.sample.inVehicle = true;  // driving: GTA's own driver shows, Minecraft hides its player
@@ -719,6 +719,13 @@ TEST_CASE("host passthrough: off without the compositor; with it, CAMERA every t
 	rig.Tick(3);
 	CHECK(rig.plugin->PassthroughActive());
 	CHECK(rig.views.size() == 2);
+
+	// The view lift: the fake ground is at 49.6 m, CraftV's terrain top at 50 (whole blocks). The camera is raised by
+	// the 0.4 difference so Minecraft's world meets the game's ground here.
+	rig.Tick(120);
+	REQUIRE(!rig.cameras.empty());
+	CHECK(std::abs(rig.cameras.back().y - (51.6 + 0.4)) < 0.02);
+	CHECK(std::abs(rig.cameras.back().feetY - (50.0 - 1.0 + 0.4)) < 0.02);
 }
 
 TEST_CASE("host passthrough: buttons become INPUT; an attack is a melee hit once Minecraft has said what the owner holds")

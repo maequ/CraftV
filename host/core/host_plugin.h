@@ -127,6 +127,9 @@ namespace craftv::host
 		proto::OwnerStateMsg      owner_{};
 		bool                      hasOwner_ = false;
 		std::uint64_t             meleeHits_ = 0;
+		double                    viewLift_ = 0.0;        // blocks: shifts Minecraft's view so its terrain meets the game's ground here
+		double                    viewLiftTarget_ = 0.0;
+		std::uint32_t             liftProbeTick_ = 0;
 		TickCost                  cost_{};
 		std::uint64_t             nextCostReportMs_ = 0;
 	};

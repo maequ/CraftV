@@ -25,7 +25,7 @@ namespace craftv::host
 	struct PassthroughConfig
 	{
 		PassthroughMode mode = PassthroughMode::kAuto;
-		std::uint64_t   maxPixels = 1920ull * 1080;  // Minecraft's frame at most this many pixels (the effect scales it up)
+		std::uint64_t   maxPixels = 1600ull * 900;  // Minecraft's frame at most this many pixels (the effect scales it up)
 		bool            hideGtaHud = false;          // hide the game's own HUD and minimap while the passthrough is on
 		double          meleeDamagePerHalfHeart = 10.0;  // game damage per Minecraft half heart of attack damage
 	};

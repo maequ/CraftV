@@ -5,6 +5,7 @@ import dev.craftv.LinkService;
 import dev.craftv.client.passthrough.HostCamera;
 import dev.craftv.client.passthrough.PassthroughClient;
 import dev.craftv.coop.CoopServer;
+import dev.craftv.terrain.TerrainIndex;
 import dev.craftv.link.Messages;
 import dev.craftv.link.Proto;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,6 +38,23 @@ public final class CraftVClient implements ClientModInitializer {
 			return;
 		}
 		LinkService.get().start();
+		// A rebuilt terrain chunk may not change a single block (same ground as before): re-mesh it so the owner's view
+		// hides it (RenderSectionRegionMixin reads the index while meshing).
+		TerrainIndex.setOnPut((key, columns) -> {
+			int[] range = columns.yRange();
+			if (range == null) {
+				return;
+			}
+			int cx = (int) (long) key, cz = (int) (key >>> 32);
+			Minecraft minecraft = Minecraft.getInstance();
+			minecraft.execute(() -> {
+				if (minecraft.level != null) {
+					for (int sy = range[0] >> 4; sy <= range[1] >> 4; sy++) {
+						minecraft.level.setSectionDirtyWithNeighbors(cx, sy, cz);
+					}
+				}
+			});
+		});
 		ClientTickEvents.START_CLIENT_TICK.register(minecraft -> {
 			try {
 				PassthroughClient.startTick(minecraft);
