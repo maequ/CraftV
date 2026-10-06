@@ -31,7 +31,7 @@ public final class Proto {
 	// ---- identity (§2, §3) ----------------------------------------------------------------------
 	public static final int MAGIC = 0x56465243; // bytes 43 52 46 56 = "CRFV"
 	public static final int VERSION_MAJOR = 1;
-	public static final int VERSION_MINOR = 2;
+	public static final int VERSION_MINOR = 3;
 	public static final String DEFAULT_MAPPING_NAME = "Local\\CraftV_Shared_v1";
 
 	public static final int ROLE_NONE = 0;
@@ -106,7 +106,7 @@ public final class Proto {
 			return false;
 		}
 		return switch (type) {
-			case MSG_PLAYER_STATE, MSG_TERRAIN_PATCH, MSG_CAMERA, MSG_VIEW, MSG_INPUT -> senderRole == ROLE_HOST; // §7.3: MC -> host is reserved
+			case MSG_PLAYER_STATE, MSG_TERRAIN_PATCH, MSG_CAMERA, MSG_VIEW, MSG_INPUT, MSG_BLOCK_REGION_REQUEST -> senderRole == ROLE_HOST; // §7.3: MC -> host is reserved
 			case MSG_REMOTE_PLAYER_JOIN, MSG_REMOTE_PLAYER_STATE, MSG_REMOTE_PLAYER_LEAVE, MSG_TERRAIN_REQUEST, MSG_SESSION_INFO, MSG_OWNER_STATE ->
 				senderRole == ROLE_MC;
 			default -> true;
@@ -136,6 +136,7 @@ public final class Proto {
 	public static final int MSG_VIEW = 15;
 	public static final int MSG_INPUT = 16;
 	public static final int MSG_OWNER_STATE = 17;
+	public static final int MSG_BLOCK_REGION_REQUEST = 18; // v1.3 (§7.19)
 	public static final int MSG_TEST_PATTERN = 0x7F00;
 	public static final int TYPE_VERSION_1 = 1;
 
@@ -155,6 +156,7 @@ public final class Proto {
 	public static final int VIEW_BYTES = 16;
 	public static final int INPUT_BYTES = 8;
 	public static final int OWNER_STATE_BYTES = 16;
+	public static final int BLOCK_REGION_REQUEST_BYTES = 16;
 
 	public static final int SOFTWARE_MAX_BYTES = 40;
 	public static final int PLAYER_ON_GROUND = 1;
@@ -166,6 +168,8 @@ public final class Proto {
 	public static final float MAX_SPEED = 1000.0F;
 	public static final int BLOCK_AIR = 0;
 	public static final int BLOCK_SET_ECHO = 1;
+	public static final int BLOCK_SET_SOLID = 1 << 1, BLOCK_SET_REGION = 1 << 2; // v1.3 (§7.19)
+	public static final int BLOCK_SET_KNOWN_FLAGS = BLOCK_SET_ECHO | BLOCK_SET_SOLID | BLOCK_SET_REGION;
 	public static final int FACE_MAX = 5;
 	public static final int FACE_UNKNOWN = 0xFF;
 	public static final int LOG_TRACE = 0, LOG_DEBUG = 1, LOG_INFO = 2, LOG_WARN = 3, LOG_ERROR = 4;

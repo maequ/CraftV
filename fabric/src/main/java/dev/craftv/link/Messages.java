@@ -193,7 +193,7 @@ public final class Messages {
 		}
 
 		public boolean valid() {
-			return blockCoordsOk(x, y, z) && (flags & ~BLOCK_SET_ECHO) == 0;
+			return blockCoordsOk(x, y, z) && (flags & ~BLOCK_SET_KNOWN_FLAGS) == 0;
 		}
 	}
 
@@ -768,6 +768,35 @@ public final class Messages {
 			return held >= HELD_EMPTY && held <= HELD_OTHER && health >= 0 && health <= 255 && food >= 0 && food <= MAX_FOOD && gameMode >= 0
 				&& gameMode <= GAME_MODE_MAX && Float.isFinite(attackDamage) && attackDamage >= 0.0F && attackDamage <= MAX_ATTACK_DAMAGE
 				&& Float.isFinite(attackCharge) && attackCharge >= 0.0F && attackCharge <= 1.0F && (flags & ~OWNER_KNOWN_FLAGS) == 0;
+		}
+	}
+
+	// ---- §7.19 BLOCK_REGION_REQUEST (v1.3) --------------------------------------------------------
+	public record BlockRegionRequest(int chunkX, int chunkZ, int requestId) implements Payload {
+		@Override
+		public int type() {
+			return MSG_BLOCK_REGION_REQUEST;
+		}
+
+		@Override
+		public int payloadBytes() {
+			return BLOCK_REGION_REQUEST_BYTES;
+		}
+
+		@Override
+		public void write(MemorySegment s, long off) {
+			s.set(I32, off, chunkX);
+			s.set(I32, off + 4, chunkZ);
+			s.set(I32, off + 8, requestId);
+			s.set(I32, off + 12, 0);
+		}
+
+		public static BlockRegionRequest read(MemorySegment s, long off) {
+			return new BlockRegionRequest(s.get(I32, off), s.get(I32, off + 4), s.get(I32, off + 8));
+		}
+
+		public boolean valid() {
+			return requestId != 0 && chunkOk(chunkX, chunkZ);
 		}
 	}
 

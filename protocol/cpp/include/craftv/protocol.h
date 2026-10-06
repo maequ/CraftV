@@ -18,7 +18,7 @@ namespace craftv::proto
 	// ---- identity (PROTOCOL.md §2, §3) --------------------------------------------------------
 	inline constexpr std::uint32_t kMagic = 0x56465243;  // bytes 43 52 46 56 = "CRFV"
 	inline constexpr std::uint16_t kVersionMajor = 1;
-	inline constexpr std::uint16_t kVersionMinor = 2;
+	inline constexpr std::uint16_t kVersionMinor = 3;
 	inline constexpr wchar_t       kDefaultMappingName[] = L"Local\\CraftV_Shared_v1";
 
 	enum class Role : std::uint32_t
@@ -183,6 +183,7 @@ namespace craftv::proto
 		kMsgView = 15,
 		kMsgInput = 16,
 		kMsgOwnerState = 17,
+		kMsgBlockRegionRequest = 18,
 		kMsgTestPattern = 0x7F00,
 	};
 	inline constexpr std::uint16_t kTypeVersion1 = 1;
@@ -265,7 +266,10 @@ namespace craftv::proto
 	enum BlockSetFlags : std::uint32_t
 	{
 		kBlockSetEcho = 1u << 0,
+		kBlockSetSolid = 1u << 1,   // v1.3: solid in the host game (§7.19)
+		kBlockSetRegion = 1u << 2,  // v1.3: answers a BLOCK_REGION_REQUEST
 	};
+	inline constexpr std::uint32_t kBlockSetKnownFlags = kBlockSetEcho | kBlockSetSolid | kBlockSetRegion;
 	struct BlockSetMsg
 	{
 		static constexpr MsgType kType = kMsgBlockSet;
@@ -599,6 +603,17 @@ namespace craftv::proto
 	static_assert(sizeof(OwnerStateMsg) == 16);
 	static_assert(offsetof(OwnerStateMsg, attackDamage) == 4);
 	static_assert(offsetof(OwnerStateMsg, flags) == 12);
+
+	// §7.19 (v1.3)
+	struct BlockRegionRequestMsg
+	{
+		static constexpr MsgType kType = kMsgBlockRegionRequest;
+		std::int32_t  chunkX, chunkZ;
+		std::uint32_t requestId;
+		std::uint32_t reserved0;
+	};
+	static_assert(sizeof(BlockRegionRequestMsg) == 16);
+	static_assert(offsetof(BlockRegionRequestMsg, requestId) == 8);
 
 	// §11 (v1.2): the frame mapping MC writes for the passthrough
 	inline constexpr const wchar_t* kFrameMappingName = L"Local\\CraftV_Frame_v1";

@@ -85,6 +85,8 @@ namespace craftv::codec
 			return sizeof(InputMsg);
 		case kMsgOwnerState:
 			return sizeof(OwnerStateMsg);
+		case kMsgBlockRegionRequest:
+			return sizeof(BlockRegionRequestMsg);
 		default:
 			return 0;
 		}
@@ -115,7 +117,8 @@ namespace craftv::codec
 		case kMsgCamera:
 		case kMsgView:
 		case kMsgInput:
-			return a_sender == Role::kHost;  // §7.12, §7.15-7.17
+		case kMsgBlockRegionRequest:
+			return a_sender == Role::kHost;  // §7.12, §7.15-7.17, §7.19
 		case kMsgPlayerState:
 			// MC -> host is reserved for Phase 3 (PROTOCOL.md §7.3); a v1.0 receiver only takes the host's.
 			return a_sender == Role::kHost;
@@ -156,7 +159,7 @@ namespace craftv::codec
 		return a_msg.y >= static_cast<std::int32_t>(kMinY) && a_msg.y <= static_cast<std::int32_t>(kMaxY) &&
 		       a_msg.x >= -static_cast<std::int32_t>(kMaxHorizontalCoord) && a_msg.x <= static_cast<std::int32_t>(kMaxHorizontalCoord) &&
 		       a_msg.z >= -static_cast<std::int32_t>(kMaxHorizontalCoord) && a_msg.z <= static_cast<std::int32_t>(kMaxHorizontalCoord) &&
-		       (a_msg.flags & ~std::uint32_t(kBlockSetEcho)) == 0;
+		       (a_msg.flags & ~kBlockSetKnownFlags) == 0;
 	}
 
 	namespace
@@ -282,6 +285,11 @@ namespace craftv::codec
 		return a_msg.held <= kHeldOther && a_msg.food <= kMaxFood && a_msg.gameMode <= kGameModeMax && Finite(a_msg.attackDamage) &&
 		       a_msg.attackDamage >= 0.0f && a_msg.attackDamage <= kMaxAttackDamage && Finite(a_msg.attackCharge) && a_msg.attackCharge >= 0.0f &&
 		       a_msg.attackCharge <= 1.0f && (a_msg.flags & ~kOwnerKnownFlags) == 0;
+	}
+
+	bool Valid(const BlockRegionRequestMsg& a_msg)
+	{
+		return a_msg.requestId != 0 && ChunkOk(a_msg.chunkX, a_msg.chunkZ);
 	}
 
 	void SetPlayerName(RemotePlayerJoinMsg& a_msg, const char* a_name)

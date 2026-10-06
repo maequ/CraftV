@@ -262,7 +262,7 @@ compiler and the JIT, and for ARM64 if it is ever a target.
 
 ## 7. Messages
 
-Type ranges: `1–0xFF` core (`1–7` since v1.0, `8–13` since v1.1, `14–17` since v1.2), `0x100–0x7EFF` reserved for later phases, `0x7F00–0x7FFF`
+Type ranges: `1–0xFF` core (`1–7` since v1.0, `8–13` since v1.1, `14–17` since v1.2, `18` since v1.3), `0x100–0x7EFF` reserved for later phases, `0x7F00–0x7FFF`
 test/debug only. Every core payload has a **fixed size**. "Dir" says who may send it: H = host, M = MC.
 A message received from a side that may not send it is counted as malformed and ignored.
 
@@ -286,6 +286,7 @@ A message received from a side that may not send it is counted as malformed and 
 | `15` | `VIEW` | H | 16 (v1.2) |
 | `16` | `INPUT` | H | 8 (v1.2) |
 | `17` | `OWNER_STATE` | M | 16 (v1.2) |
+| `18` | `BLOCK_REGION_REQUEST` | H | 16 (v1.3) |
 | `0x7F00` | `TEST_PATTERN` | H, M | 16–272 (variable, test only) |
 
 ### 7.1 `HELLO` (1), 64 bytes
@@ -295,7 +296,7 @@ Sent right after attach and again whenever a new peer session is seen.
 | Offset | Size | Type | Field | Notes |
 |---|---|---|---|---|
 | 0 | 2 | u16 | `versionMajor` | `1` |
-| 2 | 2 | u16 | `versionMinor` | `2` (v1.2) |
+| 2 | 2 | u16 | `versionMinor` | `3` (v1.3) |
 | 4 | 4 | u32 | `role` | `1` host, `2` MC |
 | 8 | 4 | u32 | `pid` | |
 | 12 | 4 | u32 | `session` | same as the record header's |
@@ -608,6 +609,23 @@ changes, at most 20 times a second, and at least once a second while connected.
 | 8 | 4 | f32 | `attackCharge` | the attack cooldown, `0..1` (1 = full strength) |
 | 12 | 4 | u32 | `flags` | bit 0 `DEAD`, bit 1 `SCREEN_OPEN` (inventory, chat, death screen). Other bits 0 |
 
+### 7.19 `BLOCK_REGION_REQUEST` (18), 16 bytes, H → M (v1.3)
+
+"Send me every block in this chunk column that should be solid in the host game" (brief §9): MC answers with one
+`BLOCK_SET` per such block, flagged `SOLID | REGION` with the same `requestId`. Blocks built in an earlier session, or
+while the host was away, get their collision this way; the host can forget far chunks and ask again later.
+
+| Offset | Size | Type | Field | Notes |
+|---|---|---|---|---|
+| 0 | 4 | i32 | `chunkX` | as §7.11 |
+| 4 | 4 | i32 | `chunkZ` | |
+| 8 | 4 | u32 | `requestId` | non-zero |
+| 12 | 4 | | reserved | |
+
+**`BLOCK_SET` flags since v1.3** (§7.4): bit 1 `SOLID`: the block should stop people and cars in the host game (a full
+collision cube that isn't part of CraftV's terrain and stands above the terrain's surface). bit 2 `REGION`: an
+answer to a `BLOCK_REGION_REQUEST`. A `BLOCK_SET` without `SOLID` removes any collision the host has at that position.
+
 ## 8. Defensive rules (both sides)
 
 - Validate every size, offset and count read from shared memory before using it (§3.2, §4.2).
@@ -631,7 +649,8 @@ changes, at most 20 times a second, and at least once a second while connected.
 - Every change updates this file, both mirrors, the goldens, and gets an entry in `DECISIONS.md`.
 - **History:** v1.0 (2026-10-02) core messages 1–7. v1.1 (2026-10-05) co-op messages 8–13 (`DECISIONS.md`
   D-016). A v1.0 peer skips them as unknown types, so v1.0 and v1.1 still link up. v1.2 (2026-10-06) the
-  passthrough messages 14–17 and the frame mapping (§11, `DECISIONS.md` D-027).
+  passthrough messages 14–17 and the frame mapping (§11, `DECISIONS.md` D-027). v1.3 (2026-10-06)
+  `BLOCK_REGION_REQUEST` and the `SOLID`/`REGION` block flags (Phase 4, D-029).
 
 ## 10. Golden vectors
 

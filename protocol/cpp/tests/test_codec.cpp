@@ -535,3 +535,28 @@ TEST_CASE("codec: v1.2 validation rejects bad values")
 	badOwner.flags = 4;
 	CHECK(!codec::Valid(badOwner));
 }
+
+TEST_CASE("codec: v1.3 BLOCK_REGION_REQUEST and the SOLID/REGION block flags")
+{
+	CHECK(codec::AllowedFrom(kMsgBlockRegionRequest, Role::kHost));
+	CHECK(!codec::AllowedFrom(kMsgBlockRegionRequest, Role::kMc));
+	CHECK_EQ(codec::FixedPayloadBytes(kMsgBlockRegionRequest), std::uint32_t(16));
+	CHECK(codec::Valid(golden::BlockRegionRequest()));
+	CHECK(!codec::Valid(BlockRegionRequestMsg{ 0, 0, 0, 0 }));
+	CHECK(!codec::Valid(BlockRegionRequestMsg{ kMaxChunkCoord + 1, 0, 1, 0 }));
+	CHECK(codec::Valid(BlockSetMsg{ 1, 64, 1, 1, kBlockSetSolid | kBlockSetRegion, 77 }));
+	CHECK(!codec::Valid(BlockSetMsg{ 1, 64, 1, 1, 1u << 3, 0 }));
+	bool seen = false;
+	for (const auto& v : golden::AllVectors()) {
+		if (v.name == "BLOCK_REGION_REQUEST") {
+			RecordHeader h;
+			std::memcpy(&h, v.record.data(), sizeof(h));
+			BlockRegionRequestMsg m;
+			REQUIRE(codec::Decode(h, v.record.data() + kRecordHeaderBytes, m));
+			CHECK(m.chunkX == -3 && m.chunkZ == 92 && m.requestId == 77u);
+			seen = true;
+		}
+	}
+	CHECK(seen);
+}
+

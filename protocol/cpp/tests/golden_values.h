@@ -37,6 +37,7 @@ namespace craftv::golden
 	proto::ViewMsg              View();
 	proto::InputMsg             Input();
 	proto::OwnerStateMsg        OwnerState();
+	proto::BlockRegionRequestMsg BlockRegionRequest();
 
 	// Every golden record, in file order, encoded with the C++ codec.
 	std::vector<Vector> AllVectors();

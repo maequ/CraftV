@@ -109,6 +109,7 @@ namespace craftv
 				case proto::kMsgView:
 				case proto::kMsgInput:
 				case proto::kMsgOwnerState:
+				case proto::kMsgBlockRegionRequest:
 				case proto::kMsgTestPattern:
 					if (!versionMismatch_) {
 						a_onMessage(a_header, a_payload);

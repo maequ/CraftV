@@ -195,6 +195,11 @@ namespace craftv::golden
 		return m;
 	}
 
+	BlockRegionRequestMsg BlockRegionRequest()
+	{
+		return BlockRegionRequestMsg{ -3, 92, 77, 0 };
+	}
+
 	namespace
 	{
 		template <class T>
@@ -226,6 +231,7 @@ namespace craftv::golden
 		all.push_back(Make("VIEW", View()));
 		all.push_back(Make("INPUT", Input()));
 		all.push_back(Make("OWNER_STATE", OwnerState()));
+		all.push_back(Make("BLOCK_REGION_REQUEST", BlockRegionRequest()));
 
 		std::uint8_t        payload[kTestPatternFixedBytes + kTestPatternMaxFill];
 		const std::uint32_t bytes = codec::BuildTestPattern(kTestPatternIndex, payload);

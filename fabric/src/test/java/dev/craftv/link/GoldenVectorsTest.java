@@ -79,6 +79,7 @@ class GoldenVectorsTest {
 		m.put("VIEW", new Messages.View(1920, 1080, 2560, 1440));
 		m.put("INPUT", new Messages.Input(INPUT_BUTTON, BUTTON_ATTACK, 1, 0));
 		m.put("OWNER_STATE", new Messages.OwnerState(HELD_PICKAXE, 17, 18, 0, 5.0F, 0.75F, 0));
+		m.put("BLOCK_REGION_REQUEST", new Messages.BlockRegionRequest(-3, 92, 77));
 		m.put("TEST_PATTERN", new Messages.TestPattern(5));
 		return m;
 	}
@@ -173,6 +174,7 @@ class GoldenVectorsTest {
 				case "VIEW" -> assertEquals(new Messages.View(1920, 1080, 2560, 1440), Messages.View.read(s, p));
 				case "INPUT" -> assertEquals(new Messages.Input(INPUT_BUTTON, BUTTON_ATTACK, 1, 0), Messages.Input.read(s, p));
 				case "OWNER_STATE" -> assertEquals(new Messages.OwnerState(HELD_PICKAXE, 17, 18, 0, 5.0F, 0.75F, 0), Messages.OwnerState.read(s, p));
+				case "BLOCK_REGION_REQUEST" -> assertEquals(new Messages.BlockRegionRequest(-3, 92, 77), Messages.BlockRegionRequest.read(s, p));
 				default -> fail("unexpected golden " + e.getKey());
 			}
 		}
@@ -190,7 +192,8 @@ class GoldenVectorsTest {
 		assertFalse(new Messages.BlockBreakRequest(1, 0, 0, 0, 6, 0).valid());
 		assertTrue(new Messages.BlockBreakRequest(1, 0, 0, 0, FACE_UNKNOWN, 0).valid());
 		assertFalse(new Messages.BlockBreakRequest(0, 0, 0, 0, 1, 0).valid());
-		assertFalse(new Messages.BlockSet(0, 0, 0, 1, 2, 0).valid());
+		assertFalse(new Messages.BlockSet(0, 0, 0, 1, 1 << 3, 0).valid());
+		assertTrue(new Messages.BlockSet(0, 0, 0, 1, BLOCK_SET_SOLID | BLOCK_SET_REGION, 7).valid());
 	}
 
 	@Test
