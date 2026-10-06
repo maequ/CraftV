@@ -6,7 +6,8 @@
 // GTA's current camera, relit from GTA's picture. overlay: Minecraft's hand, HUD and screens, always on top.
 //
 // Adapted from MCPassthrough.fx in minecraft-gta5-passthrough by rehan-remade (MIT,
-// https://github.com/rehan-remade/universal-modder): only names changed.
+// https://github.com/rehan-remade/universal-modder): names changed, plus a coverage pass that skips the depth march where
+// no Minecraft is near (CraftV).
 #include "ReShade.fxh"
 
 texture MCWorldTex : CRAFTV_WORLD;
@@ -84,6 +85,19 @@ sampler sMcInfo { Texture = McInfoTex; MinFilter = POINT; MagFilter = POINT; Add
 texture McBrightTex { Width = BUFFER_WIDTH / 4; Height = BUFFER_HEIGHT / 4; Format = RGBA16F; MipLevels = 6; };
 sampler sMcBright { Texture = McBrightTex; AddressU = CLAMP; AddressV = CLAMP; };
 
+// CraftV: where Minecraft drew anything, at 1/4 size with mips (a mip's average is above 0 wherever any pixel under it
+// is). The composite pass skips its depth march where nothing of Minecraft is near: most of the picture.
+texture McCoverTex { Width = BUFFER_WIDTH / 4; Height = BUFFER_HEIGHT / 4; Format = R8; MipLevels = 6; };
+sampler sCover { Texture = McCoverTex; AddressU = CLAMP; AddressV = CLAMP; };
+
+float4 PS_Cover(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
+{
+	const float2 o = BUFFER_PIXEL_SIZE * 1.5;
+	const float a = max(max(tex2D(sWorld, uv + float2(o.x, o.y)).a, tex2D(sWorld, uv + float2(-o.x, o.y)).a),
+		max(tex2D(sWorld, uv + float2(o.x, -o.y)).a, tex2D(sWorld, uv + float2(-o.x, -o.y)).a));
+	return float4(a > 0.0 ? 1.0 : 0.0, 0.0, 0.0, 1.0);
+}
+
 float luma(float3 c)
 {
 	return dot(c, float3(0.2126, 0.7152, 0.0722));
@@ -153,6 +167,13 @@ void PS_Composite(float4 pos : SV_Position, float2 uv : TEXCOORD, out float4 out
 	const float zh = host_linear(tex2Dlod(ReShade::DepthBuffer, float4(uv, 0, 0)).x);
 	// how far behind GTA's surface Minecraft may still show: more where that surface is seen at a grazing angle
 	const float allow = min(DepthBias + SlopeBias * abs(ddy(zh)), max(MaxBias, DepthBias));
+	// CraftV: nothing of Minecraft within ~64 px of where this pixel lands (re-projection only moves things a little):
+	// GTA as it is, without the 24-step march.
+	if (tex2Dlod(sCover, float4(ouv, 0, 4)).r <= 0.0)
+	{
+		outInfo = float4(0.0, 0.0, zh, 0.0);
+		return;
+	}
 	float zm = 1e9;
 	if (Reproject)
 	{
@@ -320,6 +341,12 @@ float3 PS_Final(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 
 technique CraftV < ui_tooltip = "CraftV: draws the hidden Minecraft into GTA while the passthrough is on (F7 in game)."; >
 {
+	pass Cover
+	{
+		VertexShader = PostProcessVS;
+		PixelShader = PS_Cover;
+		RenderTarget = McCoverTex;
+	}
 	pass Light
 	{
 		VertexShader = PostProcessVS;

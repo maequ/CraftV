@@ -48,9 +48,6 @@ namespace
 	{
 		compositor::try_register(g_module);  // ReShade may load after us; the passthrough waits for it
 		g_plugin->Tick(craftv::clock::NowMs(), craftv::clock::NowUs());
-		if (g_plugin->State() == craftv::host::PluginState::kActive && craftv::host::HostPlugin::PlayerUsable(g_plugin->LastSample())) {
-			g_game.MeasurePropCandidates();
-		}
 	}
 
 	// F7: the Minecraft view on/off. F8: CraftV's settings menu. (Script Hook V calls this on the game's window thread.)

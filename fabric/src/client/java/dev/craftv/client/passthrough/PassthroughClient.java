@@ -32,6 +32,7 @@ public final class PassthroughClient {
 	/** Frames per second while the host composites (it re-projects to its own rate), and while it's paused (its menu). */
 	private static final int FPS_COMPOSITING = 60, FPS_HOST_PAUSED = 10;
 	private static int fpsApplied;
+	private static final int OWNER_RENDER_DISTANCE = 10;
 
 	private static boolean optionsConfigured;
 	private static Messages.View appliedView;
@@ -106,6 +107,12 @@ public final class PassthroughClient {
 		options.menuBackgroundBlurriness().set(0);
 		options.enableVsync().set(false);
 		options.framerateLimit().set(FPS_COMPOSITING);
+		// Rendering costs the host frame rate. The owner's view only needs what's near; the integrated server's view
+		// distance follows this setting, and 10 chunks still covers friends' terrain radius (6) comfortably.
+		if (options.renderDistance().get() > OWNER_RENDER_DISTANCE) {
+			options.renderDistance().set(OWNER_RENDER_DISTANCE);
+		}
+		options.entityShadows().set(false);
 		options.save();
 		CraftLog.info("passthrough: options set for compositing (no clouds, no bobbing, 60 fps cap, runs unfocused)");
 	}
