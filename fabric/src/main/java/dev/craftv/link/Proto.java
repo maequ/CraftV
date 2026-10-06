@@ -207,6 +207,17 @@ public final class Proto {
 	public static final int OWNER_DEAD = 1, OWNER_SCREEN_OPEN = 1 << 1, OWNER_KNOWN_FLAGS = OWNER_DEAD | OWNER_SCREEN_OPEN;
 	public static final int MAX_FOOD = 20;
 	public static final float MAX_ATTACK_DAMAGE = 1000.0F;
+	// §11 the frame mapping (v1.2)
+	public static final String FRAME_MAPPING_NAME = "Local\\CraftV_Frame_v1";
+	public static final int FRAME_MAGIC = 0x52465643; // bytes 43 56 46 52 = "CVFR"
+	public static final int FRAME_VERSION = 1;
+	public static final int FRAME_HEADER_BYTES = 4096;
+	public static final int FRAME_SLOT_DESC_OFFSET = 256;
+	public static final int FRAME_SLOT_DESC_BYTES = 128;
+	public static final int FRAME_SLOTS = 3;
+	public static final long FRAME_LAYER_MAX_BYTES = VIEW_MAX_PIXELS * 4;
+	public static final long FRAME_SLOT_STRIDE = FRAME_LAYER_MAX_BYTES * 3;
+	public static final int FRAME_DEPTH_ZERO_TO_ONE = 1, FRAME_BOTTOM_UP = 1 << 1, FRAME_REVERSED_Z = 1 << 2;
 
 	public static final int TEST_PATTERN_FIXED_BYTES = 16;
 	public static final int TEST_PATTERN_MAX_FILL = 256;

@@ -3,6 +3,7 @@
   "package": "dev.craftv.mixin",
   "compatibilityLevel": "JAVA_25",
   "mixins": [
+    "EntityInWallMixin",
     "LevelChunkMixin"
   ],
   "injectors": { "defaultRequire": 1 }

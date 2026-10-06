@@ -76,4 +76,18 @@ class TerrainColumnsTest {
 			assertNotNull(TerrainColumns.deep(m));
 		}
 	}
+
+	@Test
+	void kindAtAgreesWithBuildForEveryHeight() {
+		int[][] cases = { { 70, NO_WATER, MAT_GRASS }, { 58, 62, MAT_SAND }, { 90, NO_WATER, MAT_BUILDING }, { 0, 3, MAT_MUD }, { 12, NO_WATER, MAT_ROAD } };
+		for (int[] c : cases) {
+			java.util.Map<Integer, Kind> built = new java.util.HashMap<>();
+			TerrainColumns.build((short) c[0], (short) c[1], c[2], 4, 10, -1024, 1023, (y, k) -> built.put(y, k));
+			for (int y = c[0] - 20; y <= c[0] + 10; y++) {
+				assertEquals(built.get(y), TerrainColumns.kindAt((short) c[0], (short) c[1], c[2], 4, 10, y), "y " + y + " of " + java.util.Arrays.toString(c));
+			}
+		}
+		assertNull(TerrainColumns.kindAt(NO_GROUND, (short) 70, MAT_GRASS, 4, 10, 70));
+	}
 }
+

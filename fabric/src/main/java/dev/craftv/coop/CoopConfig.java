@@ -23,6 +23,10 @@ public final class CoopConfig {
 	public final boolean open;
 	public final int port;
 	public final GameType friendsGameMode;
+	/** The host's own player (Sary): Survival shows the hearts and hunger bar in the passthrough (brief §8). */
+	public final GameType ownerGameMode;
+	/** Give the owner a starter hotbar when they join with an empty inventory. */
+	public final boolean ownerKit;
 	public final int terrainRadius;
 	public final int terrainDepth;
 	public final int buildingDepth;
@@ -32,6 +36,8 @@ public final class CoopConfig {
 		open = Boolean.parseBoolean(p.getProperty("friends.open", "true"));
 		port = clamp(intValue(p, "friends.port", DEFAULT_PORT), 1024, 65535);
 		friendsGameMode = gameMode(p.getProperty("friends.gameMode", "creative"));
+		ownerGameMode = gameMode(p.getProperty("owner.gameMode", "survival"));
+		ownerKit = Boolean.parseBoolean(p.getProperty("owner.kit", "true"));
 		terrainRadius = clamp(intValue(p, "terrain.radius", 6), 1, 16);
 		terrainDepth = clamp(intValue(p, "terrain.depth", TerrainColumns.DEFAULT_DEPTH), 1, 64);
 		buildingDepth = clamp(intValue(p, "terrain.buildingDepth", TerrainColumns.DEFAULT_BUILDING_DEPTH), 1, 256);
@@ -51,7 +57,8 @@ public final class CoopConfig {
 			writeDefaults(file);
 		}
 		CoopConfig c = new CoopConfig(p);
-		CraftLog.info("config: friends " + (c.open ? "open on port " + c.port : "closed") + ", game mode " + c.friendsGameMode.getName() + ", terrain radius "
+		CraftLog.info("config: friends " + (c.open ? "open on port " + c.port : "closed") + ", game mode " + c.friendsGameMode.getName() + "; you play "
+			+ c.ownerGameMode.getName() + (c.ownerKit ? " with the starter kit" : "") + "; terrain radius "
 			+ c.terrainRadius + " chunks, depth " + c.terrainDepth + (c.devNoAuth ? ", DEV: account authentication OFF" : ""));
 		return c;
 	}
@@ -68,6 +75,9 @@ public final class CoopConfig {
 					friends.port=25565
 					# survival, creative or adventure
 					friends.gameMode=creative
+					# Your own game mode (survival shows hearts and hunger), and a starter hotbar when your inventory is empty.
+					owner.gameMode=survival
+					owner.kit=true
 					# How far around every player (in 16-block chunks) to build the host game's ground.
 					terrain.radius=6
 					# How many blocks deep the ground is built under the surface, and under building tops.

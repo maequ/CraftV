@@ -247,8 +247,11 @@ namespace
 			if (endpoint_->Connected() && !killed_) {
 				if (options_.stress) {
 					PumpStress();
-				} else if (walking_) {
+					} else if (walking_) {
 					SendPlayerState(a_nowUs);
+					if (camera_) {
+						SendCamera(a_nowUs);
+					}
 				}
 				ServeTerrain();
 			}
@@ -269,6 +272,8 @@ namespace
 			if (cmd == "help") {
 				Out("commands: status | friends | ground X Z | terrain on|off | setblock X Y Z ID | break X Y Z | place X Y Z FACE [ID] | center X Y Z |"
 					" radius R | speed S | walk | stop | kill-link | resume-link | restart | quit");
+				Out("passthrough (v1.2): cam on|off|first|third | pitch DEG | view W H | press attack|use|pick|drop|inventory|swap|close |"
+					" hold attack|use | release attack|use | slot N | scroll D");
 			} else if (cmd == "status") {
 				PrintStatus();
 			} else if (cmd == "friends") {
@@ -354,6 +359,52 @@ namespace
 				endpoint_.reset();
 				killed_ = false;
 				restartAtMs_ = clock::NowMs() + kRestartGapMs;
+			} else if (cmd == "cam") {
+				std::string arg;
+				in >> arg;
+				if (arg == "on" || arg == "off") {
+					camera_ = arg == "on";
+				} else if (arg == "first" || arg == "third") {
+					camera_ = true;
+					cameraThird_ = arg == "third";
+				}
+				Out("camera %s, %s person, pitch %.1f (CAMERA every tick while walking, PROTOCOL.md §7.15)", camera_ ? "on" : "off",
+					cameraThird_ ? "third" : "first", cameraPitch_);
+			} else if (cmd == "pitch") {
+				float p = 0;
+				if (in >> p && p >= -90.0f && p <= 90.0f) cameraPitch_ = p;
+				Out("camera pitch %.1f (positive = looking down)", cameraPitch_);
+			} else if (cmd == "view") {
+				ViewMsg v{};
+				if (!(in >> v.width >> v.height)) {
+					Out("usage: view W H   (Minecraft's window size, PROTOCOL.md §7.16)");
+					return;
+				}
+				v.hostWidth = v.width;
+				v.hostHeight = v.height;
+				Out("%s VIEW %ux%u", endpoint_->Send(v) ? "sent" : "NOT sent (invalid or not connected)", v.width, v.height);
+			} else if (cmd == "press" || cmd == "hold" || cmd == "release") {
+				std::string name;
+				in >> name;
+				static const char* buttons[] = { "", "attack", "use", "pick", "drop", "inventory", "swap", "close" };
+				std::uint8_t button = 0;
+				for (std::uint8_t i = 1; i <= kButtonCloseScreen; ++i) {
+					if (name == buttons[i]) button = i;
+				}
+				if (!button) {
+					Out("usage: press|hold|release attack|use|pick|drop|inventory|swap|close");
+					return;
+				}
+				InputMsg down{ kInputButton, button, 1, 0, 0 }, up{ kInputButton, button, 0, 0, 0 };
+				bool ok = true;
+				if (cmd != "release") ok = endpoint_->Send(down) && ok;
+				if (cmd == "press" || cmd == "release") ok = endpoint_->Send(up) && ok;
+				Out("%s INPUT %s %s", ok ? "sent" : "NOT sent", cmd.c_str(), name.c_str());
+			} else if (cmd == "slot" || cmd == "scroll") {
+				int v = 0;
+				in >> v;
+				InputMsg msg{ cmd == "slot" ? kInputSlot : kInputScroll, 0, 0, static_cast<std::int8_t>(v), 0 };
+				Out("%s INPUT %s %d", codec::Valid(msg) && endpoint_->Send(msg) ? "sent" : "NOT sent (slot 0..8, scroll -9..9 non-zero)", cmd.c_str(), v);
 			} else if (cmd == "quit" || cmd == "exit") {
 				quit_ = true;
 			} else {
@@ -418,9 +469,39 @@ namespace
 			m.flags = kPlayerOnGround | (teleportNext_ ? kPlayerTeleport : 0u);
 			m.timeUs = a_nowUs;
 			m.frame = ++frame_;
-			if (endpoint_->Send(m)) {
+				if (endpoint_->Send(m)) {
 				++sentPlayerStates_;
 				teleportNext_ = false;
+			}
+			lastState_ = m;
+		}
+
+		// The host camera for the passthrough (PROTOCOL.md §7.15): in first person at the walking player's eyes,
+		// in third person 4 m behind and 2 m above them, looking where they walk.
+		void SendCamera(std::uint64_t a_nowUs)
+		{
+			constexpr double kEyeHeight = 1.62, kBehind = 4.0, kAbove = 2.0;
+			const PlayerStateMsg& s = lastState_;
+			const double          yaw = s.yaw / kRadToDeg;
+			const double          fx = -std::sin(yaw), fz = std::cos(yaw);  // Minecraft's facing for this yaw
+			CameraMsg             c{};
+			c.frame = ++cameraFrame_;
+			c.timeUs = a_nowUs;
+			c.x = cameraThird_ ? s.x - fx * kBehind : s.x;
+			c.y = s.y + (cameraThird_ ? kAbove : kEyeHeight);
+			c.z = cameraThird_ ? s.z - fz * kBehind : s.z;
+			c.yaw = s.yaw;
+			c.pitch = cameraPitch_;
+			c.fovY = 60.0f;
+			c.feetX = s.x;
+			c.feetY = s.y;
+			c.feetZ = s.z;
+			c.bodyYaw = s.yaw;
+			c.flags = kCameraPassthrough | (cameraThird_ ? 0u : kCameraFirstPerson);
+			c.nearClip = 0.15f;
+			c.farClip = 10000.0f;
+			if (endpoint_->Send(c)) {
+				++sentCameras_;
 			}
 		}
 
@@ -445,6 +526,20 @@ namespace
 		void OnMessage(const RecordHeader& h, const std::uint8_t* p)
 		{
 			switch (h.type) {
+			case kMsgOwnerState:
+				{
+					OwnerStateMsg m;
+					if (!codec::Decode(h, p, m)) {
+						endpoint_->CountMalformed();
+						return;
+					}
+					static const char* held[] = { "empty hand", "sword", "axe", "pickaxe", "shovel", "hoe", "block", "other item" };
+					if (++ownerStates_ <= 3 || ownerStates_ % 20 == 0) {
+						Out("@OWNER held=%s damage=%.1f charge=%.2f health=%u food=%u gameMode=%u flags=%u", held[m.held], m.attackDamage, m.attackCharge,
+							m.health, m.food, m.gameMode, m.flags);
+					}
+					return;
+				}
 			case kMsgBlockSet:
 				{
 					BlockSetMsg m;
@@ -628,6 +723,13 @@ namespace
 		std::unique_ptr<Endpoint> endpoint_;
 		bool                      quit_ = false;
 		bool                      walking_ = true;
+		bool                      camera_ = false;       // 'cam on|off|first|third'
+		bool                      cameraThird_ = false;
+		float                     cameraPitch_ = 20.0f;  // 'pitch DEG'
+		std::uint64_t             cameraFrame_ = 0;
+		std::uint64_t             sentCameras_ = 0;
+		PlayerStateMsg            lastState_{};
+		std::uint64_t             ownerStates_ = 0;
 		bool                      killed_ = false;
 		bool                      teleportNext_ = true;
 		std::uint64_t             restartAtMs_ = 0;

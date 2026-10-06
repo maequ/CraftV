@@ -105,6 +105,10 @@ namespace craftv
 				case proto::kMsgTerrainRequest:
 				case proto::kMsgTerrainPatch:
 				case proto::kMsgSessionInfo:
+				case proto::kMsgCamera:
+				case proto::kMsgView:
+				case proto::kMsgInput:
+				case proto::kMsgOwnerState:
 				case proto::kMsgTestPattern:
 					if (!versionMismatch_) {
 						a_onMessage(a_header, a_payload);

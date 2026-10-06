@@ -147,4 +147,37 @@ class EndpointTest {
 			mc.detach();
 		}
 	}
+
+	@Test
+	void everyDocumentedMessageReachesTheOtherSide() {
+		String name = uniqueName("alltypes");
+		Endpoint mc = make(ROLE_MC, name), host = make(ROLE_HOST, name);
+		try {
+			tickBoth(mc, host, 5);
+			assertTrue(mc.connected());
+			java.util.List<Integer> fromHost = new java.util.ArrayList<>(), fromMc = new java.util.ArrayList<>();
+			java.util.List<Integer> toMc = new java.util.ArrayList<>(), toHost = new java.util.ArrayList<>();
+			for (Messages.Payload p : GoldenVectorsTest.documented().values()) {
+				if (p.type() == MSG_HELLO || p.type() == MSG_HEARTBEAT) {
+					continue; // handled by the endpoint itself
+				}
+				if (allowedFrom(p.type(), ROLE_HOST) && host.send(p)) {
+					fromHost.add(p.type());
+				}
+				if (allowedFrom(p.type(), ROLE_MC) && mc.send(p)) {
+					fromMc.add(p.type());
+				}
+			}
+			mc.drain(ms * 1000, MAX_DRAIN_BYTES_PER_TICK, (t, n, s, o) -> toMc.add(t));
+			host.drain(ms * 1000, MAX_DRAIN_BYTES_PER_TICK, (t, n, s, o) -> toHost.add(t));
+			assertEquals(fromHost, toMc);
+			assertEquals(fromMc, toHost);
+			assertTrue(toMc.contains(MSG_CAMERA) && toMc.contains(MSG_INPUT) && toHost.contains(MSG_OWNER_STATE));
+			assertEquals(0, host.rxStats().unknown + mc.rxStats().unknown);
+		} finally {
+			host.detach();
+			mc.detach();
+		}
+	}
 }
+

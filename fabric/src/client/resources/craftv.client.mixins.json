@@ -3,6 +3,17 @@
   "package": "dev.craftv.client.mixin",
   "compatibilityLevel": "JAVA_25",
   "client": [
+    "CameraMixin",
+    "EntityPickMixin",
+    "FogRendererMixin",
+    "GameRendererMixin",
+    "GlCommandEncoderMixin",
+    "KeyMappingAccessor",
+    "LivingEntityMixin",
+    "MinecraftMixin",
+    "RenderSectionRegionMixin",
+    "ScreenEffectRendererMixin",
+    "ToastManagerMixin",
     "WorldOpenFlowsMixin"
   ],
   "injectors": { "defaultRequire": 1 }

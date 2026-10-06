@@ -26,6 +26,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.HttpUtil;
 import net.minecraft.world.entity.player.Abilities;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
@@ -108,7 +111,14 @@ public final class CoopServer {
 
 	private static void onJoin(MinecraftServer server, ServerPlayer player) {
 		if (isOwner(server, player)) {
-			// The puppet hovers while the host isn't moving it, instead of falling through unbuilt ground.
+			if (player.gameMode() != config.ownerGameMode) {
+				player.setGameMode(config.ownerGameMode);
+			}
+			if (config.ownerKit && player.getInventory().isEmpty()) {
+				giveKit(player);
+			}
+			// The puppet hovers while the host isn't moving it, instead of falling through unbuilt ground (a
+			// Survival owner can't fly; PlayerPuppet holds them in place instead).
 			Abilities a = player.getAbilities();
 			if (a.mayfly) {
 				a.flying = true;
@@ -126,6 +136,21 @@ public final class CoopServer {
 			player.teleportTo(mirror, x + 0.5, y, z + 0.5, Set.of(), FACE_WEST, 0.0F, false);
 		}
 		CraftLog.info("friend joined: " + player.getGameProfile().name() + " (" + player.getUUID() + ")");
+	}
+
+	/** The owner's starter hotbar (brief §8: Survival with a kit). */
+	private static void giveKit(ServerPlayer player) {
+		Inventory inv = player.getInventory();
+		inv.setItem(0, new ItemStack(Items.DIAMOND_SWORD));
+		inv.setItem(1, new ItemStack(Items.DIAMOND_PICKAXE));
+		inv.setItem(2, new ItemStack(Items.DIAMOND_AXE));
+		inv.setItem(3, new ItemStack(Items.DIAMOND_SHOVEL));
+		inv.setItem(4, new ItemStack(Items.OAK_PLANKS, 64));
+		inv.setItem(5, new ItemStack(Items.STONE_BRICKS, 64));
+		inv.setItem(6, new ItemStack(Items.GLASS, 64));
+		inv.setItem(7, new ItemStack(Items.TORCH, 64));
+		inv.setItem(8, new ItemStack(Items.COOKED_BEEF, 64));
+		CraftLog.info("owner: gave the starter kit (sword, pickaxe, axe, shovel, planks, stone bricks, glass, torches, steak)");
 	}
 
 	private static ServerPlayer owner(MinecraftServer server) {

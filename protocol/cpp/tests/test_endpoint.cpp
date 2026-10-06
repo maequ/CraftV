@@ -8,6 +8,7 @@
 #define NOMINMAX
 #include <Windows.h>
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -126,6 +127,33 @@ TEST_CASE("endpoint: gameplay messages flow both ways and are refused before CON
 	CHECK(mc.Send(ps));
 	host.Drain(clock.Us(), kMaxDrainBytesPerTick, [&](const RecordHeader&, const std::uint8_t*) { CHECK(false); });
 	CHECK_EQ(host.RxStats().malformed, std::uint64_t(1));
+}
+
+TEST_CASE("endpoint: every core message type reaches the other side (none is dropped as unknown)")
+{
+	const auto name = UniqueName(L"alltypes");
+	Clock      clock;
+	Endpoint   host(Config(Role::kHost, name));
+	Endpoint   mc(Config(Role::kMc, name));
+	TickBoth(host, mc, clock, 5);
+	REQUIRE(host.Connected());
+	std::vector<std::uint16_t> fromHost, fromMc, toMc, toHost;
+	std::uint8_t               payload[kMaxPayload] = {};
+	for (std::uint16_t type = kMsgPlayerState; type <= 0xFF; ++type) {
+		const std::uint32_t bytes = codec::FixedPayloadBytes(type);
+		if (bytes == 0) {
+			continue;  // not a core fixed-size type
+		}
+		if (codec::AllowedFrom(type, Role::kHost) && host.Send(type, payload, bytes)) fromHost.push_back(type);
+		if (codec::AllowedFrom(type, Role::kMc) && mc.Send(type, payload, bytes)) fromMc.push_back(type);
+	}
+	mc.Drain(clock.Us(), kMaxDrainBytesPerTick, [&](const RecordHeader& h, const std::uint8_t*) { toMc.push_back(h.type); });
+	host.Drain(clock.Us(), kMaxDrainBytesPerTick, [&](const RecordHeader& h, const std::uint8_t*) { toHost.push_back(h.type); });
+	CHECK(fromHost == toMc);
+	CHECK(fromMc == toHost);
+	CHECK(std::find(toMc.begin(), toMc.end(), std::uint16_t(kMsgCamera)) != toMc.end());
+	CHECK(std::find(toHost.begin(), toHost.end(), std::uint16_t(kMsgOwnerState)) != toHost.end());
+	CHECK_EQ(host.RxStats().unknown + mc.RxStats().unknown, std::uint64_t(0));
 }
 
 TEST_CASE("endpoint: a frozen heartbeat goes STALE, and resumes with the same session")

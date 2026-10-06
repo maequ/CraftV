@@ -2,6 +2,8 @@ package dev.craftv.client;
 
 import dev.craftv.CraftLog;
 import dev.craftv.LinkService;
+import dev.craftv.client.passthrough.HostCamera;
+import dev.craftv.client.passthrough.PassthroughClient;
 import dev.craftv.coop.CoopServer;
 import dev.craftv.link.Messages;
 import dev.craftv.link.Proto;
@@ -35,10 +37,18 @@ public final class CraftVClient implements ClientModInitializer {
 			return;
 		}
 		LinkService.get().start();
+		ClientTickEvents.START_CLIENT_TICK.register(minecraft -> {
+			try {
+				PassthroughClient.startTick(minecraft);
+			} catch (RuntimeException e) {
+				CraftLog.error("passthrough tick failed", e);
+			}
+		});
 		ClientTickEvents.END_CLIENT_TICK.register(minecraft -> {
 			try {
 				MirrorWorld.tick(minecraft);
 				PlayerPuppet.tick(minecraft);
+				PassthroughClient.endTick(minecraft);
 				if (minecraft.player != null) {
 					CoopServer.publishIfNeeded(minecraft.getSingleplayerServer()); // vanilla's "Open to LAN" runs here too
 				}
@@ -49,6 +59,9 @@ public final class CraftVClient implements ClientModInitializer {
 		registerIntents();
 		if (SHOW_HUD) {
 			HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("craftv", "link_status"), (graphics, delta) -> {
+				if (HostCamera.frame() != null) {
+					return; // the passthrough: this would be drawn over the host's picture
+				}
 				Minecraft minecraft = Minecraft.getInstance();
 				LinkService link = LinkService.get();
 				int color = switch (link.state()) {

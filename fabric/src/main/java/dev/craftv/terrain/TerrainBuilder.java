@@ -40,6 +40,11 @@ public final class TerrainBuilder {
 	private TerrainBuilder() {
 	}
 
+	/** The block state a terrain block of this kind is built with. */
+	public static BlockState state(TerrainColumns.Kind kind) {
+		return STATES.get(kind);
+	}
+
 	/** Places every column of the patch. Returns the number of blocks placed. */
 	public static int build(ServerLevel level, Messages.TerrainPatch patch, int depth, int buildingDepth) {
 		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();

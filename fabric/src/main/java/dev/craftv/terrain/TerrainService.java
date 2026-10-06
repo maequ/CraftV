@@ -78,13 +78,13 @@ public final class TerrainService {
 			}
 			long key = TerrainRequester.key(patch.chunkX(), patch.chunkZ());
 			if (!state.isBuilt(key)) {
+				state.markBuilt(key, patch, config.terrainDepth, config.buildingDepth); // first, so the owner's view knows it
 				try {
 					blocks += TerrainBuilder.build(level, patch, config.terrainDepth, config.buildingDepth);
 					built++;
 				} catch (RuntimeException e) {
 					CraftLog.error("failed to build terrain for chunk " + patch.chunkX() + ", " + patch.chunkZ(), e);
 				}
-				state.markBuilt(key);
 			}
 			if (System.nanoTime() >= deadline) {
 				return; // the rest waits for the next tick

@@ -55,6 +55,25 @@ public final class TerrainColumns {
 		return placed;
 	}
 
+	/**
+	 * What {@link #build} put at height {@code y} of this column, or null if it put nothing there. Used to
+	 * recognise terrain blocks (the owner's passthrough view hides them, brief §8).
+	 */
+	public static Kind kindAt(short groundY, short waterY, int material, int depth, int buildingDepth, int y) {
+		if (groundY == NO_GROUND) {
+			return null;
+		}
+		if (y > groundY) {
+			return waterY != NO_WATER && y <= waterY ? Kind.WATER : null;
+		}
+		int below = groundY - y;
+		int layers = material == MAT_BUILDING ? buildingDepth : depth;
+		if (below > layers) {
+			return null;
+		}
+		return below == 0 ? surface(material) : below <= TOPSOIL ? topsoil(material) : deep(material);
+	}
+
 	static Kind surface(int material) {
 		return switch (material) {
 			case MAT_GRASS -> Kind.GRASS_BLOCK;

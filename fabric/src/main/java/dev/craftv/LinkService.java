@@ -20,6 +20,11 @@ public final class LinkService {
 	private static final long STATUS_LOG_PERIOD_MS = 30_000;
 	private static final int OUTBOX_LIMIT = 50_000;
 	private static final int TERRAIN_INBOX_LIMIT = 4_096; // ~5 MiB of patches; beyond that MC asks again later
+	private static final int INPUT_LIMIT = 256; // forwarded presses; more than this unprocessed means the game is stuck
+
+	/** The host's latest CAMERA (PROTOCOL.md §7.15) and when it arrived ({@link System#nanoTime}). */
+	public record ReceivedCamera(Messages.Camera camera, long receivedNanos) {
+	}
 
 	private static final LinkService INSTANCE = new LinkService();
 
@@ -27,6 +32,9 @@ public final class LinkService {
 	private final Queue<Messages.Payload> hostBlockOps = new ConcurrentLinkedQueue<>();
 	private final Queue<Messages.Payload> outbox = new ConcurrentLinkedQueue<>();
 	private final Queue<Messages.TerrainPatch> terrainInbox = new ConcurrentLinkedQueue<>();
+	private final AtomicReference<ReceivedCamera> latestCamera = new AtomicReference<>();
+	private final AtomicReference<Messages.View> latestView = new AtomicReference<>();
+	private final Queue<Messages.Input> inputs = new ConcurrentLinkedQueue<>();
 	private volatile Thread thread;
 	private volatile boolean running;
 	private volatile boolean inGame;
@@ -103,6 +111,9 @@ public final class LinkService {
 						case MSG_BLOCK_BREAK_REQUEST -> queueBlockOp(ep, bytes >= BLOCK_REQUEST_BYTES ? Messages.BlockBreakRequest.read(s, off) : null);
 						case MSG_BLOCK_PLACE_REQUEST -> queueBlockOp(ep, bytes >= BLOCK_REQUEST_BYTES ? Messages.BlockPlaceRequest.read(s, off) : null);
 						case MSG_TERRAIN_PATCH -> acceptTerrain(ep, bytes >= TERRAIN_PATCH_BYTES ? Messages.TerrainPatch.read(s, off) : null);
+						case MSG_CAMERA -> acceptCamera(ep, bytes >= CAMERA_BYTES ? Messages.Camera.read(s, off) : null);
+						case MSG_VIEW -> acceptView(ep, bytes >= VIEW_BYTES ? Messages.View.read(s, off) : null);
+						case MSG_INPUT -> acceptInput(ep, bytes >= INPUT_BYTES ? Messages.Input.read(s, off) : null);
 						case MSG_LOG -> {
 							Messages.Log log = bytes >= LOG_BYTES ? Messages.Log.read(s, off) : null;
 							if (log != null && log.valid()) {
@@ -140,6 +151,8 @@ public final class LinkService {
 		}
 		if ((ev & (Endpoint.EV_STALE | Endpoint.EV_PEER_DETACHED)) != 0) {
 			latestPlayerState.set(null); // stop puppeting; the player stays where it is
+			latestCamera.set(null); // and the passthrough view ends
+			inputs.clear();
 		}
 		if ((ev & Endpoint.EV_CONNECTED) != 0) {
 			send(new Messages.Log(LOG_INFO, "CraftV-Fabric " + CraftV.version() + " connected"));
@@ -153,6 +166,35 @@ public final class LinkService {
 			return;
 		}
 		latestPlayerState.set(ps);
+	}
+
+	private void acceptCamera(Endpoint ep, Messages.Camera camera) {
+		if (camera == null || !camera.valid()) {
+			ep.countMalformed();
+			CraftLog.limited("badcamera", 5000, "ignored an invalid CAMERA from the host");
+			return;
+		}
+		latestCamera.set(new ReceivedCamera(camera, System.nanoTime()));
+	}
+
+	private void acceptView(Endpoint ep, Messages.View view) {
+		if (view == null || !view.valid()) {
+			ep.countMalformed();
+			CraftLog.limited("badview", 5000, "ignored an invalid VIEW from the host");
+			return;
+		}
+		latestView.set(view);
+	}
+
+	private void acceptInput(Endpoint ep, Messages.Input input) {
+		if (input == null || !input.valid()) {
+			ep.countMalformed();
+			CraftLog.limited("badinput", 5000, "ignored an invalid INPUT from the host");
+			return;
+		}
+		if (inputs.size() < INPUT_LIMIT) {
+			inputs.add(input);
+		}
 	}
 
 	private void acceptTerrain(Endpoint ep, Messages.TerrainPatch patch) {
@@ -229,6 +271,21 @@ public final class LinkService {
 
 	public boolean connected() {
 		return state == Endpoint.State.CONNECTED;
+	}
+
+	/** The host's latest camera, or null (link down or never sent). */
+	public ReceivedCamera latestCamera() {
+		return latestCamera.get();
+	}
+
+	/** The window size the host last asked for (§7.16), or null. */
+	public Messages.View latestView() {
+		return latestView.get();
+	}
+
+	/** The next forwarded input (§7.17), or null. Client thread. */
+	public Messages.Input pollInput() {
+		return inputs.poll();
 	}
 
 	public Messages.PlayerState latestPlayerState() {

@@ -9,6 +9,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Phase 1/2 "puppet" mode (PROTOCOL.md §7.3): the host's PLAYER_STATE is where the Minecraft
@@ -28,6 +29,9 @@ public final class PlayerPuppet {
 	private static long applied;
 	private static Messages.PlayerState lastState;
 	private static long lastNewStateNs;
+	/** Where a player who can't fly is held while the host isn't driving them (no state yet, or paused). */
+	private static Vec3 held;
+	private static LocalPlayer heldPlayer;
 
 	private PlayerPuppet() {
 	}
@@ -51,6 +55,24 @@ public final class PlayerPuppet {
 		});
 	}
 
+	/**
+	 * A Creative owner gets the mouse and keyboard back when the host stops; a Survival owner would fall (into the
+	 * void, where no ground is built yet), so they stay where the host last put them.
+	 */
+	private static void hold(LocalPlayer player) {
+		if (player.getAbilities().mayfly) {
+			held = null;
+			return;
+		}
+		if (held == null || player != heldPlayer) {
+			held = player.position();
+			heldPlayer = player;
+		}
+		player.setPos(held.x, held.y, held.z);
+		player.setDeltaMovement(Vec3.ZERO);
+		player.resetFallDistance();
+	}
+
 	public static void tick(Minecraft minecraft) {
 		LinkService link = LinkService.get();
 		LocalPlayer player = minecraft.player;
@@ -62,6 +84,7 @@ public final class PlayerPuppet {
 		Messages.PlayerState ps = link.latestPlayerState();
 		if (ps == null) {
 			lastState = null;
+			hold(player);
 			return;
 		}
 		// Every received record is a new object, so identity tells a fresh state from a repeat.
@@ -70,6 +93,7 @@ public final class PlayerPuppet {
 			lastState = ps;
 			lastNewStateNs = now;
 		} else if (now - lastNewStateNs > HOST_PAUSE_NS) {
+			hold(player);
 			return;
 		}
 		// The host drives this window's player; pausing on focus loss would freeze it.
@@ -94,6 +118,7 @@ public final class PlayerPuppet {
 		player.setDeltaMovement(ps.vx() / TICKS_PER_SECOND, ps.vy() / TICKS_PER_SECOND, ps.vz() / TICKS_PER_SECOND);
 		player.setOnGround(ps.onGround());
 		player.resetFallDistance();
+		held = null;
 		if (++applied % 1200 == 1) {
 			CraftLog.info(String.format("puppet: applied %d host states; now (%.2f, %.2f, %.2f) yaw %.1f", applied, ps.x(), ps.y(), ps.z(), ps.yaw()));
 		}
