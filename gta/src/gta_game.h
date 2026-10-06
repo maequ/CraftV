@@ -16,6 +16,19 @@ namespace craftv::host
 		bool ProbeGround(float a_x, float a_y, GroundProbe& a_out) override;
 		void RequestCollision(float a_x, float a_y, float a_z) override;
 
+		// the passthrough (brief §8)
+		bool PassthroughAvailable() override;
+		void SampleCamera(CameraSample& a_out) override;
+		void TakePassthroughInput(PassthroughInput& a_out) override;
+		void SetPlayerHidden(bool a_hidden) override;
+		void HideHudThisFrame() override;
+		bool ScreenSize(int& a_width, int& a_height) override;
+		void SetCompositorActive(bool a_active) override;
+		void CompositorPose(float a_yaw, float a_pitch, float a_roll, float a_fovY, double a_x, double a_y, double a_z, float a_nearClip,
+			float a_farClip) override;
+		void Melee(float a_damage) override;
+		void Notify(const char* a_text) override;
+
 	private:
 		void Count(bool a_ready, bool a_hit, std::uint32_t a_material);
 
@@ -25,5 +38,6 @@ namespace craftv::host
 		};
 
 		ProbeStats stats_{};
+		bool       playerHidden_ = false;
 	};
 }

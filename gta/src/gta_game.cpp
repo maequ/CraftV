@@ -3,12 +3,14 @@
 // Text drawing copies the SDK sample (NativeTrainer/script.cpp).
 #include "gta_game.h"
 
+#include "compositor.h"
 #include "core/host_log.h"
 
 #pragma warning(push, 0)
 #include "natives.h"
 #pragma warning(pop)
 
+#include <cmath>
 #include <cstring>
 
 namespace craftv::host
@@ -38,6 +40,42 @@ namespace craftv::host
 		}
 
 		constexpr std::uint64_t kProbeSummaryEvery = 65536;  // a probe summary line in CraftV.log every this many probes
+
+		// ---- the passthrough (brief §8). Control ids, hashes and argument counts follow minecraft-gta5-passthrough
+		// (rehan-remade, MIT), proven on GTA V Legacy 3889; the 2016 SDK has older names or none for some of them.
+		constexpr int kFollowCamFirstPerson = 4;  // GET_FOLLOW_PED_CAM_VIEW_MODE / GET_FOLLOW_VEHICLE_CAM_VIEW_MODE
+		constexpr Hash kWeaponUnarmed = 0xA2719263;
+		// GTA's own attack, aim, melee, weapon wheel, weapon slots, cover, reload, grenade and vehicle weapons: off
+		// while Minecraft has the mouse.
+		constexpr int kDisabledControls[] = {
+			24, 25, 257, 140, 141, 142, 143, 263, 264,    // attack, aim, attack 2, melee
+			14, 15, 16, 17, 37, 261, 262,                 // weapon wheel, next, previous
+			157, 158, 159, 160, 161, 162, 163, 164, 165,  // weapon slots (the number keys)
+			44, 45, 47, 58,                               // cover, reload, detonate, throw grenade
+			68, 69, 70, 91, 92, 99, 100, 114, 115, 116,   // vehicle and passenger weapons
+		};
+		constexpr int kControlAttack = 24, kControlAim = 25;
+		constexpr int kControlNext[] = { 14, 16 }, kControlPrevious[] = { 15, 17 };  // wheel down/up: the next/previous weapon
+		// Number keys 1..9 are GTA's weapon-slot controls in this order.
+		constexpr int kHotbarControls[9] = { 157, 158, 160, 164, 165, 159, 161, 162, 163 };
+		// ASSUMPTION: modern signatures (alloc8or's nativedb, as the reference project calls them on 3889): the 2016 SDK
+		// wraps these hashes with fewer or untyped arguments.
+		float FinalRenderedCamFov() { return invoke<float>(0x80EC114669DAEFF4); }
+		float FinalRenderedCamNearClip() { return invoke<float>(0xD0082607100D7193); }
+		float FinalRenderedCamFarClip() { return invoke<float>(0xDFC8CBC606FDB0FC); }
+		void  ApplyDamageToPed(Ped a_ped, int a_damage) { invoke<Void>(0x697157CED63F18D4, a_ped, a_damage, FALSE, 0, 0); }
+		void  ApplyForce(Entity a_entity, float a_x, float a_y, float a_z)
+		{
+			ENTITY::APPLY_FORCE_TO_ENTITY(a_entity, 1, a_x, a_y, a_z, 0.0f, 0.0f, 0.0f, 0, FALSE, TRUE, TRUE, FALSE, TRUE);
+		}
+		// Melee reach and knock-back. ASSUMPTION: tuned by eye in the reference; to check in game.
+		constexpr float kMeleeReach = 3.5f, kMeleeHeight = 2.5f, kMeleeCone = 0.3f;  // cos of the half angle
+		constexpr float kCarReach = 5.5f, kCarHeight = 3.0f, kCarCone = 0.2f;
+		constexpr float kPushPerDamage = 0.12f, kPushUp = 2.0f, kCarPushPerDamage = 0.08f;
+		constexpr int   kRagdollMs = 1500;
+		constexpr int   kMaxWorldEntities = 512;
+		constexpr float kDegToRad = 3.14159265f / 180.0f;
+		char            g_notificationEntry[] = "STRING";
 
 		// _ADD_TEXT_COMPONENT_STRING takes at most 99 characters; longer lines go in as several components.
 		constexpr std::size_t kTextComponentChars = 90;
@@ -124,6 +162,146 @@ namespace craftv::host
 				static_cast<unsigned long long>(stats_.hits), static_cast<unsigned long long>(stats_.withMaterial),
 				static_cast<unsigned long long>(stats_.probes - stats_.ready));
 		}
+	}
+
+	bool GtaGame::PassthroughAvailable()
+	{
+		return compositor::registered();
+	}
+
+	void GtaGame::SampleCamera(CameraSample& a_out)
+	{
+		a_out = CameraSample{};
+		// 0xA200EB1EE790F448 and 0x5B4E4C817FCC2DFB are GET_FINAL_RENDERED_CAM_COORD / _ROT (the SDK calls them
+		// _GET_GAMEPLAY_CAM_COORDS / _ROT): the camera this frame is drawn with, whichever camera is active.
+		const Vector3 p = CAM::_GET_GAMEPLAY_CAM_COORDS();
+		const Vector3 r = CAM::_GET_GAMEPLAY_CAM_ROT(kRotationOrderZxy);
+		a_out.x = p.x;
+		a_out.y = p.y;
+		a_out.z = p.z;
+		a_out.pitch = r.x;
+		a_out.roll = r.y;
+		a_out.heading = r.z;
+		a_out.fovY = FinalRenderedCamFov();
+		a_out.nearClip = FinalRenderedCamNearClip();
+		a_out.farClip = FinalRenderedCamFarClip();
+		const Ped  ped = PLAYER::PLAYER_PED_ID();
+		const bool inVehicle = PED::IS_PED_IN_ANY_VEHICLE(ped, FALSE) != FALSE;
+		a_out.firstPerson = (inVehicle ? CAM::GET_FOLLOW_VEHICLE_CAM_VIEW_MODE() : CAM::GET_FOLLOW_PED_CAM_VIEW_MODE()) == kFollowCamFirstPerson;
+		a_out.valid = std::isfinite(a_out.x) && std::isfinite(a_out.y) && std::isfinite(a_out.z) && std::isfinite(a_out.fovY) && a_out.fovY > 0.0f;
+	}
+
+	void GtaGame::TakePassthroughInput(PassthroughInput& a_out)
+	{
+		a_out = PassthroughInput{};
+		for (int control : kDisabledControls) {
+			CONTROLS::DISABLE_CONTROL_ACTION(0, control, TRUE);
+		}
+		a_out.attackPressed = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kControlAttack) != FALSE;
+		a_out.attackReleased = CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, kControlAttack) != FALSE;
+		a_out.usePressed = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kControlAim) != FALSE;
+		a_out.useReleased = CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, kControlAim) != FALSE;
+		for (int c : kControlNext) {
+			a_out.scroll += CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, c) ? 1 : 0;
+		}
+		for (int c : kControlPrevious) {
+			a_out.scroll -= CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, c) ? 1 : 0;
+		}
+		a_out.scroll = a_out.scroll > 0 ? 1 : a_out.scroll < 0 ? -1 : 0;  // the wheel reports through two controls at once
+		for (int i = 0; i < 9; ++i) {
+			if (CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kHotbarControls[i])) {
+				a_out.slot = i;
+			}
+		}
+		if (playerHidden_) {
+			// Kept hidden every frame: switching character, respawning or a cutscene gives a new or visible ped.
+			const Ped ped = PLAYER::PLAYER_PED_ID();
+			ENTITY::SET_ENTITY_VISIBLE(ped, FALSE, FALSE);
+		}
+	}
+
+	void GtaGame::SetPlayerHidden(bool a_hidden)
+	{
+		playerHidden_ = a_hidden;
+		const Ped ped = PLAYER::PLAYER_PED_ID();
+		ENTITY::SET_ENTITY_VISIBLE(ped, a_hidden ? FALSE : TRUE, FALSE);
+		if (a_hidden) {
+			WEAPON::SET_CURRENT_PED_WEAPON(ped, kWeaponUnarmed, TRUE);  // Minecraft's item is what the player holds
+		}
+	}
+
+	void GtaGame::HideHudThisFrame()
+	{
+		UI::HIDE_HUD_AND_RADAR_THIS_FRAME();
+	}
+
+	bool GtaGame::ScreenSize(int& a_width, int& a_height)
+	{
+		compositor::backbuffer_size(a_width, a_height);  // ReShade's view of the backbuffer: exact
+		if (a_width <= 0 || a_height <= 0) {
+			GRAPHICS::_GET_SCREEN_ACTIVE_RESOLUTION(&a_width, &a_height);
+		}
+		return a_width > 0 && a_height > 0;
+	}
+
+	void GtaGame::SetCompositorActive(bool a_active)
+	{
+		compositor::set_active(a_active);
+	}
+
+	void GtaGame::CompositorPose(float a_yaw, float a_pitch, float a_roll, float a_fovY, double a_x, double a_y, double a_z, float a_nearClip,
+		float a_farClip)
+	{
+		compositor::set_host_planes(a_nearClip, a_farClip);
+		compositor::set_host_pose(a_yaw, a_pitch, a_roll, a_fovY, a_x, a_y, a_z);
+	}
+
+	// A Minecraft swing (the reference project's melee): people in front of the player within reach ragdoll, take the
+	// damage and are pushed away; cars get a shove.
+	void GtaGame::Melee(float a_damage)
+	{
+		const Ped     me = PLAYER::PLAYER_PED_ID();
+		const Vector3 at = ENTITY::GET_ENTITY_COORDS(me, TRUE);
+		const float   h = CAM::GET_GAMEPLAY_CAM_ROT(kRotationOrderZxy).z * kDegToRad;
+		const float   fx = -std::sin(h), fy = std::cos(h);
+		int           handles[kMaxWorldEntities];
+		const int     peds = worldGetAllPeds(handles, kMaxWorldEntities);
+		int           hit = 0;
+		for (int i = 0; i < peds; ++i) {
+			const Ped q = handles[i];
+			if (q == me || ENTITY::IS_ENTITY_DEAD(q)) {
+				continue;
+			}
+			const Vector3 o = ENTITY::GET_ENTITY_COORDS(q, TRUE);
+			const float   dx = o.x - at.x, dy = o.y - at.y, d = std::sqrt(dx * dx + dy * dy);
+			if (d > kMeleeReach || std::fabs(o.z - at.z) > kMeleeHeight || (d > 0.3f && (dx * fx + dy * fy) / d < kMeleeCone)) {
+				continue;
+			}
+			PED::SET_PED_TO_RAGDOLL(q, kRagdollMs, kRagdollMs, 0, FALSE, FALSE, FALSE);
+			ApplyDamageToPed(q, static_cast<int>(a_damage + 0.5f));
+			ApplyForce(q, fx * a_damage * kPushPerDamage, fy * a_damage * kPushPerDamage, kPushUp);
+			++hit;
+		}
+		const int cars = worldGetAllVehicles(handles, kMaxWorldEntities);
+		for (int i = 0; i < cars; ++i) {
+			const Vehicle v = handles[i];
+			const Vector3 o = ENTITY::GET_ENTITY_COORDS(v, TRUE);
+			const float   dx = o.x - at.x, dy = o.y - at.y, d = std::sqrt(dx * dx + dy * dy);
+			if (d > kCarReach || std::fabs(o.z - at.z) > kCarHeight || (d > 0.5f && (dx * fx + dy * fy) / d < kCarCone)) {
+				continue;
+			}
+			ApplyForce(v, fx * a_damage * kCarPushPerDamage, fy * a_damage * kCarPushPerDamage, 0.0f);
+		}
+		if (hit > 0) {
+			HostLog::Info("melee: %d %s hit for %.0f", hit, hit == 1 ? "person" : "people", a_damage);
+		}
+	}
+
+	void GtaGame::Notify(const char* a_text)
+	{
+		UI::_SET_NOTIFICATION_TEXT_ENTRY(g_notificationEntry);
+		UI::_ADD_TEXT_COMPONENT_STRING(const_cast<char*>(a_text));
+		UI::_DRAW_NOTIFICATION(FALSE, FALSE);
 	}
 
 	void GtaGame::RequestCollision(float a_x, float a_y, float a_z)

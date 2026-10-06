@@ -7,6 +7,7 @@
 #include "core/config.h"
 #include "core/host_log.h"
 #include "core/host_plugin.h"
+#include "compositor.h"
 #include "gta_game.h"
 
 #include "craftv/clock.h"
@@ -45,7 +46,16 @@ namespace
 
 	__declspec(noinline) void TickOnce()
 	{
+		compositor::try_register(g_module);  // ReShade may load after us; the passthrough waits for it
 		g_plugin->Tick(craftv::clock::NowMs(), craftv::clock::NowUs());
+	}
+
+	// F7 turns the Minecraft view on and off (Script Hook V calls this on the game's window thread).
+	void OnKeyboard(DWORD a_key, WORD, BYTE, BOOL, BOOL, BOOL a_wasDownBefore, BOOL a_isUpNow)
+	{
+		if (a_key == VK_F7 && !a_wasDownBefore && !a_isUpNow && g_plugin) {
+			g_plugin->RequestPassthroughToggle();
+		}
 	}
 
 	// No C++ objects with destructors in this frame, so SEH is allowed here.
@@ -86,9 +96,12 @@ BOOL APIENTRY DllMain(HMODULE a_module, DWORD a_reason, LPVOID a_reserved)
 	case DLL_PROCESS_ATTACH:
 		g_module = a_module;
 		scriptRegister(a_module, ScriptMain);
+		keyboardHandlerRegister(OnKeyboard);
 		break;
 	case DLL_PROCESS_DETACH:
+		keyboardHandlerUnregister(OnKeyboard);
 		scriptUnregister(a_module);
+		compositor::unregister(a_module);
 		// On a normal unload (Ctrl+R reload with ScriptHookV.dev) detach cleanly. During process exit
 		// (a_reserved != null) other threads are already gone; Minecraft notices the stopped heartbeat instead.
 		if (a_reserved == nullptr && g_plugin) {

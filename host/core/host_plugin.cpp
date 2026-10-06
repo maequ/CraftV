@@ -59,7 +59,8 @@ namespace craftv::host
 		return "?";
 	}
 
-	HostPlugin::HostPlugin(IGame& a_game, const Config& a_config) : game_(a_game), config_(a_config), terrain_(a_config.terrain)
+	HostPlugin::HostPlugin(IGame& a_game, const Config& a_config) :
+		game_(a_game), config_(a_config), terrain_(a_config.terrain), passthroughWanted_(a_config.passthrough.mode == PassthroughMode::kAuto)
 	{
 	}
 
@@ -100,6 +101,123 @@ namespace craftv::host
 		return m;
 	}
 
+	CameraMsg HostPlugin::MakeCamera(const CameraSample& a_cam, const GameSample& a_s, const WorldConfig& a_world, std::uint64_t a_frame,
+		std::uint64_t a_nowUs)
+	{
+		CameraMsg m{};
+		m.frame = a_frame;
+		m.timeUs = a_nowUs;
+		const McPosition c = PointToMinecraft(a_cam.x, a_cam.y, a_cam.z, a_world);
+		m.x = c.x;
+		m.y = c.y;
+		m.z = c.z;
+		m.yaw = HeadingToYaw(a_cam.heading);
+		m.pitch = CamPitchToMcPitch(a_cam.pitch);
+		m.roll = a_cam.roll;
+		m.fovY = std::clamp(a_cam.fovY, kMinFov, kMaxFov);
+		const McPosition f = ToMinecraft(a_s.x, a_s.y, a_s.z, a_world);
+		m.feetX = f.x;
+		m.feetY = f.y;
+		m.feetZ = f.z;
+		m.bodyYaw = HeadingToYaw(a_s.heading);
+		m.flags = kCameraPassthrough | (a_cam.firstPerson ? kCameraFirstPerson : 0u) | (a_s.inVehicle ? kCameraInVehicle : 0u);
+		m.nearClip = std::max(0.0f, a_cam.nearClip);
+		m.farClip = std::max(0.0f, a_cam.farClip);
+		return m;
+	}
+
+	ViewMsg HostPlugin::MakeView(int a_width, int a_height, std::uint64_t a_maxPixels)
+	{
+		ViewMsg      v{};
+		const double w = std::max(1, a_width), h = std::max(1, a_height);
+		const double pixels = static_cast<double>(std::min<std::uint64_t>(a_maxPixels, kViewMaxPixels));
+		double       scale = std::min(1.0, std::sqrt(pixels / (w * h)));
+		scale = std::min({ scale, kViewMaxWidth / w, kViewMaxHeight / h });
+		v.width = std::clamp(static_cast<std::uint32_t>(w * scale), kViewMinSide, kViewMaxWidth);
+		v.height = std::clamp(static_cast<std::uint32_t>(h * scale), kViewMinSide, kViewMaxHeight);
+		v.hostWidth = std::min(static_cast<std::uint32_t>(w), kHostMaxSide);
+		v.hostHeight = std::min(static_cast<std::uint32_t>(h), kHostMaxSide);
+		return v;
+	}
+
+	float HostPlugin::MeleeDamage(const OwnerStateMsg& a_owner, double a_perHalfHeart)
+	{
+		const double charge = std::clamp(static_cast<double>(a_owner.attackCharge), 0.0, 1.0);
+		return static_cast<float>(a_owner.attackDamage * (0.2 + 0.8 * charge * charge) * a_perHalfHeart);
+	}
+
+	void HostPlugin::SetPassthrough(bool a_on)
+	{
+		if (a_on == passthroughActive_) {
+			return;
+		}
+		passthroughActive_ = a_on;
+		game_.SetPlayerHidden(a_on);
+		game_.SetCompositorActive(a_on);
+		viewSent_ = ViewMsg{};  // size Minecraft's window again next time
+		HostLog::Info("passthrough %s", a_on ? "on: Minecraft draws the player, hand and HUD into the game's picture" : "off");
+	}
+
+	// The passthrough (brief §8, PROTOCOL.md §7.15-7.17): every frame the rendered camera, the window size when it
+	// changes, and the owner's buttons; a Minecraft melee swing hurts the people in front of the player.
+	void HostPlugin::TickPassthrough(bool a_linked, std::uint64_t a_nowUs)
+	{
+		if (toggleRequested_.exchange(false, std::memory_order_relaxed)) {
+			passthroughWanted_ = !passthroughWanted_;
+			const bool available = game_.PassthroughAvailable();
+			game_.Notify(!available ? "CraftV: the Minecraft view needs ReShade (see INSTALL.txt)"
+			             : passthroughWanted_ ? "CraftV: Minecraft view on" : "CraftV: Minecraft view off");
+		}
+		SetPassthrough(a_linked && passthroughWanted_ && game_.PassthroughAvailable());
+		if (!passthroughActive_) {
+			return;
+		}
+		CameraSample cam;
+		game_.SampleCamera(cam);
+		if (cam.valid) {
+			const CameraMsg m = MakeCamera(cam, sample_, config_.world, ++cameraFrame_, a_nowUs);
+			if (endpoint_->Send(m)) {
+				++camerasSent_;
+			}
+			game_.CompositorPose(m.yaw, m.pitch, m.roll, m.fovY, m.x, m.y, m.z, m.nearClip, m.farClip);
+		}
+		int w = 0, h = 0;
+		if (game_.ScreenSize(w, h) && w > 0 && h > 0) {
+			const ViewMsg v = MakeView(w, h, config_.passthrough.maxPixels);
+			if ((v.width != viewSent_.width || v.height != viewSent_.height) && endpoint_->Send(v)) {
+				viewSent_ = v;
+			}
+		}
+		PassthroughInput in;
+		game_.TakePassthroughInput(in);
+		auto button = [&](bool a_pressed, bool a_released, std::uint8_t a_button) {
+			if (a_pressed) {
+				endpoint_->Send(InputMsg{ kInputButton, a_button, 1, 0, 0 });
+			}
+			if (a_released) {
+				endpoint_->Send(InputMsg{ kInputButton, a_button, 0, 0, 0 });
+			}
+		};
+		button(in.attackPressed, in.attackReleased, kButtonAttack);
+		button(in.usePressed, in.useReleased, kButtonUse);
+		if (in.slot >= 0 && in.slot < kHotbarSlots) {
+			endpoint_->Send(InputMsg{ kInputSlot, 0, 0, static_cast<std::int8_t>(in.slot), 0 });
+		}
+		if (in.scroll != 0) {
+			endpoint_->Send(InputMsg{ kInputScroll, 0, 0, static_cast<std::int8_t>(std::clamp(in.scroll, -int(kHotbarSlots), int(kHotbarSlots))), 0 });
+		}
+		if (in.attackPressed && hasOwner_ && (owner_.flags & (kOwnerDead | kOwnerScreenOpen)) == 0) {
+			const float damage = MeleeDamage(owner_, config_.passthrough.meleeDamagePerHalfHeart);
+			if (damage > 0.0f) {
+				game_.Melee(damage);
+				++meleeHits_;
+			}
+		}
+		if (config_.passthrough.hideGtaHud) {
+			game_.HideHudThisFrame();
+		}
+	}
+
 	void HostPlugin::Tick(std::uint64_t a_nowMs, std::uint64_t a_nowUs)
 	{
 		const std::uint64_t start = clock::NowUs();
@@ -123,6 +241,7 @@ namespace craftv::host
 			HostLog::Warn("online session detected (gameInProgress=%d sessionStarted=%d inSession=%d): CraftV is off until the game restarts",
 				sample_.networkGameInProgress, sample_.networkSessionStarted, sample_.networkInSession);
 			state_ = PluginState::kOnlineBlocked;
+			SetPassthrough(false);
 			endpoint_.reset();  // clean detach: Minecraft sees the host leave at once
 			return;
 		}
@@ -172,6 +291,7 @@ namespace craftv::host
 			}
 		}
 		wasUsable_ = usable;
+		TickPassthrough(usable && endpoint_->Connected() && !sample_.screenFadedOut, a_nowUs);
 
 		if (config_.debugOverlay) {
 			DrawOverlay();
@@ -182,6 +302,7 @@ namespace craftv::host
 	{
 		const std::uint32_t ev = endpoint_->TakeEvents();
 		if (ev & (kEvConnected | kEvPeerRestarted)) {
+			hasOwner_ = false;
 			teleportNext_ = true;  // a new Minecraft: snap its player onto ours
 			terrain_.Reset();      // its requests and friends come again (§7.10, §7.11)
 			friends_.Clear();
@@ -268,6 +389,16 @@ namespace craftv::host
 			HostLog::Info("friend #%u left (reason %u)", m.playerId, m.reason);
 			return;
 		}
+		case kMsgOwnerState: {
+			OwnerStateMsg m;
+			if (!codec::Decode(a_h, a_p, m)) {
+				endpoint_->CountMalformed();
+				return;
+			}
+			owner_ = m;
+			hasOwner_ = true;
+			return;
+		}
 		case kMsgSessionInfo: {
 			SessionInfoMsg m;
 			if (!codec::Decode(a_h, a_p, m)) {
@@ -308,8 +439,8 @@ namespace craftv::host
 				static_cast<unsigned long long>(rx.consumed), static_cast<unsigned long long>(rx.malformed + rx.corrupt), cost_.avgUs / 1000.0,
 				cost_.maxUs / 1000.0);
 		} else {
-			std::snprintf(lines[0], sizeof(lines[0]), "CraftV  link %s  ping %.0f ms  tick %.2f ms", ToString(st), peer.rttValid ? peer.rttUs / 1000.0 : 0.0,
-				cost_.avgUs / 1000.0);
+			std::snprintf(lines[0], sizeof(lines[0]), "CraftV  link %s  ping %.0f ms  tick %.2f ms%s", ToString(st), peer.rttValid ? peer.rttUs / 1000.0 : 0.0,
+				cost_.avgUs / 1000.0, passthroughActive_ ? "  MC view" : "");
 		}
 
 		// Friends: how many, how they join, and the first few by name with their distance.
@@ -364,6 +495,13 @@ namespace craftv::host
 
 	void HostPlugin::Fault(const char* a_what)
 	{
+		if (passthroughActive_) {
+			try {
+				game_.SetPlayerHidden(false);  // never leave the player invisible
+			} catch (...) {
+			}
+			passthroughActive_ = false;
+		}
 		if (state_ == PluginState::kFaulted) {
 			return;
 		}

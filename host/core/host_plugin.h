@@ -4,6 +4,8 @@
 //   - sends PLAYER_STATE from the player ped (PROTOCOL.md §7.3), converted by coords.h
 //   - answers TERRAIN_REQUESTs by probing the game's ground (§7.11-7.12, terrain_scanner.h)
 //   - keeps the friends Minecraft reports (§7.8-7.10) and how they join (§7.13) for the overlay
+//   - the passthrough (brief §8): sends the game's camera, window size and the owner's buttons, hides the
+//     player, turns Minecraft melee hits into game damage (PROTOCOL.md §7.15-7.18)
 //   - draws a debug overlay through IGame
 //   - never throws, never blocks; no heap allocation after the first tick
 #pragma once
@@ -15,6 +17,7 @@
 
 #include "craftv/endpoint.h"
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 
@@ -64,6 +67,9 @@ namespace craftv::host
 		const Friends&               FriendsTable() const { return friends_; }
 		bool                         HasSessionInfo() const { return hasSession_; }
 		const proto::SessionInfoMsg& Session() const { return session_; }
+		bool                         PassthroughActive() const { return passthroughActive_; }
+		// F7: any thread (the game's keyboard hook). Applied on the next tick.
+		void RequestPassthroughToggle() { toggleRequested_.store(true, std::memory_order_relaxed); }
 
 		// True while the game is in a state where the player's position means something.
 		static bool PlayerUsable(const GameSample& a_sample);
@@ -72,6 +78,13 @@ namespace craftv::host
 		// Builds the PLAYER_STATE for a sample (public for tests).
 		static proto::PlayerStateMsg MakePlayerState(const GameSample& a_sample, const WorldConfig& a_world, std::uint64_t a_nowUs,
 			std::uint32_t a_frame, bool a_teleport);
+		// The passthrough's CAMERA (§7.15) for the rendered camera and the player (public for tests).
+		static proto::CameraMsg MakeCamera(const CameraSample& a_camera, const GameSample& a_sample, const WorldConfig& a_world, std::uint64_t a_frame,
+			std::uint64_t a_nowUs);
+		// Minecraft's window for the game's picture: same aspect, at most a_maxPixels (§7.16).
+		static proto::ViewMsg MakeView(int a_width, int a_height, std::uint64_t a_maxPixels);
+		// Game damage for a Minecraft melee swing: vanilla's charge scaling (0.2 + 0.8 * charge²) of the held item's damage.
+		static float MeleeDamage(const proto::OwnerStateMsg& a_owner, double a_perHalfHeart);
 
 	private:
 		void TickImpl(std::uint64_t a_nowMs, std::uint64_t a_nowUs);
@@ -81,6 +94,8 @@ namespace craftv::host
 		void Fault(const char* a_what);
 		void MeasureTick(std::uint64_t a_startUs, std::uint64_t a_nowMs);
 		void ExpireSilentFriends(std::uint64_t a_nowMs, std::uint64_t a_gapMs);
+		void TickPassthrough(bool a_linked, std::uint64_t a_nowUs);
+		void SetPassthrough(bool a_on);
 
 		IGame&                    game_;
 		Config                    config_;
@@ -101,6 +116,16 @@ namespace craftv::host
 		bool                      hasSession_ = false;
 		std::uint64_t             nowMs_ = 0;
 		std::uint64_t             silenceBaseMs_ = 0;  // friends' silence counts from here at the earliest
+		// the passthrough
+		std::atomic<bool>         toggleRequested_{ false };
+		bool                      passthroughWanted_ = true;   // Mode=Auto, flipped by F7
+		bool                      passthroughActive_ = false;
+		std::uint64_t             cameraFrame_ = 0;
+		std::uint64_t             camerasSent_ = 0;
+		proto::ViewMsg            viewSent_{};
+		proto::OwnerStateMsg      owner_{};
+		bool                      hasOwner_ = false;
+		std::uint64_t             meleeHits_ = 0;
 		TickCost                  cost_{};
 		std::uint64_t             nextCostReportMs_ = 0;
 	};

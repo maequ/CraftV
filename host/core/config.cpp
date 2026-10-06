@@ -57,6 +57,12 @@ namespace craftv::host
 		const double attempts = ReadDouble(L"Terrain", L"MaxAttempts", terrain.maxAttempts, a_iniPath);
 		terrain.maxAttempts = attempts >= 1 && attempts <= 100 ? static_cast<int>(attempts) : TerrainConfig{}.maxAttempts;
 
+		const std::wstring mode = ReadString(L"Passthrough", L"Mode", L"Auto", a_iniPath);
+		passthrough.mode = _wcsicmp(mode.c_str(), L"Off") == 0 ? PassthroughMode::kOff : PassthroughMode::kAuto;
+		const double pixels = ReadDouble(L"Passthrough", L"MaxPixels", static_cast<double>(passthrough.maxPixels), a_iniPath);
+		passthrough.maxPixels = static_cast<std::uint64_t>(std::clamp(pixels, 320.0 * 180.0, static_cast<double>(proto::kViewMaxPixels)));
+		passthrough.hideGtaHud = ReadBool(L"Passthrough", L"HideGtaHud", passthrough.hideGtaHud, a_iniPath);
+		passthrough.meleeDamagePerHalfHeart = std::clamp(ReadDouble(L"Passthrough", L"MeleeDamagePerHalfHeart", passthrough.meleeDamagePerHalfHeart, a_iniPath), 0.0, 1000.0);
 		debugOverlay = ReadBool(L"Debug", L"Overlay", debugOverlay, a_iniPath);
 		const std::wstring corner = ReadString(L"Debug", L"OverlayCorner", L"TopRight", a_iniPath);
 		overlayCorner = _wcsicmp(corner.c_str(), L"TopLeft") == 0 ? OverlayCorner::kTopLeft : OverlayCorner::kTopRight;

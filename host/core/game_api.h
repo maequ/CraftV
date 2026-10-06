@@ -51,6 +51,26 @@ namespace craftv::host
 		std::uint8_t r, g, b, a;
 	};
 
+	// The camera the game rendered this frame with (the passthrough, brief §8, PROTOCOL.md §7.15).
+	struct CameraSample
+	{
+		bool  valid = false;
+		float x = 0, y = 0, z = 0;               // GET_FINAL_RENDERED_CAM_COORD
+		float pitch = 0, roll = 0, heading = 0;  // GET_FINAL_RENDERED_CAM_ROT(2): x (positive up), y, z (heading, as GameSample)
+		float fovY = 50;                         // GET_FINAL_RENDERED_CAM_FOV: vertical, degrees
+		float nearClip = 0, farClip = 0;         // GET_FINAL_RENDERED_CAM_NEAR_CLIP / FAR_CLIP
+		bool  firstPerson = false;               // the follow cam's view mode is first person
+	};
+
+	// The owner's Minecraft buttons this frame while the passthrough has them (PROTOCOL.md §7.17).
+	struct PassthroughInput
+	{
+		bool attackPressed = false, attackReleased = false;  // left mouse
+		bool usePressed = false, useReleased = false;        // right mouse
+		int  scroll = 0;                                     // +1 next hotbar slot, -1 previous
+		int  slot = -1;                                      // 0..8 when a number key was pressed
+	};
+
 	class IGame
 	{
 	public:
@@ -65,5 +85,32 @@ namespace craftv::host
 		virtual bool ProbeGround(float a_x, float a_y, GroundProbe& a_out) = 0;
 		// Asks the game to stream collision in around a point, so later probes there can hit.
 		virtual void RequestCollision(float a_x, float a_y, float a_z) = 0;
+
+		// ---- the passthrough (brief §8). The defaults are a game without it.
+		// Whether Minecraft's frames can be composited into the game's picture (the ReShade add-on is loaded).
+		virtual bool PassthroughAvailable() { return false; }
+		virtual void SampleCamera(CameraSample& a_out) { a_out = CameraSample{}; }
+		// Disables the game's own attack, aim and weapon controls for this frame and reports the owner's buttons.
+		virtual void TakePassthroughInput(PassthroughInput& a_out) { a_out = PassthroughInput{}; }
+		// Minecraft draws the owner while the passthrough is on, so the game hides its player (and their weapon).
+		virtual void SetPlayerHidden(bool) {}
+		virtual void HideHudThisFrame() {}
+		// The game's picture in pixels. False if unknown.
+		virtual bool ScreenSize(int& a_width, int& a_height)
+		{
+			a_width = a_height = 0;
+			return false;
+		}
+		// Whether the compositor draws Minecraft this frame, and the camera in Minecraft's terms (§7.15) it
+		// re-projects Minecraft's frame to.
+		virtual void SetCompositorActive(bool) {}
+		virtual void CompositorPose(float /*yaw*/, float /*pitch*/, float /*roll*/, float /*fovY*/, double /*x*/, double /*y*/, double /*z*/,
+			float /*nearClip*/, float /*farClip*/)
+		{
+		}
+		// A Minecraft melee swing: hurt and knock back the people in front of the player, shove cars.
+		virtual void Melee(float /*damage*/) {}
+		// A short on-screen message (the game's notification feed).
+		virtual void Notify(const char* /*text*/) {}
 	};
 }

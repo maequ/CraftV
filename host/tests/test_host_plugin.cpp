@@ -92,6 +92,33 @@ namespace
 			return true;
 		}
 		void RequestCollision(float, float, float) override { ++collisionRequests; }
+
+		// the passthrough
+		bool                     available = false;
+		CameraSample             camera{};
+		PassthroughInput         nextInput{};  // handed out once, then cleared
+		bool                     hidden = false;
+		int                      screenW = 0, screenH = 0;
+		int                      poses = 0;
+		std::vector<float>       melee;
+		std::vector<std::string> notes;
+		bool PassthroughAvailable() override { return available; }
+		void SampleCamera(CameraSample& a_out) override { a_out = camera; }
+		void TakePassthroughInput(PassthroughInput& a_out) override
+		{
+			a_out = nextInput;
+			nextInput = PassthroughInput{};
+		}
+		void SetPlayerHidden(bool a_hidden) override { hidden = a_hidden; }
+		bool ScreenSize(int& a_w, int& a_h) override
+		{
+			a_w = screenW;
+			a_h = screenH;
+			return screenW > 0;
+		}
+		void CompositorPose(float, float, float, float, double, double, double, float, float) override { ++poses; }
+		void Melee(float a_damage) override { melee.push_back(a_damage); }
+		void Notify(const char* a_text) override { notes.emplace_back(a_text); }
 	};
 
 	std::wstring UniqueName(const wchar_t* a_tag)
@@ -123,6 +150,9 @@ namespace
 		std::uint64_t          ms = 500000;
 		std::vector<PlayerStateMsg> received;
 		std::vector<TerrainPatchMsg> patches;
+		std::vector<CameraMsg>       cameras;
+		std::vector<ViewMsg>         views;
+		std::vector<InputMsg>        inputs;
 
 		explicit Rig(const wchar_t* a_tag, bool a_withMc = true) : name(UniqueName(a_tag))
 		{
@@ -149,10 +179,19 @@ namespace
 					mc->Drain(ms * 1000, kMaxDrainBytesPerTick, [&](const RecordHeader& h, const std::uint8_t* p) {
 						PlayerStateMsg  m;
 						TerrainPatchMsg patch;
+						CameraMsg       cam;
+						ViewMsg         view;
+						InputMsg        input;
 						if (h.type == kMsgPlayerState && codec::Decode(h, p, m)) {
 							received.push_back(m);
 						} else if (h.type == kMsgTerrainPatch && codec::Decode(h, p, patch)) {
 							patches.push_back(patch);
+						} else if (h.type == kMsgCamera && codec::Decode(h, p, cam)) {
+							cameras.push_back(cam);
+						} else if (h.type == kMsgView && codec::Decode(h, p, view)) {
+							views.push_back(view);
+						} else if (h.type == kMsgInput && codec::Decode(h, p, input)) {
+							inputs.push_back(input);
 						}
 					});
 				}
@@ -595,3 +634,124 @@ TEST_CASE("host plugin: messages only Minecraft may send are refused from a host
 	CHECK_EQ(rig.plugin->FriendsTable().Count(), 0);
 	CHECK(rig.plugin->Link()->RxStats().malformed >= 1);
 }
+
+// ---- the passthrough (brief §8, PROTOCOL.md §7.15-7.18) -----------------------------------------
+TEST_CASE("host passthrough: the camera, the window and melee damage convert as documented")
+{
+	CameraSample cam;
+	cam.valid = true;
+	cam.x = 10.0f;
+	cam.y = 20.0f;
+	cam.z = 30.0f;
+	cam.heading = 90.0f;  // facing west
+	cam.pitch = -10.0f;   // looking down
+	cam.roll = 2.0f;
+	cam.fovY = 50.0f;
+	cam.firstPerson = true;
+	GameSample s = StoryPlayer(10.0f, 21.0f, 29.5f, 80.0f);
+	const CameraMsg m = HostPlugin::MakeCamera(cam, s, WorldConfig{}, 7, 1234);
+	CHECK(codec::Valid(m));
+	CHECK(Near(m.x, 10.0) && Near(m.y, 30.0) && Near(m.z, -20.0));  // the camera has no feet offset
+	CHECK(Near(m.feetX, 10.0) && Near(m.feetY, 28.5) && Near(m.feetZ, -21.0));
+	CHECK(Near(m.yaw, 90.0) && Near(m.pitch, 10.0) && Near(m.roll, 2.0) && Near(m.bodyYaw, 100.0));
+	CHECK_EQ(m.flags, std::uint32_t(kCameraPassthrough | kCameraFirstPerson));
+	CHECK_EQ(m.frame, std::uint64_t(7));
+
+	const ViewMsg v = HostPlugin::MakeView(2560, 1440, 1920ull * 1080);
+	CHECK(v.width == 1920 && v.height == 1080 && v.hostWidth == 2560);
+	const ViewMsg wide = HostPlugin::MakeView(5120, 1440, 1920ull * 1080);
+	CHECK(codec::Valid(wide));
+	CHECK(std::uint64_t(wide.width) * wide.height <= 1920ull * 1080);
+	CHECK(std::abs(double(wide.width) / wide.height - 5120.0 / 1440.0) < 0.01);
+	CHECK(HostPlugin::MakeView(1280, 720, 1920ull * 1080).width == 1280);  // never scaled up
+
+	OwnerStateMsg owner{};
+	owner.attackDamage = 7.0f;  // a diamond sword
+	owner.attackCharge = 1.0f;
+	CHECK(Near(HostPlugin::MeleeDamage(owner, 10.0), 70.0));
+	owner.attackCharge = 0.0f;
+	CHECK(Near(HostPlugin::MeleeDamage(owner, 10.0), 14.0));  // vanilla: 20 % for a spammed swing
+}
+
+TEST_CASE("host passthrough: off without the compositor; with it, CAMERA every tick, the player hidden, VIEW once; F7 shows them again")
+{
+	Rig rig(L"pass");
+	rig.game.sample = StoryPlayer(0, 0, 50, 0);
+	rig.game.camera.valid = true;
+	rig.game.camera.z = 51.6f;
+	rig.game.screenW = 2560;
+	rig.game.screenH = 1440;
+	rig.Tick(10);
+	REQUIRE(rig.mc->Connected());
+	CHECK(rig.cameras.empty());  // no ReShade add-on: never
+	CHECK(!rig.game.hidden);
+	CHECK(!rig.plugin->PassthroughActive());
+
+	rig.game.available = true;
+	rig.Tick(5);
+	CHECK(rig.plugin->PassthroughActive());
+	CHECK(rig.game.hidden);
+	CHECK(rig.cameras.size() >= 4);
+	CHECK(rig.game.poses >= 4);
+	REQUIRE(rig.views.size() == 1);
+	CHECK(rig.views[0].width == 1920 && rig.views[0].height == 1080);
+	CHECK((rig.cameras.back().flags & kCameraPassthrough) != 0);
+
+	rig.plugin->RequestPassthroughToggle();
+	rig.Tick(2);
+	CHECK(!rig.plugin->PassthroughActive());
+	CHECK(!rig.game.hidden);
+	REQUIRE(!rig.game.notes.empty());
+	CHECK(rig.game.notes.back().find("off") != std::string::npos);
+	const auto camerasWhenOff = rig.cameras.size();
+	rig.Tick(3);
+	CHECK(rig.cameras.size() == camerasWhenOff);
+
+	rig.plugin->RequestPassthroughToggle();  // and on again: the window is sized again
+	rig.Tick(3);
+	CHECK(rig.plugin->PassthroughActive());
+	CHECK(rig.views.size() == 2);
+}
+
+TEST_CASE("host passthrough: buttons become INPUT; an attack is a melee hit once Minecraft has said what the owner holds")
+{
+	Rig rig(L"passinput");
+	rig.game.sample = StoryPlayer(0, 0, 50, 0);
+	rig.game.available = true;
+	rig.game.camera.valid = true;
+	rig.Tick(10);
+	REQUIRE(rig.plugin->PassthroughActive());
+	rig.inputs.clear();
+
+	rig.game.nextInput.attackPressed = true;  // nothing known about the owner yet: forwarded, no melee
+	rig.game.nextInput.slot = 3;
+	rig.game.nextInput.scroll = -1;
+	rig.Tick(2);
+	REQUIRE(rig.inputs.size() == 3);
+	CHECK(rig.inputs[0].kind == kInputButton && rig.inputs[0].button == kButtonAttack && rig.inputs[0].down == 1);
+	CHECK(rig.inputs[1].kind == kInputSlot && rig.inputs[1].value == 3);
+	CHECK(rig.inputs[2].kind == kInputScroll && rig.inputs[2].value == -1);
+	CHECK(rig.game.melee.empty());
+
+	OwnerStateMsg owner{};
+	owner.held = kHeldPickaxe;
+	owner.health = 20;
+	owner.food = 20;
+	owner.attackDamage = 5.0f;
+	owner.attackCharge = 1.0f;
+	REQUIRE(rig.mc->Send(owner));
+	rig.Tick(2);
+	rig.game.nextInput.attackPressed = true;
+	rig.game.nextInput.attackReleased = true;
+	rig.Tick(2);
+	REQUIRE(rig.game.melee.size() == 1);
+	CHECK(Near(rig.game.melee[0], 50.0));
+
+	owner.flags = kOwnerScreenOpen;  // the inventory is open: clicks go to it, not to people
+	REQUIRE(rig.mc->Send(owner));
+	rig.Tick(2);
+	rig.game.nextInput.attackPressed = true;
+	rig.Tick(2);
+	CHECK(rig.game.melee.size() == 1);
+}
+

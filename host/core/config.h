@@ -16,6 +16,20 @@ namespace craftv::host
 		kTopLeft,
 	};
 
+	enum class PassthroughMode
+	{
+		kAuto,  // on whenever the compositor (ReShade add-on) is loaded; F7 toggles
+		kOff,   // never (F7 still turns it on)
+	};
+
+	struct PassthroughConfig
+	{
+		PassthroughMode mode = PassthroughMode::kAuto;
+		std::uint64_t   maxPixels = 1920ull * 1080;  // Minecraft's frame at most this many pixels (the effect scales it up)
+		bool            hideGtaHud = false;          // hide the game's own HUD and minimap while the passthrough is on
+		double          meleeDamagePerHalfHeart = 10.0;  // game damage per Minecraft half heart of attack damage
+	};
+
 	struct Config
 	{
 		// Set by the ASI, not the .ini: the name in HELLO and the logs, e.g. "CraftV-GTA5 0.1.0".
@@ -27,6 +41,8 @@ namespace craftv::host
 		WorldConfig world{};
 		// [Terrain]
 		TerrainConfig terrain{};
+		// [Passthrough]
+		PassthroughConfig passthrough{};
 		// [Debug]
 		bool          debugOverlay = true;
 		OverlayCorner overlayCorner = OverlayCorner::kTopRight;

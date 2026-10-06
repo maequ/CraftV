@@ -30,6 +30,13 @@ namespace craftv::host
 		return { a_x * s, (a_z - a_cfg.feetOffset) * s + a_cfg.yOffset, -a_y * s };
 	}
 
+	// A point that isn't the player (the camera): no feet offset.
+	inline McPosition PointToMinecraft(double a_x, double a_y, double a_z, const WorldConfig& a_cfg)
+	{
+		const double s = a_cfg.blocksPerMetre;
+		return { a_x * s, a_z * s + a_cfg.yOffset, -a_y * s };
+	}
+
 	// Velocity has no offsets: (vx, vy, vz) metres/s -> blocks/s in Minecraft axes.
 	inline McPosition VelocityToMinecraft(double a_vx, double a_vy, double a_vz, const WorldConfig& a_cfg)
 	{
