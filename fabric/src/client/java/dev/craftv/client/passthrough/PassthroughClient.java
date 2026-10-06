@@ -27,6 +27,8 @@ import org.lwjgl.sdl.SDLVideo;
 public final class PassthroughClient {
 	private static final int OWNER_STATE_EVERY_TICKS = 20;
 	private static final int RESPAWN_DELAY_TICKS = 40;
+	/** The terrain stays hidden this long after the last camera: a pause menu shouldn't re-mesh every chunk twice. */
+	private static final long HIDE_TERRAIN_FOR_NANOS = 60_000_000_000L;
 
 	private static boolean optionsConfigured;
 	private static Messages.View appliedView;
@@ -40,19 +42,20 @@ public final class PassthroughClient {
 	/** Start of every client tick: before vanilla handles key bindings, so forwarded clicks count this tick. */
 	public static void startTick(Minecraft minecraft) {
 		boolean on = HostCamera.live() != null;
-		if (on != Passthrough.hideTerrain()) {
-			Passthrough.setHideTerrain(on);
+		boolean hide = HostCamera.recent(HIDE_TERRAIN_FOR_NANOS);
+		if (hide != Passthrough.hideTerrain()) {
+			Passthrough.setHideTerrain(hide);
 			if (minecraft.level != null) {
 				// re-mesh every chunk with terrain hidden (or shown again)
 				minecraft.levelRenderer.invalidateCompiledGeometry(minecraft.level, minecraft.options, minecraft.gameRenderer.mainCamera(),
 					minecraft.getBlockColors());
 			}
-			CraftLog.info("passthrough " + (on ? "on: rendering the owner's view for the host" : "off"));
-			if (on && !optionsConfigured) {
+			CraftLog.info("passthrough " + (hide ? "on: rendering the owner's view for the host" : "off"));
+			if (hide && !optionsConfigured) {
 				optionsConfigured = true;
 				configure(minecraft.options);
 			}
-			if (on) {
+			if (hide) {
 				minecraft.gui.toastManager().clear(); // anything already showing (a tutorial hint) would sit over the host's picture
 			}
 		}

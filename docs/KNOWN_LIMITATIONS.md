@@ -95,6 +95,8 @@ As of Phase 2 (2026-10-05). "Planned" names the phase expected to fix it.
   as air in your view and never suffocates you, but blocks you place there land on the roof or deck terrain.
 - **In a vehicle** GTA shows its own driver and Minecraft doesn't draw yours (it has no car to seat you in). The hand
   and HUD stay. Building from a car isn't meant to work.
+- **Your hearts only drop from Minecraft things** (a friend hitting you, hunger). GTA handles your falls and swimming,
+  so Minecraft gives you no fall damage and you never drown; GTA damage doesn't touch your hearts yet.
 - **Melee reach and knock-back** are the reference project's values, untested in CraftV. Damage is Minecraft's attack
   damage x `MeleeDamagePerHalfHeart` (10), with vanilla's charge scaling.
 - **GTA's HUD stays** by default (`[Passthrough] HideGtaHud=1` hides it). Its minimap sits left of Minecraft's hotbar.

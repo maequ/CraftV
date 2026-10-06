@@ -34,6 +34,9 @@ namespace
 	// would stay over the map. Composite only while the script has set a pose this recently.
 	constexpr ULONGLONG kPoseStaleMs = 250;
 	std::atomic<ULONGLONG> g_lastPoseMs{0};
+	// Minecraft froze or closed: don't keep its last picture over GTA.
+	constexpr ULONGLONG kFrameStaleMs = 1000;
+	ULONGLONG          g_lastFrameMs = 0;
 	std::atomic<float> g_hostNear{0.15f};
 	std::atomic<float> g_hostFar{10000.0f};
 	std::atomic<uint32_t> g_bbWidth{0}, g_bbHeight{0};
@@ -187,6 +190,7 @@ namespace
 		if (read<int64_t>(desc) != seq)
 			return; // Minecraft rewrote the slot mid-copy: show the next one instead
 		g_lastPublish = published;
+		g_lastFrameMs = GetTickCount64();
 		g_mcNear = read<float>(desc + 32);
 		g_mcFar = read<float>(desc + 36);
 		g_mcFlags = read<int32_t>(desc + 44);
@@ -278,7 +282,7 @@ namespace
 		bool on = g_active && GetTickCount64() - g_lastPoseMs.load() < kPoseStaleMs && open_mapping();
 		if (on)
 			upload(runtime);
-		on = on && g_hasFrame;
+		on = on && g_hasFrame && GetTickCount64() - g_lastFrameMs < kFrameStaleMs;
 		// The technique stays enabled (preset); McActive gates it, so GTA passes through untouched until a
 		// Minecraft frame is here. (Toggling techniques from inside this callback crashes ReShade.)
 		if (const effect_uniform_variable v = runtime->find_uniform_variable(kEffect, "McActive"); v.handle != 0)

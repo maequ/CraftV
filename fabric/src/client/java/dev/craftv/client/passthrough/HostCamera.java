@@ -17,6 +17,12 @@ public final class HostCamera {
 		return r != null && r.camera().passthrough() && System.nanoTime() - r.receivedNanos() < TIMEOUT_NANOS ? r.camera() : null;
 	}
 
+	/** Whether the host sent a passthrough camera within the last {@code nanos} (link still up). */
+	public static boolean recent(long nanos) {
+		LinkService.ReceivedCamera r = LinkService.get().latestCamera();
+		return r != null && r.camera().passthrough() && System.nanoTime() - r.receivedNanos() < nanos;
+	}
+
 	/** Camera.update, before any hook reads the pose. */
 	public static void beginFrame() {
 		frame = live();
