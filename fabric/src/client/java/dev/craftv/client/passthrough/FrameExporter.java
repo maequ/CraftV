@@ -90,10 +90,10 @@ public final class FrameExporter {
 		if (failed) {
 			return false;
 		}
-		Win32.MappedView v = Win32.createOrOpenMapping(FRAME_MAPPING_NAME, MAPPING_BYTES);
+		Win32.MappedView v = Win32.createOrOpenMapping(frameMappingName(), MAPPING_BYTES);
 		if (!v.ok() || v.viewBytes() < MAPPING_BYTES) {
 			failed = true;
-			CraftLog.warn("passthrough: frame export off, couldn't create " + FRAME_MAPPING_NAME + ": " + (v.ok() ? "view too small" : v.error()));
+			CraftLog.warn("passthrough: frame export off, couldn't create " + frameMappingName() + ": " + (v.ok() ? "view too small" : v.error()));
 			return false;
 		}
 		MemorySegment m = v.base();
@@ -108,7 +108,7 @@ public final class FrameExporter {
 		VarHandle.fullFence();
 		m.set(INT, 0, FRAME_MAGIC); // last: a reader that sees the magic sees a complete header
 		mapping = m;
-		CraftLog.info("passthrough: frame export ready (" + FRAME_MAPPING_NAME + ", " + (MAPPING_BYTES >> 20) + " MiB)");
+		CraftLog.info("passthrough: frame export ready (" + frameMappingName() + ", " + (MAPPING_BYTES >> 20) + " MiB)");
 		return true;
 	}
 
@@ -225,5 +225,10 @@ public final class FrameExporter {
 		try (GpuBufferSlice.MappedView view = buffer.map(true, false)) {
 			MemorySegment.copy(MemorySegment.ofBuffer(view.data()), 0L, dst, offset, n);
 		}
+	}
+
+	/** The frame mapping (PROTOCOL.md §11); tests running two CraftV Minecrafts on one PC give the second its own. */
+	private static String frameMappingName() {
+		return System.getProperty("craftv.frame", FRAME_MAPPING_NAME);
 	}
 }

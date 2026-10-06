@@ -127,7 +127,7 @@ public final class TerrainService {
 	private void buildArrived(ServerLevel level, TerrainState state, LinkService link) {
 		long deadline = System.nanoTime() + BUILD_BUDGET_NS;
 		Messages.TerrainPatch patch;
-		while ((patch = link.pollTerrainPatch()) != null) {
+		while ((patch = nextPatch(link)) != null) {
 			requester.answered(patch.chunkX(), patch.chunkZ());
 			if (TerrainBuilder.noGround(patch)) {
 				// Not remembered as built: the host may have had no collision there yet, or an older plugin's map
@@ -152,9 +152,18 @@ public final class TerrainService {
 		}
 	}
 
+	/** The owner's GTA's patches first, then the guests' (they're built the same way). */
+	private static Messages.TerrainPatch nextPatch(LinkService link) {
+		Messages.TerrainPatch p = link.pollTerrainPatch();
+		return p != null ? p : dev.craftv.coop.GuestSync.pollPatch();
+	}
+
 	private void request(ServerLevel level, TerrainState state, LinkService link) {
 		List<TerrainRequester.Center> centers = new ArrayList<>();
 		for (ServerPlayer player : level.players()) {
+			if (dev.craftv.coop.GuestSync.isGuest(player)) {
+				continue; // a guest's own GTA scans their ground (GuestClient); this host's GTA can't reach that far
+			}
 			ChunkPos c = player.chunkPosition();
 			centers.add(new TerrainRequester.Center(c.x(), c.z()));
 		}

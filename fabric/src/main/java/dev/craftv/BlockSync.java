@@ -34,7 +34,24 @@ public final class BlockSync {
 	// While building host terrain: those blocks came from the host, so they are not reported back (§7.12).
 	private static final ThreadLocal<Boolean> SILENT = new ThreadLocal<>();
 
+	/**
+	 * A guest's Minecraft (DECISIONS D-030) has no server of its own: the world it sees arrives from the owner's server, so
+	 * its client world is what its host is told about. Set by GuestClient every client tick.
+	 */
+	private static volatile boolean clientAuthority;
+
 	private BlockSync() {
+	}
+
+	public static boolean clientIsAuthority() {
+		return clientAuthority;
+	}
+
+	public static void setClientAuthority(boolean value) {
+		clientAuthority = value;
+		if (!value) {
+			waiting.clear();
+		}
 	}
 
 	/**
@@ -62,6 +79,11 @@ public final class BlockSync {
 		if (!link.connected() || SILENT.get() != null) {
 			return; // the host asks for what it missed with BLOCK_REGION_REQUEST (§7.19)
 		}
+		if (level.isClientSide() && TerrainIndex.get(pos.getX() >> 4, pos.getZ() >> 4) == null) {
+			// A guest: the owner's server is building this chunk's ground and its columns aren't here yet, so terrain
+			// can't be told from builds. The region is answered once they arrive (answerRegionsAsGuest).
+			return;
+		}
 		int[] applying = APPLYING.get();
 		int flags = (applying != null ? BLOCK_SET_ECHO : 0) | (solidForHost(level, pos, newState) ? BLOCK_SET_SOLID : 0);
 		int requestId = applying != null ? applying[0] : 0;
@@ -85,33 +107,74 @@ public final class BlockSync {
 			if (r == null) {
 				return;
 			}
-			LevelChunk chunk = level.getChunk(r.chunkX(), r.chunkZ());
-			LevelChunkSection[] sections = chunk.getSections();
-			BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-			int sent = 0;
-			for (int si = 0; si < sections.length; si++) {
-				LevelChunkSection section = sections[si];
-				if (section.hasOnlyAir()) {
-					continue;
-				}
-				int baseY = level.getSectionYFromSectionIndex(si) << 4;
-				for (int y = 0; y < 16; y++) {
-					for (int z = 0; z < 16; z++) {
-						for (int x = 0; x < 16; x++) {
-							BlockState state = section.getBlockState(x, y, z);
-							if (state.isAir()) {
-								continue;
-							}
-							pos.set(r.chunkX() * 16 + x, baseY + y, r.chunkZ() * 16 + z);
-							if (solidForHost(level, pos, state)) {
-								link.send(new Messages.BlockSet(pos.getX(), pos.getY(), pos.getZ(), Block.getId(state), BLOCK_SET_SOLID | BLOCK_SET_REGION, r.requestId()));
-								sent++;
-							}
+			int sent = sendRegion(level, level.getChunk(r.chunkX(), r.chunkZ()), r, link);
+			CraftLog.limited("region", 2000, "blocks: chunk " + r.chunkX() + ", " + r.chunkZ() + " has " + sent + " solid blocks for the host");
+		}
+	}
+
+	private static int sendRegion(Level level, LevelChunk chunk, Messages.BlockRegionRequest r, LinkService link) {
+		LevelChunkSection[] sections = chunk.getSections();
+		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+		int sent = 0;
+		for (int si = 0; si < sections.length; si++) {
+			LevelChunkSection section = sections[si];
+			if (section.hasOnlyAir()) {
+				continue;
+			}
+			int baseY = level.getSectionYFromSectionIndex(si) << 4;
+			for (int y = 0; y < 16; y++) {
+				for (int z = 0; z < 16; z++) {
+					for (int x = 0; x < 16; x++) {
+						BlockState state = section.getBlockState(x, y, z);
+						if (state.isAir()) {
+							continue;
+						}
+						pos.set(r.chunkX() * 16 + x, baseY + y, r.chunkZ() * 16 + z);
+						if (solidForHost(level, pos, state)) {
+							link.send(new Messages.BlockSet(pos.getX(), pos.getY(), pos.getZ(), Block.getId(state), BLOCK_SET_SOLID | BLOCK_SET_REGION, r.requestId()));
+							sent++;
 						}
 					}
 				}
 			}
-			CraftLog.limited("region", 2000, "blocks: chunk " + r.chunkX() + ", " + r.chunkZ() + " has " + sent + " solid blocks for the host");
+		}
+		return sent;
+	}
+
+	private record Waiting(Messages.BlockRegionRequest request, long sinceMs) {
+	}
+
+	/** A guest's region requests until that chunk and its terrain columns have arrived from the owner's server. */
+	private static final java.util.ArrayDeque<Waiting> waiting = new java.util.ArrayDeque<>();
+	private static final long COLUMNS_WAIT_MS = 15_000, CHUNK_WAIT_MS = 120_000;
+	private static final int WAITING_LIMIT = 4_096;
+
+	/**
+	 * A guest's client tick: answers its host's BLOCK_REGION_REQUESTs from the client world. A chunk is answered once
+	 * it's loaded and its terrain columns are here (or 15 s passed: a chunk with no ground never gets any).
+	 */
+	public static void answerRegionsAsGuest(Level level) {
+		LinkService link = LinkService.get();
+		long now = System.currentTimeMillis();
+		Messages.BlockRegionRequest r;
+		while ((r = link.pollRegionRequest()) != null) {
+			if (waiting.size() < WAITING_LIMIT) {
+				waiting.add(new Waiting(r, now));
+			}
+		}
+		int answered = 0;
+		for (var it = waiting.iterator(); it.hasNext() && answered < MAX_REGIONS_PER_TICK;) {
+			Waiting w = it.next();
+			int cx = w.request().chunkX(), cz = w.request().chunkZ();
+			boolean loaded = level.hasChunk(cx, cz);
+			if (loaded && (TerrainIndex.get(cx, cz) != null || now - w.sinceMs() > COLUMNS_WAIT_MS)) {
+				it.remove();
+				int sent = sendRegion(level, level.getChunk(cx, cz), w.request(), link);
+				CraftLog.limited("region", 2000, "blocks: chunk " + cx + ", " + cz + " has " + sent + " solid blocks for the host (guest)");
+				answered++;
+			} else if (!loaded && now - w.sinceMs() > CHUNK_WAIT_MS) {
+				it.remove(); // too far from where the owner's server keeps this guest's chunks loaded
+			}
 		}
 	}
 

@@ -42,14 +42,25 @@ public final class MirrorWorld {
 	private MirrorWorld() {
 	}
 
+	/** Where this Minecraft joins by itself: the stand-in friend's -Dcraftv.join, or a guest's guest.join. Empty: nowhere. */
+	private static String joinAddress() {
+		if (FRIEND) {
+			return JOIN;
+		}
+		var config = dev.craftv.coop.CoopServer.config();
+		return AUTO_WORLD || config == null ? "" : config.guestJoin;
+	}
+
 	public static void tick(Minecraft minecraft) {
-		if ((!AUTO_WORLD && !FRIEND) || minecraft.level != null || minecraft.gui.overlay() != null) {
+		String join = joinAddress();
+		boolean joining = !join.isEmpty();
+		if ((!AUTO_WORLD && !joining) || minecraft.level != null || minecraft.gui.overlay() != null) {
 			return;
 		}
 		if (!(minecraft.gui.screen() instanceof TitleScreen title)) {
 			// First launch shows an onboarding/accessibility screen before the title screen.
 			var screen = minecraft.gui.screen();
-			if (screen == null || screen.getClass().getName().contains("Onboarding") || (FRIEND && screen.getClass().getName().contains("Disconnected"))) {
+			if (screen == null || screen.getClass().getName().contains("Onboarding") || (joining && screen.getClass().getName().contains("Disconnected"))) {
 				CraftLog.info("mirror world: skipping " + (screen == null ? "empty screen" : screen.getClass().getSimpleName()) + " to reach the title screen");
 				minecraft.gui.setScreen(new TitleScreen());
 			} else {
@@ -57,8 +68,8 @@ public final class MirrorWorld {
 			}
 			return;
 		}
-		if (FRIEND) {
-			join(minecraft, title);
+		if (joining) {
+			join(minecraft, title, join);
 			return;
 		}
 		if (worldAttempted) {
@@ -77,13 +88,13 @@ public final class MirrorWorld {
 			registries -> registries.lookupOrThrow(Registries.WORLD_PRESET).getOrThrow(PRESET).value().createWorldDimensions(), title);
 	}
 
-	private static void join(Minecraft minecraft, TitleScreen title) {
+	private static void join(Minecraft minecraft, TitleScreen title, String address) {
 		long now = System.currentTimeMillis();
 		if (now < nextJoinMs) {
 			return;
 		}
 		nextJoinMs = now + JOIN_RETRY_MS;
-		CraftLog.info("friend: joining " + JOIN);
-		ConnectScreen.startConnecting(title, minecraft, ServerAddress.parseString(JOIN), new ServerData("CraftV", JOIN, ServerData.Type.OTHER), false, null);
+		CraftLog.info((FRIEND ? "friend" : "guest") + ": joining " + address);
+		ConnectScreen.startConnecting(title, minecraft, ServerAddress.parseString(address), new ServerData("CraftV", address, ServerData.Type.OTHER), false, null);
 	}
 }

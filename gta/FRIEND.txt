@@ -1,0 +1,45 @@
+CraftV with a friend: you both play Minecraft inside your own GTA V, in the same world
+==================================================================================
+
+Your friend sees you as your Minecraft character inside his GTA, and you see him in yours. Blocks either of you
+places show up for both, and they're solid for both. Each of you has your own GTA (your own people and cars):
+only the Minecraft part is shared.
+
+The host (the one whose PC holds the world, Sary) changes nothing; they play as usual.
+
+What the friend needs
+---------------------
+- GTA V Legacy (his own copy), story mode. Never take mods into GTA Online.
+- Script Hook V, from the official site only: http://www.dev-c.com/gtav/scripthookv/
+  (copy ScriptHookV.dll and dinput8.dll from its "bin" folder into the GTA V folder).
+- Minecraft Java Edition (his own account) with Fabric for 26.3:
+  a. Fabric Loader from the official site: https://fabricmc.net/use/installer/
+     Run it, choose Minecraft 26.3, untick nothing, Install. A "fabric-loader-26.3" installation appears in the
+     Minecraft Launcher.
+  b. In the Minecraft Launcher: Installations > fabric-loader-26.3 > Edit > Game directory: pick a new, empty
+     folder, for example C:\Users\<you>\AppData\Roaming\.minecraft-craftv
+     (CraftV changes that Minecraft's settings: render distance, frame rate. Your normal Minecraft stays as it is.)
+  c. Fabric API 0.161.0+26.3 from its official page: https://modrinth.com/mod/fabric-api (Versions tab, 26.3).
+  d. Put the Fabric API jar and craftv-0.1.0.jar (in this folder) into that game directory's "mods" folder
+     (create the folder if it isn't there).
+
+Then the GTA part, exactly as the host did it: follow INSTALL.txt (CraftV.asi, CraftV.ini, ReShade, GTA settings).
+
+Playing together
+----------------
+1. The host starts their Minecraft and GTA as usual. Their CraftV overlay (or F8 > "Friends join at") shows the
+   address, for example 192.168.1.110:25565.
+2. The friend starts the fabric-loader-26.3 installation in the Minecraft Launcher, then Multiplayer >
+   Direct Connect > the host's address > Join Server. (To skip this every time, write the address after
+   guest.join= in config\craftv.properties in that game directory; Minecraft then joins by itself.)
+3. The friend starts GTA V and loads story mode. Their overlay says "MC view": their GTA now drives their
+   Minecraft player, and they get Survival with the starter kit.
+
+Not on the same Wi-Fi?
+----------------------
+The address above only works on the host's own network. Over the internet the host forwards TCP port 25565 on
+their router to their PC (the router's "port forwarding" page) and gives the friend their public IP address with
+:25565 at the end. Only share it with people you trust.
+
+If something's wrong, send both sides' CraftV.log (next to GTA5.exe) and craftv-fabric.log (logs folder of the
+Minecraft game directory).

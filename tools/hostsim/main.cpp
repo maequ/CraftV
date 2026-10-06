@@ -3,7 +3,9 @@
 // same map (reported with GTA material names), and the overlay is printed to the console. Run it against the
 // real Minecraft to test everything the ASI does except the natives (brief §0: test before asking Sary).
 //
-//   hostsim [--mapping NAME] [--seconds N] [--quiet] [--passthrough first|third]
+//   hostsim [--mapping NAME] [--seconds N] [--quiet] [--passthrough first|third] [--center X Y]
+//
+// --center: walk the circle around game position (X, Y) instead of the origin (a guest far from the owner).
 //
 // --passthrough: the game "has ReShade": the core runs the passthrough (brief §8) with a camera at the walking ped
 // (first person) or behind it (third), a 1280x720 picture, and the owner placing planks every few seconds, so
@@ -68,6 +70,7 @@ namespace
 	{
 	public:
 		double                   angle = 0.0;
+		double                   centerX = 0.5, centerY = -0.5;  // --center: where the circle is (game x, y)
 		std::vector<std::string> lines;
 		std::uint64_t            probes = 0, collisionRequests = 0;
 
@@ -83,8 +86,8 @@ namespace
 		{
 			s = GameSample{};
 			s.playerExists = true;
-			s.x = static_cast<float>(0.5 + kRadius * std::cos(angle));
-			s.y = static_cast<float>(-0.5 + kRadius * std::sin(angle));
+			s.x = static_cast<float>(centerX + kRadius * std::cos(angle));
+			s.y = static_cast<float>(centerY + kRadius * std::sin(angle));
 			s.z = static_cast<float>(FeetZ(s.x, s.y) + kFeetOffset);
 			const double vx = -kSpeed * std::sin(angle), vy = kSpeed * std::cos(angle);
 			s.vx = static_cast<float>(vx);
@@ -176,18 +179,22 @@ int wmain(int argc, wchar_t** argv)
 	double seconds = 0;
 	bool   quiet = false;
 	int    passthrough = 0;  // 1 first person, 2 third
+	double centerX = 0.5, centerY = -0.5;
 	for (int i = 1; i < argc; ++i) {
 		const std::wstring a = argv[i];
 		if (a == L"--mapping" && i + 1 < argc) {
 			config.mappingName = argv[++i];
 		} else if (a == L"--seconds" && i + 1 < argc) {
 			seconds = _wtof(argv[++i]);
+		} else if (a == L"--center" && i + 2 < argc) {
+			centerX = _wtof(argv[++i]);
+			centerY = _wtof(argv[++i]);
 		} else if (a == L"--quiet") {
 			quiet = true;
 		} else if (a == L"--passthrough" && i + 1 < argc) {
 			passthrough = std::wstring(argv[++i]) == L"third" ? 2 : 1;
 		} else {
-			std::printf("hostsim [--mapping NAME] [--seconds N] [--quiet] [--passthrough first|third]\n");
+			std::printf("hostsim [--mapping NAME] [--seconds N] [--quiet] [--passthrough first|third] [--center X Y]\n");
 			return 2;
 		}
 	}
@@ -195,6 +202,8 @@ int wmain(int argc, wchar_t** argv)
 	::timeBeginPeriod(1);
 	SimGame    game;
 	game.passthrough = passthrough != 0;
+	game.centerX = centerX;
+	game.centerY = centerY;
 	game.thirdPerson = passthrough == 2;
 	HostPlugin plugin(game, config);
 	std::printf("CraftV host simulator: the GTA V plugin core with a simulated game. Ctrl+C to stop.\n");

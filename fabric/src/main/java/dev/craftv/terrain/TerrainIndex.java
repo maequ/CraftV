@@ -4,7 +4,9 @@ import dev.craftv.link.Messages;
 import dev.craftv.link.Proto;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -29,7 +31,7 @@ public final class TerrainIndex {
 		}
 
 		/** The saved form (TerrainState): little-endian heights, materials, then the two depths. */
-		byte[] encode() {
+		public byte[] encode() {
 			ByteBuffer b = ByteBuffer.allocate(BYTES).order(ByteOrder.LITTLE_ENDIAN);
 			for (int i = 0; i < 256; i++) {
 				b.putShort(GROUND_OFF + 2 * i, groundY[i]);
@@ -42,7 +44,7 @@ public final class TerrainIndex {
 		}
 
 		/** Null if the bytes aren't a saved column set. */
-		static Columns decode(byte[] bytes) {
+		public static Columns decode(byte[] bytes) {
 			if (bytes == null || bytes.length != BYTES) {
 				return null;
 			}
@@ -83,10 +85,11 @@ public final class TerrainIndex {
 	 * Called (server thread) whenever a chunk's columns are added. The client re-meshes that chunk: rebuilding a chunk
 	 * with the blocks it already had changes no block, so without this its mesh would keep showing the terrain.
 	 */
-	private static volatile BiConsumer<Long, Columns> onPut;
+	private static final List<BiConsumer<Long, Columns>> ON_PUT = new CopyOnWriteArrayList<>();
 
-	public static void setOnPut(BiConsumer<Long, Columns> listener) {
-		onPut = listener;
+	/** Also used by the server, to send a rebuilt chunk to guests again (GuestSync). */
+	public static void addOnPut(BiConsumer<Long, Columns> listener) {
+		ON_PUT.add(listener);
 	}
 
 	private TerrainIndex() {
@@ -94,9 +97,16 @@ public final class TerrainIndex {
 
 	static void put(long chunkKey, Columns columns) {
 		CHUNKS.put(chunkKey, columns);
-		BiConsumer<Long, Columns> listener = onPut;
-		if (listener != null) {
+		for (BiConsumer<Long, Columns> listener : ON_PUT) {
 			listener.accept(chunkKey, columns);
+		}
+	}
+
+	/** A guest's client: a chunk the owner's server built (CraftNet.Columns). Ignored if the bytes aren't columns. */
+	public static void putFromServer(int chunkX, int chunkZ, byte[] bytes) {
+		Columns c = Columns.decode(bytes);
+		if (c != null) {
+			put(TerrainRequester.key(chunkX, chunkZ), c);
 		}
 	}
 
@@ -113,6 +123,10 @@ public final class TerrainIndex {
 	/** The world closed (or another opened): nothing is known about the next one until its TerrainState loads. */
 	public static void clear() {
 		CHUNKS.clear();
+	}
+
+	public static boolean has(long chunkKey) {
+		return CHUNKS.containsKey(chunkKey);
 	}
 
 	public static int size() {

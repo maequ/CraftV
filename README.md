@@ -20,6 +20,7 @@ A Fabric mod and a GTA V ASI plugin talk through shared memory.
 | 2 | GTA V plugin: link, overlay, scanning GTA's ground for friends | **Done, confirmed in Sary's game (2026-10-05)** |
 | 3 | The Minecraft view: Sary plays as a Minecraft player in GTA (hand, hotbar, hearts, blocks), friends drawn with their skins | **Built and tested without the game; awaiting the in-game test** |
 | 4 | Blocks are solid in GTA (invisible collision props) | **Built and tested without the game; awaiting the in-game test** |
+| 4b | Two GTA players: a friend plays Minecraft inside his own GTA in the host's world (`gta/FRIEND.txt`) | **Built and tested with two Minecrafts and a simulated GTA; awaiting the in-game test** |
 | 5 | Friends from anywhere (no port forwarding), whitelist | Not started |
 | 6 | A better blocky Los Santos (buildings) | Not started |
 

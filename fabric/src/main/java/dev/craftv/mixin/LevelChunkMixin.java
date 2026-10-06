@@ -22,7 +22,7 @@ public abstract class LevelChunkMixin {
 			return;
 		}
 		LevelChunk self = (LevelChunk) (Object) this;
-		if (self.getLevel().isClientSide()) {
+		if (self.getLevel().isClientSide() && !BlockSync.clientIsAuthority()) {
 			return;
 		}
 		BlockSync.onBlockChanged(self.getLevel(), pos.immutable(), state);

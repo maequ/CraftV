@@ -168,6 +168,18 @@ once. Each column is one straight-down ray from 1200 m to -250 m against map col
 means friends stand on roofs and bridges, which is the "blocky copy" a friend sees; underneath bridges isn't
 modelled yet (KNOWN_LIMITATIONS).
 
+### D-030: Two GTA players (guests) (2026-10-06)
+**Decision:** a friend can play exactly like the owner: his own GTA V + CraftV.asi + ReShade drive the CraftV Fabric mod in
+his own Minecraft (Fabric 26.3 through the official launcher, his own account), which joins the owner's world as a
+*guest*. Fabric payloads (`net/CraftNet`): the guest says its GTA drives it (`gta_hello`), snaps (`snap`) and sends the
+ground its GTA scans (`terrain_patch`); the server sends built terrain columns back (`terrain_columns`) so the guest's
+view hides the ground too. The server treats guests like the owner (Survival + kit, no in-wall/fall/drowning damage,
+`noPhysics` so moves inside terrain aren't "moved wrongly"). A guest's client is the block authority for its own host
+(Phase 4 props from the client world). The link protocol is unchanged (v1.3).
+**Reason:** Sary: "I have to see him in GTA five as Minecraft. He has seen me in GTA five as Minecraft... We play
+together." Each PC's GTA can only scan the ground around its own player, so each GTA scans for its own player.
+**Not shared:** each GTA has its own peds, cars and traffic; only Minecraft is shared.
+
 ### D-029: Phase 4 defaults and the settings menu (2026-10-06)
 **Decision:**
 - Digging terrain is allowed and makes a hole in Minecraft only (option a); GTA's ground stays.

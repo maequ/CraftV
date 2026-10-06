@@ -1,6 +1,6 @@
 package dev.craftv.mixin;
 
-import dev.craftv.coop.CoopServer;
+import dev.craftv.coop.GuestSync;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 abstract class EntityInWallMixin {
 	@Inject(method = "isInWall", at = @At("HEAD"), cancellable = true)
 	private void craftv$ownerNeverInWall(CallbackInfoReturnable<Boolean> cir) {
-		if ((Object) this instanceof ServerPlayer player && player.level().getServer() != null && CoopServer.isOwner(player.level().getServer(), player)) {
+		if ((Object) this instanceof ServerPlayer player && player.level().getServer() != null && GuestSync.isGtaPlayer(player.level().getServer(), player)) {
 			cir.setReturnValue(false);
 		}
 	}

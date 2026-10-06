@@ -38,9 +38,10 @@ public final class CraftVClient implements ClientModInitializer {
 			return;
 		}
 		LinkService.get().start();
+		GuestClient.init();
 		// A rebuilt terrain chunk may not change a single block (same ground as before): re-mesh it so the owner's view
 		// hides it (RenderSectionRegionMixin reads the index while meshing).
-		TerrainIndex.setOnPut((key, columns) -> {
+		TerrainIndex.addOnPut((key, columns) -> {
 			int[] range = columns.yRange();
 			if (range == null) {
 				return;
@@ -65,6 +66,7 @@ public final class CraftVClient implements ClientModInitializer {
 		ClientTickEvents.END_CLIENT_TICK.register(minecraft -> {
 			try {
 				MirrorWorld.tick(minecraft);
+				GuestClient.tick(minecraft); // before the puppet: the server must know a guest is GTA-driven before their first snap
 				PlayerPuppet.tick(minecraft);
 				PassthroughClient.endTick(minecraft);
 				if (minecraft.player != null) {

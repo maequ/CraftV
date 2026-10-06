@@ -32,6 +32,7 @@ public final class CraftV implements ModInitializer {
 		CraftLog.info("CraftV " + version() + " loading (protocol " + Proto.VERSION_MAJOR + "." + Proto.VERSION_MINOR + ")");
 		ServerLifecycleEvents.SERVER_STARTED.register(CraftV::configureServer);
 		ServerTickEvents.END_SERVER_TICK.register(BlockSync::applyHostOps);
+		dev.craftv.net.CraftNet.register();
 		CoopServer.init(FabricLoader.getInstance().getGameDir());
 	}
 

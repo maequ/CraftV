@@ -13,7 +13,7 @@ import java.util.Properties;
 import net.minecraft.world.level.GameType;
 
 /**
- * Minecraft-side settings in {@code config/craftv.properties} (brief §13), written with defaults on the
+ * Minecraft-side settings in {@code config/craftv.properties} (DECISIONS D-030), written with defaults on the
  * first run. Account authentication is not a setting: it's always on, except with the dev-only system
  * property {@code -Dcraftv.devNoAuth=true}, which no normal script sets (brief §2.4).
  */
@@ -31,6 +31,8 @@ public final class CoopConfig {
 	public final int terrainDepth;
 	public final int buildingDepth;
 	public final boolean devNoAuth;
+	/** A guest's Minecraft (DECISIONS D-030): the owner's address, joined automatically from the title screen. Empty: no. */
+	public final String guestJoin;
 
 	private CoopConfig(Properties p) {
 		open = Boolean.parseBoolean(p.getProperty("friends.open", "true"));
@@ -42,6 +44,7 @@ public final class CoopConfig {
 		terrainDepth = clamp(intValue(p, "terrain.depth", TerrainColumns.DEFAULT_DEPTH), 1, 64);
 		buildingDepth = clamp(intValue(p, "terrain.buildingDepth", TerrainColumns.DEFAULT_BUILDING_DEPTH), 1, 256);
 		devNoAuth = Boolean.getBoolean("craftv.devNoAuth");
+		guestJoin = p.getProperty("guest.join", "").trim();
 	}
 
 	public static CoopConfig load(Path gameDir) {
@@ -83,6 +86,9 @@ public final class CoopConfig {
 					# How many blocks deep the ground is built under the surface, and under building tops.
 					terrain.depth=8
 					terrain.buildingDepth=40
+					# Playing through GTA in a friend's world: their address (as Minecraft shows it, for example 203.0.113.7:25565).
+					# This Minecraft then joins it by itself. Leave empty to host your own world.
+					guest.join=
 					""");
 			}
 		} catch (IOException e) {

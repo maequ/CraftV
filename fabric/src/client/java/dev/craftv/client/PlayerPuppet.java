@@ -44,6 +44,10 @@ public final class PlayerPuppet {
 	private static void moveOnServer(Minecraft minecraft, LocalPlayer player, Messages.PlayerState ps) {
 		IntegratedServer server = minecraft.getSingleplayerServer();
 		if (server == null) {
+			// A guest (DECISIONS D-030): the owner's server puts them there.
+			if (net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(dev.craftv.net.CraftNet.Snap.TYPE)) {
+				net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(new dev.craftv.net.CraftNet.Snap(ps.x(), ps.y(), ps.z(), ps.yaw(), ps.pitch()));
+			}
 			return;
 		}
 		UUID id = player.getUUID();

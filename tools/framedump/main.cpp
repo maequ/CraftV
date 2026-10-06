@@ -2,7 +2,7 @@
 //   <out>_composite.png  the world layer over a stand-in host picture (sky and checkerboard), the overlay on top
 //   <out>_depth.png      the world depth (near = white)
 //   <out>_overlay.png    the overlay alone over a checkerboard
-// Usage: framedump <out prefix> [--wait-ms N]
+// Usage: framedump <out prefix> [--wait-ms N] [--frame NAME]
 #include "craftv/protocol.h"
 
 #define NOMINMAX
@@ -105,17 +105,19 @@ namespace
 int main(int argc, char** argv)
 {
 	if (argc < 2) {
-		std::fprintf(stderr, "usage: framedump <out prefix> [--wait-ms N]\n");
+		std::fprintf(stderr, "usage: framedump <out prefix> [--wait-ms N] [--frame NAME]\n");
 		return 2;
 	}
 	const std::string out = argv[1];
+	std::wstring      frameName = kFrameMappingName;  // --frame: a second CraftV Minecraft's mapping (the stand-in guest)
 	DWORD             waitMs = 10000;
 	for (int i = 2; i + 1 < argc; ++i) {
 		if (std::strcmp(argv[i], "--wait-ms") == 0) waitMs = static_cast<DWORD>(std::atoi(argv[++i]));
+		else if (std::strcmp(argv[i], "--frame") == 0) frameName = std::wstring(argv[i + 1], argv[i + 1] + std::strlen(argv[i + 1])), ++i;
 	}
 	HANDLE mapping = nullptr;
 	for (DWORD t0 = GetTickCount(); !mapping && GetTickCount() - t0 < waitMs; Sleep(100)) {
-		mapping = OpenFileMappingW(FILE_MAP_READ, FALSE, kFrameMappingName);
+		mapping = OpenFileMappingW(FILE_MAP_READ, FALSE, frameName.c_str());
 	}
 	if (!mapping) {
 		std::fprintf(stderr, "no frame mapping (is Minecraft rendering the passthrough? mock: cam on)\n");

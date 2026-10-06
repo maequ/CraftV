@@ -66,11 +66,13 @@ public final class CoopServer {
 		config = CoopConfig.load(gameDir);
 		terrain = new TerrainService(config);
 		tracker = new FriendTracker(LinkService.get()::send);
+		GuestSync.init(config);
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> publishTried = false);
 		ServerLifecycleEvents.SERVER_STOPPED.register(server -> dev.craftv.terrain.TerrainIndex.clear()); // the next world has its own
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
 			tracker.resetAll(); // §7.10: everyone is gone when the world closes
 			hovering.clear();
+			GuestSync.clear();
 			address = "";
 			friendsOnline = 0;
 		});
@@ -83,7 +85,10 @@ public final class CoopServer {
 			}
 		});
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> server.execute(() -> onJoin(server, handler.player)));
-		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> hovering.remove(handler.player.getUUID()));
+		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+			hovering.remove(handler.player.getUUID());
+			GuestSync.left(handler.player);
+		});
 	}
 
 	/**
@@ -112,6 +117,10 @@ public final class CoopServer {
 		} else {
 			CraftLog.warn("couldn't open the world to friends on port " + port);
 		}
+	}
+
+	public static CoopConfig config() {
+		return config;
 	}
 
 	public static boolean isOwner(MinecraftServer server, ServerPlayer player) {
@@ -148,7 +157,7 @@ public final class CoopServer {
 	}
 
 	/** The owner's starter hotbar (brief §8: Survival with a kit). */
-	private static void giveKit(ServerPlayer player) {
+	static void giveKit(ServerPlayer player) {
 		Inventory inv = player.getInventory();
 		inv.setItem(0, new ItemStack(Items.DIAMOND_SWORD));
 		inv.setItem(1, new ItemStack(Items.DIAMOND_PICKAXE));
@@ -159,7 +168,7 @@ public final class CoopServer {
 		inv.setItem(6, new ItemStack(Items.GLASS, 64));
 		inv.setItem(7, new ItemStack(Items.TORCH, 64));
 		inv.setItem(8, new ItemStack(Items.COOKED_BEEF, 64));
-		CraftLog.info("owner: gave the starter kit (sword, pickaxe, axe, shovel, planks, stone bricks, glass, torches, steak)");
+		CraftLog.info(player.getGameProfile().name() + ": gave the starter kit (sword, pickaxe, axe, shovel, planks, stone bricks, glass, torches, steak)");
 	}
 
 	private static ServerPlayer owner(MinecraftServer server) {
@@ -174,6 +183,7 @@ public final class CoopServer {
 	private static void tick(MinecraftServer server) {
 		try {
 			terrain.tick(server);
+			GuestSync.tick(server);
 			LinkService link = LinkService.get();
 			// A new host, or the link back from STALE (GTA pauses its scripts when it loses focus, and while the
 			// link is stale every message for it is dropped, JOINs included): announce every friend again (§7.10).
@@ -196,7 +206,9 @@ public final class CoopServer {
 					continue;
 				}
 				present.add(sample(server, p));
-				keepSafe(server, p);
+				if (!GuestSync.isGuest(p)) {
+					keepSafe(server, p); // a guest's GTA holds them up, like the owner's
+				}
 			}
 			tracker.tick(present, gone.isEmpty() ? Collections.emptyMap() : gone);
 			friendsOnline = present.size();

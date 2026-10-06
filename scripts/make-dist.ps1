@@ -17,4 +17,13 @@ $shaders = Join-Path $view 'reshade-shaders\Shaders'
 New-Item -ItemType Directory -Force $shaders | Out-Null
 Copy-Item (Join-Path $root 'gta\reshade\ReShade.ini'), (Join-Path $root 'gta\reshade\ReShadePreset.ini') $view -Force
 Copy-Item (Join-Path $root 'gta\shaders\CraftV.fx'), (Join-Path $fxh 'ReShade.fxh'), (Join-Path $fxh 'ReShadeUI.fxh') $shaders -Force
+
+# A friend who plays through their own GTA (DECISIONS D-030) also gets the Minecraft mod and FRIEND.txt.
+$jar = Get-ChildItem (Join-Path $root 'fabric\build\libs') -Filter 'craftv-*.jar' -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -notmatch 'sources' } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $jar) { throw "build the mod first: cd fabric; .\gradlew.bat build" }
+$friend = Join-Path $dist 'For your friend (Minecraft mod)'
+New-Item -ItemType Directory -Force $friend | Out-Null
+Copy-Item $jar.FullName, (Join-Path $root 'gta\FRIEND.txt') $friend -Force
+Copy-Item (Join-Path $root 'gta\FRIEND.txt') $dist -Force
 Get-ChildItem $dist -Recurse -File | ForEach-Object { "{0,-60} {1,10:N0} bytes  {2:HH:mm}" -f $_.FullName.Substring($dist.Length + 1), $_.Length, $_.LastWriteTime }

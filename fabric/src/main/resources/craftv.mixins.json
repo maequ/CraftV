@@ -5,6 +5,7 @@
   "mixins": [
     "EntityInWallMixin",
     "FlowingFluidMixin",
+    "GtaPlayerPhysicsMixin",
     "LevelChunkMixin",
     "OwnerSafetyMixin"
   ],

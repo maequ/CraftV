@@ -84,6 +84,14 @@ As of Phase 2 (2026-10-05). "Planned" names the phase expected to fix it.
 - The parked RDR2 plugin (`rdr2/`, `CraftV_RDR2.asi`) was built against ScriptHookRDR2 and never run in RDR2. It
   has no terrain scanning.
 
+## Two GTA players (D-030, not yet run in GTA)
+- Only Minecraft is shared: each GTA has its own people, cars and traffic, and hitting a GTA person only happens in
+  your own GTA. Hitting the other player is Minecraft's own PvP.
+- The friend needs his own GTA V, Script Hook V, ReShade, Fabric and Fabric API (`gta/FRIEND.txt`). Over the internet
+  the host has to forward TCP port 25565 (Phase 5 would remove that).
+- Ground near the friend comes from the friend's GTA; where nobody has been, it appears a second or two after arriving.
+- Breathing: under CraftV's terrain water Minecraft still shows the air bubbles (the server never drowns either player).
+
 ## The Minecraft view (Phase 3, not yet run in GTA)
 - **Needs ReShade with add-on support**, loaded as `ReShade64.asi`, and GTA in Windowed Borderless with Pause On Focus
   Loss off (Minecraft runs in its own window next to GTA). Two games render at once, so expect a lower frame rate.

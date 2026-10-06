@@ -35,6 +35,18 @@ loom {
 				"-Dcraftv.join=${System.getenv("CRAFTV_JOIN") ?: "localhost:25565"}",
 				"-Dcraftv.friendBot=${System.getenv("CRAFTV_FRIEND_BOT") ?: "false"}"
 		}
+		// A stand-in guest (brief §13) for automated tests: a CraftV Minecraft with its own host link and frame
+		// mapping, joining the dev world like a friend whose own GTA drives them (start tools/hostsim on CRAFTV_GUEST_LINK).
+		guest {
+			client()
+			configName = "Minecraft Client (CraftV stand-in guest)"
+			runDir "run-guest"
+			programArgs "--username", "CraftVGuest"
+			vmArgs "--enable-native-access=ALL-UNNAMED",
+				"-Dcraftv.logDir=${craftvLogDir}${File.separator}guest",
+				"-Dcraftv.link=${System.getenv("CRAFTV_GUEST_LINK") ?: "Local\\CraftV_GuestTest"}",
+				"-Dcraftv.frame=Local\\CraftV_Frame_GuestTest"
+		}
 	}
 
 	mods {
