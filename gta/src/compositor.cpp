@@ -30,6 +30,10 @@ namespace
 
 	std::atomic<bool> g_registered{false};
 	std::atomic<bool> g_active{false};
+	// GTA's pause menu (and anything else that stops scripts) stops the camera updates: then the last Minecraft frame
+	// would stay over the map. Composite only while the script has set a pose this recently.
+	constexpr ULONGLONG kPoseStaleMs = 250;
+	std::atomic<ULONGLONG> g_lastPoseMs{0};
 	std::atomic<float> g_hostNear{0.15f};
 	std::atomic<float> g_hostFar{10000.0f};
 	std::atomic<uint32_t> g_bbWidth{0}, g_bbHeight{0};
@@ -271,7 +275,7 @@ namespace
 		runtime->get_screenshot_width_and_height(&bw, &bh);
 		g_bbWidth = bw;
 		g_bbHeight = bh;
-		bool on = g_active && open_mapping();
+		bool on = g_active && GetTickCount64() - g_lastPoseMs.load() < kPoseStaleMs && open_mapping();
 		if (on)
 			upload(runtime);
 		on = on && g_hasFrame;
@@ -401,6 +405,7 @@ namespace compositor
 		std::lock_guard<std::mutex> lock(g_poseLock);
 		g_hostPoses[g_hostPoseCount & 3] = {yaw, pitch, roll, fov, x, y, z, true};
 		++g_hostPoseCount;
+		g_lastPoseMs = GetTickCount64();
 	}
 
 	void set_pose_lag(int frames)

@@ -16,10 +16,10 @@ A Fabric mod and a GTA V ASI plugin talk through shared memory.
 
 | Phase | What | State |
 |---|---|---|
-| 1 | Co-op on the Minecraft side with a fake GTA: friends join, walk on host terrain, everything reaches the host | **Built and tested; awaiting Sary's test** |
-| 2 | GTA V plugin: link, overlay, scanning GTA's ground for friends | **Built and tested without the game; awaiting the in-game test** |
-| 3 | Friends appear as characters in Los Santos | Not started |
-| 4 | Friends' blocks appear in Los Santos | Not started |
+| 1 | Co-op on the Minecraft side with a fake GTA: friends join, walk on host terrain, everything reaches the host | **Done** (Sary joined in Phase 2's test) |
+| 2 | GTA V plugin: link, overlay, scanning GTA's ground for friends | **Done, confirmed in Sary's game (2026-10-05)** |
+| 3 | The Minecraft view: Sary plays as a Minecraft player in GTA (hand, hotbar, hearts, blocks), friends drawn with their skins | **Built and tested without the game; awaiting the in-game test** |
+| 4 | Blocks are solid in GTA (invisible collision props) | Not started |
 | 5 | Friends from anywhere (no port forwarding), whitelist | Not started |
 | 6 | A better blocky Los Santos (buildings) | Not started |
 
@@ -50,6 +50,20 @@ The full plan is in [docs/BRIEF.md](docs/BRIEF.md).
 - Internet on first build (Gradle downloads Minecraft 26.3, Fabric Loader 0.19.5, Fabric API 0.161.0+26.3)
 - Friends: Minecraft Java Edition 26.3, nothing else
 - From Phase 2: GTA V **Legacy** (story mode), Script Hook V + its ASI loader from http://www.dev-c.com/gtav/scripthookv/
+- From Phase 3: ReShade **with full add-on support** from https://reshade.me (installed as `ReShade64.asi`, see
+  `gta/INSTALL.txt`). Building the compositor needs ReShade's add-on headers (crosire/reshade v6.8.0 `include/`) in
+  `sdk/reshade-src`; without them CraftV.asi builds without the Minecraft view.
+
+## Controls in GTA (the Minecraft view)
+
+| Key | What it does |
+|---|---|
+| F7 | Minecraft view on/off (on by default whenever ReShade is loaded) |
+| Left mouse | Minecraft's attack: break blocks, hit. People in GTA in front of you get hurt and knocked back |
+| Right mouse | Minecraft's use: place blocks, eat, use items |
+| Mouse wheel, 1-9 | Minecraft's hotbar |
+
+Walking, driving and the camera stay GTA's. GTA's own attack, aim and weapon keys are off while the view is on.
 
 ## Quick start
 
@@ -72,6 +86,9 @@ The JVM flag `--enable-native-access=ALL-UNNAMED` is required, because the link 
 - **minecraft-gta5-passthrough** by rehan-remade (MIT): the GTA V reference.
   https://github.com/rehan-remade/universal-modder/tree/main/examples/minecraft-gta5-passthrough
 - **Script Hook V** by Alexander Blade (used from Phase 2).
+- **ReShade** by crosire (BSD-3-Clause add-on API headers; `ReShade.fxh`/`ReShadeUI.fxh` are CC0). The Minecraft
+  view's compositor (`gta/src/compositor.cpp`), effect (`gta/shaders/CraftV.fx`), frame export and camera hooks are
+  adapted from **minecraft-gta5-passthrough** by rehan-remade (MIT).
 - **Script Hook V .NET** by crosire, kagikn and contributors (zlib): the GTA V surface material hash list.
   https://github.com/scripthookvdotnet/scripthookvdotnet
 

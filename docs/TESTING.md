@@ -8,9 +8,9 @@
 
 | Suite | What it proves | Count |
 |---|---|---|
-| C++ `craftv_link_tests` | Layout, golden vectors for all 13 messages, spec-literal encodings, validation and direction rules, ring wrap/full/stale/corrupt, mapping create/open/validate, endpoint connect/stale/resume/restart, **1,000,000 records through each ring at once** | 35 |
-| Java `gradlew test` | The same golden vectors (C++ and Java agree byte for byte), ring and endpoint behaviour, 1,000,000 records through each ring, terrain column building, the terrain request planner (nearest first, cap, retry), friend tracking (join/state/leave, velocity, swing, resync) | 37 |
-| C++ `craftv_host_tests` | The plugin core shared by GTA V and RDR2, with a fake game: coordinates, story-mode gate, PLAYER_STATE end to end, terrain requests answered (near and far chunks, misses, map edge, materials), friends and session info, faults, overlay, config, zero heap allocations per tick | 24 |
+| C++ `craftv_link_tests` | Layout, golden vectors for all 17 messages, spec-literal encodings, validation and direction rules, ring wrap/full/stale/corrupt, mapping create/open/validate, endpoint connect/stale/resume/restart, **1,000,000 records through each ring at once**, every message type delivered by the endpoint | 39 |
+| Java `gradlew test` | The same golden vectors (C++ and Java agree byte for byte), ring and endpoint behaviour, 1,000,000 records through each ring, terrain column building, the terrain request planner (nearest first, cap, retry), friend tracking (join/state/leave, velocity, swing, resync), terrain recognised for the owner's view, every message type delivered | 52 |
+| C++ `craftv_host_tests` | The plugin core shared by GTA V and RDR2, with a fake game: coordinates, story-mode gate, PLAYER_STATE end to end, terrain requests answered (near and far chunks, misses, map edge, materials), friends and session info, faults, overlay, config, zero heap allocations per tick, friends across a pause, the passthrough (camera conversion, window size, input, melee damage, F7) | 28 |
 | `gradlew integrationTest` | Real `mockhost.exe` against the real Java link in separate processes: start orders, crashes, restarts, timeouts, block messages, terrain requests answered (and a host that answers none), a friend joining/moving/leaving, SESSION_INFO, **1,000,000 records each way** | 11 |
 
 Done on 2026-10-05 with the mock host, the hidden Minecraft and a stand-in friend (a second dev
@@ -84,3 +84,28 @@ http://www.dev-c.com/gtav/scripthookv/ for your exact game build (the current re
 - `CraftV.log` (next to GTA5.exe) and `logs\craftv-fabric.log`
 - a screenshot of the overlay
 - what the deploy script printed (it shows the GTA5.exe version)
+
+## Phase 3 test: the Minecraft view (needs GTA V and ReShade)
+
+Checked without GTA: the mock host and `hostsim --passthrough first|third` drive the real Minecraft, and
+`tools/framedump` writes the exported frame: no sky, no terrain, the hand, the hotbar with the kit, hearts and
+hunger, forwarded number keys and right-clicks placing planks, third person showing the player, and the window
+resized by VIEW. Not checked without GTA: ReShade loading as `ReShade64.asi`, the compositor and `CraftV.fx` in GTA,
+GTA's depth buffer, and the natives (camera, controls, hiding the ped, melee).
+
+1. Follow `gta/INSTALL.txt` (dist\CraftV): CraftV.asi + CraftV.ini, ReShade with add-on support renamed to
+   ReShade64.asi, the "Minecraft view (ReShade)" files, Windowed Borderless with Pause On Focus Loss off.
+2. Minecraft is running. Start GTA, load story mode.
+3. Expected: the overlay's first line ends in `MC view`. Your GTA character is gone and Minecraft's hand, hotbar,
+   hearts and hunger are on screen. The hotbar holds a sword, pickaxe, axe, shovel, planks, stone bricks, glass,
+   torches and steak.
+4. Press 5 and right-click the street: planks appear on it, and GTA's lampposts and cars in front hide them.
+   Left-click holding the pickaxe breaks them.
+5. Walk up to someone and left-click with the sword: they fall over and get hurt.
+6. Switch to third person (V): a Minecraft character walks where you walk.
+7. Press F7: GTA's own character comes back; F7 again: the Minecraft view returns.
+8. Open the pause menu: no Minecraft HUD stays on the map.
+
+### If something fails, send me
+`CraftV.log` and `ReShade.log` (both next to GTA5.exe), and a screenshot.
+

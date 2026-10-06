@@ -168,6 +168,22 @@ once. Each column is one straight-down ray from 1200 m to -250 m against map col
 means friends stand on roofs and bridges, which is the "blocky copy" a friend sees; underneath bridges isn't
 modelled yet (KNOWN_LIMITATIONS).
 
+### D-028: How the Minecraft view behaves (2026-10-06)
+**Decision:**
+- Sary plays Survival with a starter kit (their choice). The world reacts: a Minecraft attack hurts and knocks back
+  the people in front of them in GTA.
+- The view is on whenever ReShade loaded CraftV's add-on, and F7 toggles it.
+- The owner's terrain is hidden by meshing terrain blocks as air on the hidden client only.
+- The owner never suffocates in terrain and respawns at once.
+- Minecraft's frame is capped at 1920x1080 pixels (`MaxPixels`).
+- GTA's HUD stays unless `HideGtaHud=1`.
+- The compositor stops drawing when the script hasn't set a camera for 250 ms (pause menu).
+**Reason:**
+- Sary asked for hearts, hunger and the world reacting.
+- The rest follows the reference project, except where CraftV differs: shared visible terrain for friends, and
+  GTA's HUD, which Sary cares about (they moved CraftV's overlay out of its way).
+- The 250 ms stop fixes the reference's open problem of a frozen frame over the pause menu.
+
 ### D-027: Protocol v1.2 for the passthrough, plus a separate frame mapping (2026-10-06)
 **Decision:** Four fixed-size messages: `CAMERA` (H→M, every host frame), `VIEW` (H→M, Minecraft's window size),
 `INPUT` (H→M, the owner's forwarded buttons, hotbar slot and scroll) and `OWNER_STATE` (M→H, held item, health,

@@ -83,3 +83,20 @@ As of Phase 2 (2026-10-05). "Planned" names the phase expected to fix it.
 - **Script Hook V must match the game build exactly;** after a GTA update, wait for a new Script Hook V.
 - The parked RDR2 plugin (`rdr2/`, `CraftV_RDR2.asi`) was built against ScriptHookRDR2 and never run in RDR2. It
   has no terrain scanning.
+
+## The Minecraft view (Phase 3, not yet run in GTA)
+- **Needs ReShade with add-on support**, loaded as `ReShade64.asi`, and GTA in Windowed Borderless with Pause On Focus
+  Loss off (Minecraft runs in its own window next to GTA). Two games render at once, so expect a lower frame rate.
+- **Blocks have no collision in GTA yet.** You, people and cars pass through what you build until Phase 4 (invisible
+  collision props).
+- **Heights can be off by up to half a block.** CraftV's terrain stores GTA's ground in whole blocks, so a block placed
+  on a sloped street can sink into it or float above it a little. Friends' feet have the same offset.
+- **Indoors and under bridges** you stand inside CraftV's terrain (the ground is probed from above). Minecraft treats it
+  as air in your view and never suffocates you, but blocks you place there land on the roof or deck terrain.
+- **In a vehicle** your GTA character is hidden and Minecraft's stands in the car. Driving works; building from a car
+  isn't meant to.
+- **Melee reach and knock-back** are the reference project's values, untested in CraftV. Damage is Minecraft's attack
+  damage x `MeleeDamagePerHalfHeart` (10), with vanilla's charge scaling.
+- **GTA's HUD stays** by default (`[Passthrough] HideGtaHud=1` hides it). Its minimap sits left of Minecraft's hotbar.
+- Worlds from before protocol v1.2 rebuild their terrain chunks once (the save didn't keep their columns).
+

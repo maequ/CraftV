@@ -1,0 +1,35 @@
+CraftV for GTA V (story mode only)
+
+The Minecraft view: real Minecraft drawn into GTA. You see your Minecraft hand, hotbar, hearts
+and hunger, the blocks you place, and your friends with their own skins.
+
+1) Update CraftV (every new build)
+   Copy CraftV.asi and CraftV.ini into the game folder (the one with GTA5.exe), replacing the
+   old ones.
+
+2) One time: install ReShade (it draws Minecraft into GTA's picture)
+   a. Download ReShade from the official site only: https://reshade.me
+      Pick "Download with full add-on support". CraftV needs the add-on version. It's meant
+      for single-player games only, which story mode is.
+   b. Run the installer, pick GTA5.exe, and choose "DirectX 10/11/12".
+      When it offers effect packages, untick them all (CraftV brings its own) and finish.
+   c. In the game folder, rename dxgi.dll to ReShade64.asi
+      (GTA ignores ReShade's dxgi.dll; Script Hook V's ASI loader loads ReShade64.asi instead).
+   d. Copy everything inside the "Minecraft view (ReShade)" folder into the game folder:
+      ReShade.ini, ReShadePreset.ini and the reshade-shaders folder (merge it if asked).
+
+3) One time: GTA settings
+   Graphics > Screen Type: Windowed Borderless, and Pause Game On Focus Loss: Off.
+   Recommended: Depth of Field off. GTA blurs its own picture but not Minecraft's.
+
+4) Play
+   Minecraft must be running first. Then start GTA and load story mode.
+   The CraftV overlay (top right) says "MC view" while it's on. F7 turns it on and off.
+   Left mouse: break blocks and hit (people in GTA get hurt too). Right mouse: place and use.
+   Mouse wheel and 1-9: the hotbar. Walking, driving and the camera are GTA's own.
+
+If something's wrong, send CraftV.log (next to GTA5.exe).
+
+To remove CraftV: delete CraftV.asi. To remove ReShade: delete ReShade64.asi, ReShade.ini,
+ReShadePreset.ini and the reshade-shaders folder.
+Never take mods into GTA Online: Script Hook V closes the game if you try.
