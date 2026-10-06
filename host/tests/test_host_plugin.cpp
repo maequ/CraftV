@@ -109,6 +109,13 @@ namespace
 			a_out = nextInput;
 			nextInput = PassthroughInput{};
 		}
+		int  screenInputCalls = 0;
+		void TakeScreenInput(PassthroughInput& a_out) override
+		{
+			++screenInputCalls;
+			a_out = nextInput;
+			nextInput = PassthroughInput{};
+		}
 		void SetPlayerHidden(bool a_hidden) override { hidden = a_hidden; }
 		bool ScreenSize(int& a_w, int& a_h) override
 		{
@@ -923,5 +930,46 @@ TEST_CASE("host solid blocks: nearby chunks are asked for, at most maxProps live
 	for (const auto& p : rig.game.props) {
 		CHECK(p.x < 8.0f);  // the nearest three: x 5, 6, 7 (+0.5)
 	}
+}
+
+TEST_CASE("host passthrough: Tab opens the inventory; while it's open the cursor and clicks go to it, not to people")
+{
+	Rig rig(L"inventory");
+	rig.game.sample = StoryPlayer(0, 0, 50, 0);
+	rig.game.available = true;
+	rig.game.camera.valid = true;
+	rig.Tick(10);
+	REQUIRE(rig.plugin->PassthroughActive());
+	rig.inputs.clear();
+	rig.game.nextInput.inventory = true;
+	rig.Tick(2);
+	REQUIRE(rig.inputs.size() == 2);
+	CHECK(rig.inputs[0].button == kButtonInventory && rig.inputs[0].down == 1 && rig.inputs[1].down == 0);
+
+	OwnerStateMsg owner{};
+	owner.attackDamage = 7.0f;
+	owner.attackCharge = 1.0f;
+	owner.flags = kOwnerScreenOpen;
+	REQUIRE(rig.mc->Send(owner));
+	rig.Tick(2);
+	rig.inputs.clear();
+	const int before = rig.game.screenInputCalls;
+	rig.game.nextInput.cursorValid = true;
+	rig.game.nextInput.cursorX = 0.25f;
+	rig.game.nextInput.cursorY = 0.5f;
+	rig.game.nextInput.attackPressed = true;
+	rig.Tick(2);
+	CHECK(rig.game.screenInputCalls > before);
+	REQUIRE(rig.inputs.size() >= 2);
+	bool cursor = false, click = false;
+	for (const auto& in : rig.inputs) {
+		if (in.kind == kInputCursor) {
+			cursor = (in.cursor & 0xFFFF) == 16384 && (in.cursor >> 16) == 32768;
+		}
+		click = click || (in.kind == kInputButton && in.button == kButtonAttack && in.down == 1);
+	}
+	CHECK(cursor);
+	CHECK(click);
+	CHECK(rig.game.melee.empty());  // clicking in the inventory hits nobody
 }
 

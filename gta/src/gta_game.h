@@ -20,6 +20,7 @@ namespace craftv::host
 		bool PassthroughAvailable() override;
 		void SampleCamera(CameraSample& a_out) override;
 		void TakePassthroughInput(PassthroughInput& a_out) override;
+		void TakeScreenInput(PassthroughInput& a_out) override;
 		void SetPlayerHidden(bool a_hidden) override;
 		void HideHudThisFrame() override;
 		bool ScreenSize(int& a_width, int& a_height) override;

@@ -12,6 +12,7 @@
     "KeyMappingAccessor",
     "LivingEntityMixin",
     "MinecraftMixin",
+    "MouseHandlerAccessor",
     "RenderSectionRegionMixin",
     "ScreenEffectRendererMixin",
     "ToastManagerMixin",

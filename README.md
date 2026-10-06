@@ -19,7 +19,7 @@ A Fabric mod and a GTA V ASI plugin talk through shared memory.
 | 1 | Co-op on the Minecraft side with a fake GTA: friends join, walk on host terrain, everything reaches the host | **Done** (Sary joined in Phase 2's test) |
 | 2 | GTA V plugin: link, overlay, scanning GTA's ground for friends | **Done, confirmed in Sary's game (2026-10-05)** |
 | 3 | The Minecraft view: Sary plays as a Minecraft player in GTA (hand, hotbar, hearts, blocks), friends drawn with their skins | **Built and tested without the game; awaiting the in-game test** |
-| 4 | Blocks are solid in GTA (invisible collision props) | Not started |
+| 4 | Blocks are solid in GTA (invisible collision props) | **Built and tested without the game; awaiting the in-game test** |
 | 5 | Friends from anywhere (no port forwarding), whitelist | Not started |
 | 6 | A better blocky Los Santos (buildings) | Not started |
 
@@ -59,6 +59,8 @@ The full plan is in [docs/BRIEF.md](docs/BRIEF.md).
 | Key | What it does |
 |---|---|
 | F7 | Minecraft view on/off (on by default whenever ReShade is loaded) |
+| F8 | CraftV's settings menu (arrows to move and change, Backspace to close) |
+| Tab | Minecraft's inventory (the mouse works it while it's open; Esc or Tab closes it) |
 | Left mouse | Minecraft's attack: break blocks, hit. People in GTA in front of you get hurt and knocked back |
 | Right mouse | Minecraft's use: place blocks, eat, use items |
 | Mouse wheel, 1-9 | Minecraft's hotbar |

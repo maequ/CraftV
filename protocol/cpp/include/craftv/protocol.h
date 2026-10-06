@@ -545,6 +545,7 @@ namespace craftv::proto
 		kInputButton = 1,
 		kInputSlot = 2,
 		kInputScroll = 3,
+		kInputCursor = 4,  // v1.3
 	};
 	enum InputButton : std::uint8_t
 	{
@@ -564,7 +565,7 @@ namespace craftv::proto
 		std::uint8_t  button;
 		std::uint8_t  down;
 		std::int8_t   value;
-		std::uint32_t reserved0;
+		std::uint32_t cursor;  // CURSOR: x in the low 16 bits, y in the high, 0..65535 across the picture
 	};
 	static_assert(sizeof(InputMsg) == 8);
 	static_assert(offsetof(InputMsg, value) == 3);

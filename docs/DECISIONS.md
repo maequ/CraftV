@@ -168,6 +168,21 @@ once. Each column is one straight-down ray from 1200 m to -250 m against map col
 means friends stand on roofs and bridges, which is the "blocky copy" a friend sees; underneath bridges isn't
 modelled yet (KNOWN_LIMITATIONS).
 
+### D-029: Phase 4 defaults and the settings menu (2026-10-06)
+**Decision:**
+- Digging terrain is allowed and makes a hole in Minecraft only (option a); GTA's ground stays.
+- At most 400 solid blocks within 48 m, nearest first (`[Blocks]`).
+- Each block is an invisible `prop_box_wood01a`, the closest to 1 m of the 16 sizes measured in Sary's game, with its top
+  level with the block and shifted by the terrain's rounding.
+- Chunks are synced with `BLOCK_REGION_REQUEST`.
+- The settings menu (F8) uses the game's own commonmenu textures, fonts, sounds and the interaction menu's proportions.
+- The inventory opens with Tab: the mouse works it through INPUT `CURSOR`.
+**Reason:**
+- Sary said "finish everything" without answering the two Phase 4 questions, so these are the recommended answers,
+  easy to change.
+- The menu has to "look identical to the GTA font and everything".
+- Tab is GTA's weapon wheel, which is unused while the view is on.
+
 ### D-028: How the Minecraft view behaves (2026-10-06)
 **Decision:**
 - Sary plays Survival with a starter kit (their choice). The world reacts: a Minecraft attack hurts and knocks back

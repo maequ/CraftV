@@ -213,9 +213,28 @@ namespace craftv::host
 			}
 		}
 		PassthroughInput in;
-		game_.TakePassthroughInput(in);  // also keeps GTA's weapon controls off
+		const bool       screenOpen = hasOwner_ && (owner_.flags & kOwnerScreenOpen) != 0;
+		if (screenOpen) {
+			game_.TakeScreenInput(in);  // the inventory: the mouse works it
+		} else {
+			game_.TakePassthroughInput(in);  // also keeps GTA's weapon controls off
+		}
 		if (menu_.Open()) {
 			in = PassthroughInput{};
+		}
+		if (in.inventory) {
+			endpoint_->Send(InputMsg{ kInputButton, kButtonInventory, 1, 0, 0 });
+			endpoint_->Send(InputMsg{ kInputButton, kButtonInventory, 0, 0, 0 });
+		}
+		if (in.closeScreen) {
+			endpoint_->Send(InputMsg{ kInputButton, kButtonCloseScreen, 1, 0, 0 });
+		}
+		if (in.cursorValid) {
+			const auto q = [](float v) { return static_cast<std::uint32_t>(std::clamp(v, 0.0f, 1.0f) * 65535.0f + 0.5f); };
+			const std::uint32_t packed = q(in.cursorX) | (q(in.cursorY) << 16);
+			if (packed != lastCursor_ && endpoint_->Send(InputMsg{ kInputCursor, 0, 0, 0, packed })) {
+				lastCursor_ = packed;
+			}
 		}
 		auto button = [&](bool a_pressed, bool a_released, std::uint8_t a_button) {
 			if (a_pressed) {
@@ -233,7 +252,7 @@ namespace craftv::host
 		if (in.scroll != 0) {
 			endpoint_->Send(InputMsg{ kInputScroll, 0, 0, static_cast<std::int8_t>(std::clamp(in.scroll, -int(kHotbarSlots), int(kHotbarSlots))), 0 });
 		}
-		if (in.attackPressed && hasOwner_ && (owner_.flags & (kOwnerDead | kOwnerScreenOpen)) == 0) {
+		if (in.attackPressed && !screenOpen && hasOwner_ && (owner_.flags & kOwnerDead) == 0) {
 			const float damage = MeleeDamage(owner_, config_.passthrough.meleeDamagePerHalfHeart);
 			if (damage > 0.0f) {
 				game_.Melee(damage);

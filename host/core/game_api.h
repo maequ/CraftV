@@ -92,6 +92,10 @@ namespace craftv::host
 		bool usePressed = false, useReleased = false;        // right mouse
 		int  scroll = 0;                                     // +1 next hotbar slot, -1 previous
 		int  slot = -1;                                      // 0..8 when a number key was pressed
+		bool inventory = false;                              // Tab: open (or close) Minecraft's inventory
+		bool closeScreen = false;                            // Esc while a Minecraft screen is open
+		bool cursorValid = false;                            // while a Minecraft screen is open:
+		float cursorX = 0, cursorY = 0;                      //   the mouse over the picture, 0..1
 	};
 
 	class IGame
@@ -115,6 +119,9 @@ namespace craftv::host
 		virtual void SampleCamera(CameraSample& a_out) { a_out = CameraSample{}; }
 		// Disables the game's own attack, aim and weapon controls for this frame and reports the owner's buttons.
 		virtual void TakePassthroughInput(PassthroughInput& a_out) { a_out = PassthroughInput{}; }
+		// While a Minecraft screen (the inventory) is open: shows the mouse cursor, holds the player still and reports
+		// the cursor, the mouse buttons (attack = left, use = right), Tab and Esc.
+		virtual void TakeScreenInput(PassthroughInput& a_out) { a_out = PassthroughInput{}; }
 		// Minecraft draws the owner while the passthrough is on, so the game hides its player (and their weapon).
 		virtual void SetPlayerHidden(bool) {}
 		virtual void HideHudThisFrame() {}

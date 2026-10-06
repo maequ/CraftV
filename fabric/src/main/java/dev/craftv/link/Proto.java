@@ -203,7 +203,7 @@ public final class Proto {
 	public static final float MIN_FOV = 1.0F, MAX_FOV = 179.0F;
 	public static final int VIEW_MIN_SIDE = 64, VIEW_MAX_WIDTH = 3840, VIEW_MAX_HEIGHT = 2160, HOST_MAX_SIDE = 16384;
 	public static final long VIEW_MAX_PIXELS = 2560L * 1440;
-	public static final int INPUT_BUTTON = 1, INPUT_SLOT = 2, INPUT_SCROLL = 3;
+	public static final int INPUT_BUTTON = 1, INPUT_SLOT = 2, INPUT_SCROLL = 3, INPUT_CURSOR = 4;
 	public static final int BUTTON_ATTACK = 1, BUTTON_USE = 2, BUTTON_PICK = 3, BUTTON_DROP = 4, BUTTON_INVENTORY = 5, BUTTON_SWAP_HANDS = 6,
 		BUTTON_CLOSE_SCREEN = 7;
 	public static final int HOTBAR_SLOTS = 9;

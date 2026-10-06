@@ -588,11 +588,14 @@ The host window has the focus, so the host forwards the owner's Minecraft contro
 
 | Offset | Size | Type | Field | Notes |
 |---|---|---|---|---|
-| 0 | 1 | u8 | `kind` | `1` BUTTON, `2` SLOT, `3` SCROLL |
+| 0 | 1 | u8 | `kind` | `1` BUTTON, `2` SLOT, `3` SCROLL, `4` CURSOR (v1.3) |
 | 1 | 1 | u8 | `button` | BUTTON: `1` ATTACK, `2` USE, `3` PICK, `4` DROP, `5` INVENTORY, `6` SWAP_HANDS, `7` CLOSE_SCREEN; else `0` |
 | 2 | 1 | u8 | `down` | BUTTON: `1` pressed, `0` released; else `0` |
 | 3 | 1 | i8 | `value` | SLOT: hotbar slot `0..8`; SCROLL: `-9..9` slots, non-zero (positive = next); else `0` |
-| 4 | 4 | | reserved | |
+| 4 | 4 | u32 | `cursor` | CURSOR (v1.3): where the mouse is over the host's picture while a Minecraft screen (inventory) is open: low 16 bits x, high 16 bits y, `0..65535` across the picture. Else `0` |
+
+While a Minecraft screen is open (OWNER_STATE `SCREEN_OPEN`), BUTTON `ATTACK` and `USE` are the left and right mouse
+buttons on that screen, at the last CURSOR.
 
 ### 7.18 `OWNER_STATE` (17), 16 bytes, M → H (v1.2)
 

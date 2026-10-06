@@ -403,7 +403,7 @@ namespace
 			} else if (cmd == "slot" || cmd == "scroll") {
 				int v = 0;
 				in >> v;
-				InputMsg msg{ cmd == "slot" ? kInputSlot : kInputScroll, 0, 0, static_cast<std::int8_t>(v), 0 };
+				InputMsg msg{ cmd == "slot" ? kInputSlot : kInputScroll, 0, 0, static_cast<std::int8_t>(v), 0u };
 				Out("%s INPUT %s %d", codec::Valid(msg) && endpoint_->Send(msg) ? "sent" : "NOT sent (slot 0..8, scroll -9..9 non-zero)", cmd.c_str(), v);
 			} else if (cmd == "quit" || cmd == "exit") {
 				quit_ = true;

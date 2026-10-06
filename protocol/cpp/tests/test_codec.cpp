@@ -521,7 +521,7 @@ TEST_CASE("codec: v1.2 validation rejects bad values")
 	CHECK(codec::Valid(InputMsg{ kInputScroll, 0, 0, -1, 0 }));
 	CHECK(!codec::Valid(InputMsg{ kInputScroll, 0, 0, 0, 0 }));
 	CHECK(!codec::Valid(InputMsg{ kInputButton, 8, 1, 0, 0 }));
-	CHECK(!codec::Valid(InputMsg{ 4, 0, 0, 0, 0 }));
+	CHECK(!codec::Valid(InputMsg{ 5, 0, 0, 0, 0 }));
 
 	auto owner = golden::OwnerState();
 	CHECK(codec::Valid(owner));
@@ -558,5 +558,12 @@ TEST_CASE("codec: v1.3 BLOCK_REGION_REQUEST and the SOLID/REGION block flags")
 		}
 	}
 	CHECK(seen);
+}
+
+TEST_CASE("codec: v1.3 INPUT CURSOR")
+{
+	CHECK(codec::Valid(InputMsg{ kInputCursor, 0, 0, 0, 0xFFFF0000u }));
+	CHECK(!codec::Valid(InputMsg{ kInputCursor, 1, 0, 0, 0 }));
+	CHECK(!codec::Valid(InputMsg{ 5, 0, 0, 0, 0 }));
 }
 

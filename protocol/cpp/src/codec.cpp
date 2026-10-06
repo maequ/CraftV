@@ -275,6 +275,8 @@ namespace craftv::codec
 			return a_msg.button == 0 && a_msg.down == 0 && a_msg.value >= 0 && a_msg.value < kHotbarSlots;
 		case kInputScroll:
 			return a_msg.button == 0 && a_msg.down == 0 && a_msg.value != 0 && a_msg.value >= -kHotbarSlots && a_msg.value <= kHotbarSlots;
+		case kInputCursor:
+			return a_msg.button == 0 && a_msg.down == 0 && a_msg.value == 0;
 		default:
 			return false;
 		}

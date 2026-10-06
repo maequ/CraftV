@@ -56,6 +56,9 @@ namespace craftv::host
 			68, 69, 70, 91, 92, 99, 100, 114, 115, 116,   // vehicle and passenger weapons
 		};
 		constexpr int kControlAttack = 24, kControlAim = 25;
+		constexpr int kControlSelectWeapon = 37;  // Tab (GTA's weapon wheel, off in the passthrough): Minecraft's inventory
+		// While Minecraft's inventory is open: the cursor and its buttons (INPUT_CURSOR_X/Y, ACCEPT, CANCEL), Esc.
+		constexpr int kCursorX = 239, kCursorY = 240, kCursorAccept = 237, kCursorCancel = 238, kPause = 199, kPauseAlt = 200;
 		constexpr int kControlNext[] = { 14, 16 }, kControlPrevious[] = { 15, 17 };  // wheel down/up: the next/previous weapon
 		// Number keys 1..9 are GTA's weapon-slot controls in this order.
 		constexpr int kHotbarControls[9] = { 157, 158, 160, 164, 165, 159, 161, 162, 163 };
@@ -237,10 +240,30 @@ namespace craftv::host
 				a_out.slot = i;
 			}
 		}
+		a_out.inventory = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kControlSelectWeapon) != FALSE;
 		if (playerHidden_) {
 			// Kept hidden every frame: switching character, respawning or a cutscene gives a new or visible ped.
 			const Ped ped = PLAYER::PLAYER_PED_ID();
 			ENTITY::SET_ENTITY_VISIBLE(ped, FALSE, FALSE);
+		}
+	}
+
+	void GtaGame::TakeScreenInput(PassthroughInput& a_out)
+	{
+		a_out = PassthroughInput{};
+		CONTROLS::DISABLE_ALL_CONTROL_ACTIONS(0);  // the player stands still while the inventory is open
+		UI::_SHOW_CURSOR_THIS_FRAME();
+		a_out.cursorValid = true;
+		a_out.cursorX = CONTROLS::GET_DISABLED_CONTROL_NORMAL(0, kCursorX);
+		a_out.cursorY = CONTROLS::GET_DISABLED_CONTROL_NORMAL(0, kCursorY);
+		a_out.attackPressed = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kCursorAccept) != FALSE;
+		a_out.attackReleased = CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, kCursorAccept) != FALSE;
+		a_out.usePressed = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kCursorCancel) != FALSE;
+		a_out.useReleased = CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, kCursorCancel) != FALSE;
+		a_out.inventory = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kControlSelectWeapon) != FALSE;
+		a_out.closeScreen = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kPause) || CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kPauseAlt);
+		if (playerHidden_) {
+			ENTITY::SET_ENTITY_VISIBLE(PLAYER::PLAYER_PED_ID(), FALSE, FALSE);
 		}
 	}
 

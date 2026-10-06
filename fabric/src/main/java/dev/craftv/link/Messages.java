@@ -701,7 +701,11 @@ public final class Messages {
 	}
 
 	// ---- §7.17 INPUT (v1.2) ----------------------------------------------------------------------
-	public record Input(int kind, int button, int down, int value) implements Payload {
+	public record Input(int kind, int button, int down, int value, int cursor) implements Payload {
+		public Input(int kind, int button, int down, int value) {
+			this(kind, button, down, value, 0);
+		}
+
 		@Override
 		public int type() {
 			return MSG_INPUT;
@@ -718,12 +722,21 @@ public final class Messages {
 			s.set(U8, off + 1, (byte) button);
 			s.set(U8, off + 2, (byte) down);
 			s.set(U8, off + 3, (byte) value);
-			s.set(I32, off + 4, 0);
+			s.set(I32, off + 4, cursor);
 		}
 
 		public static Input read(MemorySegment s, long off) {
 			return new Input(Byte.toUnsignedInt(s.get(U8, off)), Byte.toUnsignedInt(s.get(U8, off + 1)), Byte.toUnsignedInt(s.get(U8, off + 2)),
-				s.get(U8, off + 3));
+				s.get(U8, off + 3), s.get(I32, off + 4));
+		}
+
+		/** CURSOR: 0..1 across the host's picture. */
+		public double cursorX() {
+			return (cursor & 0xFFFF) / 65535.0;
+		}
+
+		public double cursorY() {
+			return (cursor >>> 16) / 65535.0;
 		}
 
 		public boolean valid() {
@@ -731,6 +744,7 @@ public final class Messages {
 				case INPUT_BUTTON -> button >= BUTTON_ATTACK && button <= BUTTON_CLOSE_SCREEN && (down == 0 || down == 1) && value == 0;
 				case INPUT_SLOT -> button == 0 && down == 0 && value >= 0 && value < HOTBAR_SLOTS;
 				case INPUT_SCROLL -> button == 0 && down == 0 && value != 0 && value >= -HOTBAR_SLOTS && value <= HOTBAR_SLOTS;
+				case INPUT_CURSOR -> button == 0 && down == 0 && value == 0;
 				default -> false;
 			};
 		}

@@ -26,7 +26,9 @@ and hunger, the blocks you place, and your friends with their own skins.
    Minecraft must be running first. Then start GTA and load story mode.
    The CraftV overlay (top right) says "MC view" while it's on. F7 turns it on and off.
    Left mouse: break blocks and hit (people in GTA get hurt too). Right mouse: place and use.
-   Mouse wheel and 1-9: the hotbar. Walking, driving and the camera are GTA's own.
+   Mouse wheel and 1-9: the hotbar. Tab: Minecraft's inventory (use the mouse; Esc closes it).
+   F8: CraftV's settings menu. Walking, driving and the camera are GTA's own.
+   Blocks you and friends build are solid in GTA (people, cars and you bump into them).
 
 If something's wrong, send CraftV.log (next to GTA5.exe).
 

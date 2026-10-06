@@ -87,8 +87,10 @@ As of Phase 2 (2026-10-05). "Planned" names the phase expected to fix it.
 ## The Minecraft view (Phase 3, not yet run in GTA)
 - **Needs ReShade with add-on support**, loaded as `ReShade64.asi`, and GTA in Windowed Borderless with Pause On Focus
   Loss off (Minecraft runs in its own window next to GTA). Two games render at once, so expect a lower frame rate.
-- **Blocks have no collision in GTA yet.** You, people and cars pass through what you build until Phase 4 (invisible
-  collision props).
+- **Solid blocks (Phase 4, not yet run in GTA):** at most 400 blocks within 48 m of you are solid in GTA (GTA crashes at
+  around 1,500 script objects). Each is an invisible box 2 cm narrower than the block and 20 cm short underneath; its
+  top is level with the block's. Only full blocks above the ground count (no slabs, fences or torches). Breaking the
+  floor makes a hole in Minecraft only: GTA's street stays.
 - **Heights: half a block off away from you.** CraftV's terrain stores GTA's ground in whole blocks. Around you, Minecraft's
   view is lifted so its ground meets GTA's (blocks you place sit on the street); further away, on slopes, blocks and
   friends can still sink in or float up to half a block.
@@ -103,5 +105,6 @@ As of Phase 2 (2026-10-05). "Planned" names the phase expected to fix it.
 - **GTA's HUD stays** by default (`[Passthrough] HideGtaHud=1` hides it). Its minimap sits left of Minecraft's hotbar.
 - Worlds from before protocol v1.2 rebuild their terrain chunks once (the save didn't keep their columns).
 
-- **No inventory screen yet** (it needs the mouse inside Minecraft's window). The hotbar, wheel and 1-9 work.
+- **The inventory** (Tab) holds the player still while it's open; drag-and-drop works by clicking (Minecraft's own
+  click-to-pick-up, click-to-drop). Shift-click and number-key swaps inside the inventory aren't forwarded yet.
 - **Breaking the floor** breaks the hidden terrain block: in your view nothing changes (the floor is GTA's). Phase 4 decides what digging does.
