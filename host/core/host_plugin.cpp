@@ -152,7 +152,6 @@ namespace craftv::host
 			return;
 		}
 		passthroughActive_ = a_on;
-		game_.SetPlayerHidden(a_on);
 		game_.SetCompositorActive(a_on);
 		viewSent_ = ViewMsg{};  // size Minecraft's window again next time
 		HostLog::Info("passthrough %s", a_on ? "on: Minecraft draws the player, hand and HUD into the game's picture" : "off");
@@ -169,6 +168,13 @@ namespace craftv::host
 			             : passthroughWanted_ ? "CraftV: Minecraft view on" : "CraftV: Minecraft view off");
 		}
 		SetPassthrough(a_linked && passthroughWanted_ && game_.PassthroughAvailable());
+		// Minecraft draws the player on foot; in a vehicle the game's own driver shows (Minecraft has no car to seat
+		// them in, and hides its player then, PROTOCOL.md §7.15 IN_VEHICLE).
+		const bool hide = passthroughActive_ && !sample_.inVehicle;
+		if (hide != playerHidden_) {
+			playerHidden_ = hide;
+			game_.SetPlayerHidden(hide);
+		}
 		if (!passthroughActive_) {
 			return;
 		}
@@ -242,6 +248,10 @@ namespace craftv::host
 				sample_.networkGameInProgress, sample_.networkSessionStarted, sample_.networkInSession);
 			state_ = PluginState::kOnlineBlocked;
 			SetPassthrough(false);
+			if (playerHidden_) {
+				playerHidden_ = false;
+				game_.SetPlayerHidden(false);
+			}
 			endpoint_.reset();  // clean detach: Minecraft sees the host leave at once
 			return;
 		}
@@ -495,13 +505,14 @@ namespace craftv::host
 
 	void HostPlugin::Fault(const char* a_what)
 	{
-		if (passthroughActive_) {
+		if (playerHidden_) {
 			try {
 				game_.SetPlayerHidden(false);  // never leave the player invisible
 			} catch (...) {
 			}
-			passthroughActive_ = false;
+			playerHidden_ = false;
 		}
+		passthroughActive_ = false;
 		if (state_ == PluginState::kFaulted) {
 			return;
 		}

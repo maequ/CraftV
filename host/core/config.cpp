@@ -54,6 +54,8 @@ namespace craftv::host
 		terrain.collisionWaitTicks = wait >= 0 && wait <= 600 ? static_cast<int>(wait) : TerrainConfig{}.collisionWaitTicks;
 		const double nearM = ReadDouble(L"Terrain", L"NearDistance", terrain.nearDistance, a_iniPath);
 		terrain.nearDistance = nearM >= 0 && nearM <= 5000 ? static_cast<float>(nearM) : TerrainConfig{}.nearDistance;
+		const double budget = ReadDouble(L"Terrain", L"ProbeBudgetUs", terrain.probeBudgetUs, a_iniPath);
+		terrain.probeBudgetUs = static_cast<int>(std::clamp(budget, 100.0, 16000.0));
 		const double attempts = ReadDouble(L"Terrain", L"MaxAttempts", terrain.maxAttempts, a_iniPath);
 		terrain.maxAttempts = attempts >= 1 && attempts <= 100 ? static_cast<int>(attempts) : TerrainConfig{}.maxAttempts;
 

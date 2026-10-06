@@ -5,6 +5,7 @@
   "client": [
     "CameraMixin",
     "EntityPickMixin",
+    "EntityRenderDispatcherMixin",
     "FogRendererMixin",
     "GameRendererMixin",
     "GlCommandEncoderMixin",

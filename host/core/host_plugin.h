@@ -120,6 +120,7 @@ namespace craftv::host
 		std::atomic<bool>         toggleRequested_{ false };
 		bool                      passthroughWanted_ = true;   // Mode=Auto, flipped by F7
 		bool                      passthroughActive_ = false;
+		bool                      playerHidden_ = false;
 		std::uint64_t             cameraFrame_ = 0;
 		std::uint64_t             camerasSent_ = 0;
 		proto::ViewMsg            viewSent_{};

@@ -697,6 +697,14 @@ TEST_CASE("host passthrough: off without the compositor; with it, CAMERA every t
 	CHECK(rig.views[0].width == 1920 && rig.views[0].height == 1080);
 	CHECK((rig.cameras.back().flags & kCameraPassthrough) != 0);
 
+	rig.game.sample.inVehicle = true;  // driving: GTA's own driver shows, Minecraft hides its player
+	rig.Tick(2);
+	CHECK(!rig.game.hidden);
+	CHECK((rig.cameras.back().flags & kCameraInVehicle) != 0);
+	rig.game.sample.inVehicle = false;
+	rig.Tick(2);
+	CHECK(rig.game.hidden);
+
 	rig.plugin->RequestPassthroughToggle();
 	rig.Tick(2);
 	CHECK(!rig.plugin->PassthroughActive());

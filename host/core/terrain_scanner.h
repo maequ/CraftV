@@ -21,6 +21,7 @@ namespace craftv::host
 	struct TerrainConfig
 	{
 		int   probesPerTick = 64;       // [Terrain] ProbesPerTick
+		int   probeBudgetUs = 1500;     // [Terrain] ProbeBudgetUs: stop probing for this frame once this much time is spent
 		int   collisionWaitTicks = 10;  // [Terrain] CollisionWaitTicks
 		float nearDistance = 150.0f;    // [Terrain] NearDistance, metres: closer chunks are probed at once
 		int   maxAttempts = 3;          // [Terrain] MaxAttempts
@@ -31,6 +32,7 @@ namespace craftv::host
 
 	struct TerrainStats
 	{
+		std::uint64_t budgetStops = 0;  // frames that stopped probing early on the time budget
 		std::uint64_t served = 0;      // patches with ground
 		std::uint64_t empty = 0;       // patches with no ground (outside the map, or nothing after retries)
 		std::uint64_t deferred = 0;    // scans that hit nothing and weren't answered (Minecraft asks again)

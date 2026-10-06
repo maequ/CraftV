@@ -43,6 +43,10 @@ public final class BlockSync {
 		int flags = applying != null ? BLOCK_SET_ECHO : 0;
 		int requestId = applying != null ? applying[0] : 0;
 		link.send(new Messages.BlockSet(pos.getX(), pos.getY(), pos.getZ(), Block.getId(newState), flags, requestId));
+		if (applying == null) {
+			// KNOWN_LIMITATIONS: block changes arrived with no friends online; this names them (water? falling blocks?)
+			CraftLog.limited("worldchange", 2000, "block change sent to the host: " + pos.toShortString() + " -> " + newState);
+		}
 	}
 
 	/** Server tick: apply what the host asked for. */

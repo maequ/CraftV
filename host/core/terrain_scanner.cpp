@@ -3,6 +3,7 @@
 #include "host_log.h"
 #include "materials.h"
 
+#include "craftv/clock.h"
 #include "craftv/codec.h"
 
 #include <cmath>
@@ -138,8 +139,16 @@ namespace craftv::host
 			return nullptr;
 		}
 
-		const int end = column_ + config_.probesPerTick < kColumns ? column_ + config_.probesPerTick : kColumns;
-		for (; column_ < end; ++column_) {
+		// At most probesPerTick probes, and at most probeBudgetUs of them: a synchronous ray is cheap on streamed-in
+		// ground but can take milliseconds where collision just arrived, which showed as hitches up to 22 ms.
+		constexpr int       kBudgetCheckEvery = 8;
+		const std::uint64_t startUs = clock::NowUs();
+		const int           end = column_ + config_.probesPerTick < kColumns ? column_ + config_.probesPerTick : kColumns;
+		for (int done = 0; column_ < end; ++column_, ++done) {
+			if (done > 0 && done % kBudgetCheckEvery == 0 && clock::NowUs() - startUs > static_cast<std::uint64_t>(config_.probeBudgetUs)) {
+				++stats_.budgetStops;
+				break;
+			}
 			const int lx = column_ % kChunkSize, lz = column_ / kChunkSize;
 			const std::uint32_t i = codec::TerrainColumn(static_cast<std::uint32_t>(lx), static_cast<std::uint32_t>(lz));
 			float x = 0, y = 0;

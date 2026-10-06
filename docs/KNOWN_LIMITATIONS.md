@@ -93,8 +93,8 @@ As of Phase 2 (2026-10-05). "Planned" names the phase expected to fix it.
   on a sloped street can sink into it or float above it a little. Friends' feet have the same offset.
 - **Indoors and under bridges** you stand inside CraftV's terrain (the ground is probed from above). Minecraft treats it
   as air in your view and never suffocates you, but blocks you place there land on the roof or deck terrain.
-- **In a vehicle** your GTA character is hidden and Minecraft's stands in the car. Driving works; building from a car
-  isn't meant to.
+- **In a vehicle** GTA shows its own driver and Minecraft doesn't draw yours (it has no car to seat you in). The hand
+  and HUD stay. Building from a car isn't meant to work.
 - **Melee reach and knock-back** are the reference project's values, untested in CraftV. Damage is Minecraft's attack
   damage x `MeleeDamagePerHalfHeart` (10), with vanilla's charge scaling.
 - **GTA's HUD stays** by default (`[Passthrough] HideGtaHud=1` hides it). Its minimap sits left of Minecraft's hotbar.
