@@ -262,7 +262,7 @@ compiler and the JIT, and for ARM64 if it is ever a target.
 
 ## 7. Messages
 
-Type ranges: `1–0xFF` core (`1–7` since v1.0, `8–13` since v1.1), `0x100–0x7EFF` reserved for later phases, `0x7F00–0x7FFF`
+Type ranges: `1–0xFF` core (`1–7` since v1.0, `8–13` since v1.1, `14–17` since v1.2), `0x100–0x7EFF` reserved for later phases, `0x7F00–0x7FFF`
 test/debug only. Every core payload has a **fixed size**. "Dir" says who may send it: H = host, M = MC.
 A message received from a side that may not send it is counted as malformed and ignored.
 
@@ -282,6 +282,10 @@ A message received from a side that may not send it is counted as malformed and 
 | `11` | `TERRAIN_REQUEST` | M | 16 (v1.1) |
 | `12` | `TERRAIN_PATCH` | H | 1296 (v1.1) |
 | `13` | `SESSION_INFO` | M | 96 (v1.1) |
+| `14` | `CAMERA` | H | 96 (v1.2) |
+| `15` | `VIEW` | H | 16 (v1.2) |
+| `16` | `INPUT` | H | 8 (v1.2) |
+| `17` | `OWNER_STATE` | M | 16 (v1.2) |
 | `0x7F00` | `TEST_PATTERN` | H, M | 16–272 (variable, test only) |
 
 ### 7.1 `HELLO` (1), 64 bytes
@@ -291,7 +295,7 @@ Sent right after attach and again whenever a new peer session is seen.
 | Offset | Size | Type | Field | Notes |
 |---|---|---|---|---|
 | 0 | 2 | u16 | `versionMajor` | `1` |
-| 2 | 2 | u16 | `versionMinor` | `1` (v1.1) |
+| 2 | 2 | u16 | `versionMinor` | `2` (v1.2) |
 | 4 | 4 | u32 | `role` | `1` host, `2` MC |
 | 8 | 4 | u32 | `pid` | |
 | 12 | 4 | u32 | `session` | same as the record header's |
@@ -536,6 +540,74 @@ Used by the stress and chaos tests. Normal builds ignore it unless a test mode i
 
 The stress sender uses `n = index mod 257`, so record sizes vary and wrap-around is exercised.
 
+### 7.15 `CAMERA` (14), 96 bytes, H → M (v1.2)
+
+The camera the host rendered this frame with, already in Minecraft coordinates (1 block = 1 metre, the same
+conversion as §7.3), sent every host frame while the passthrough is on (brief §8). Minecraft renders the owner's
+view from it and echoes `frame` in the frame it exports (§11).
+
+| Offset | Size | Type | Field | Notes |
+|---|---|---|---|---|
+| 0 | 8 | u64 | `frame` | host frame counter |
+| 8 | 8 | u64 | `timeUs` | host clock (§5.4) |
+| 16 | 8 | f64 | `x` | camera position |
+| 24 | 8 | f64 | `y` | |
+| 32 | 8 | f64 | `z` | |
+| 40 | 4 | f32 | `yaw` | Minecraft yaw, degrees |
+| 44 | 4 | f32 | `pitch` | Minecraft pitch, degrees, positive = down, `[-90, 90]` |
+| 48 | 4 | f32 | `roll` | degrees |
+| 52 | 4 | f32 | `fovY` | vertical field of view, degrees, `[1, 179]` |
+| 56 | 8 | f64 | `feetX` | the owner's feet (where Minecraft draws them in third person) |
+| 64 | 8 | f64 | `feetY` | |
+| 72 | 8 | f64 | `feetZ` | |
+| 80 | 4 | f32 | `bodyYaw` | Minecraft yaw of the owner's body, degrees |
+| 84 | 4 | u32 | `flags` | bit 0 `FIRST_PERSON`, bit 1 `PASSTHROUGH` (the host composites the export: render for it), bit 2 `IN_VEHICLE`. Other bits 0 |
+| 88 | 4 | f32 | `nearClip` | the host camera's near plane, metres (informational) |
+| 92 | 4 | f32 | `farClip` | the host camera's far plane, metres (informational) |
+
+Validation: everything finite, both positions as §7.3, pitch and fov in range, no unknown flags,
+`0 <= nearClip`, `0 <= farClip`. MC stops using the camera 2 s after the last one (the host paused or left).
+
+### 7.16 `VIEW` (15), 16 bytes, H → M (v1.2)
+
+The size Minecraft's window must have so its frame matches the host's picture: the host's backbuffer scaled
+down to at most `VIEW_MAX_PIXELS = 2560 × 1440` pixels, same aspect. Sent when the passthrough starts and
+whenever the host's picture changes size.
+
+| Offset | Size | Type | Field | Notes |
+|---|---|---|---|---|
+| 0 | 4 | u32 | `width` | `64..3840` |
+| 4 | 4 | u32 | `height` | `64..2160`; `width × height <= VIEW_MAX_PIXELS` |
+| 8 | 4 | u32 | `hostWidth` | the host's backbuffer, informational, `<= 16384` |
+| 12 | 4 | u32 | `hostHeight` | `<= 16384` |
+
+### 7.17 `INPUT` (16), 8 bytes, H → M (v1.2)
+
+The host window has the focus, so the host forwards the owner's Minecraft controls (brief §8).
+
+| Offset | Size | Type | Field | Notes |
+|---|---|---|---|---|
+| 0 | 1 | u8 | `kind` | `1` BUTTON, `2` SLOT, `3` SCROLL |
+| 1 | 1 | u8 | `button` | BUTTON: `1` ATTACK, `2` USE, `3` PICK, `4` DROP, `5` INVENTORY, `6` SWAP_HANDS, `7` CLOSE_SCREEN; else `0` |
+| 2 | 1 | u8 | `down` | BUTTON: `1` pressed, `0` released; else `0` |
+| 3 | 1 | i8 | `value` | SLOT: hotbar slot `0..8`; SCROLL: `-9..9` slots, non-zero (positive = next); else `0` |
+| 4 | 4 | | reserved | |
+
+### 7.18 `OWNER_STATE` (17), 16 bytes, M → H (v1.2)
+
+The owner's Minecraft state the host acts on (a melee hit uses the held item, brief §8). Sent when a field
+changes, at most 20 times a second, and at least once a second while connected.
+
+| Offset | Size | Type | Field | Notes |
+|---|---|---|---|---|
+| 0 | 1 | u8 | `held` | `0` empty hand, `1` sword, `2` axe, `3` pickaxe, `4` shovel, `5` hoe, `6` block, `7` other item |
+| 1 | 1 | u8 | `health` | half hearts, rounded up, `0..255` (20 = full) |
+| 2 | 1 | u8 | `food` | `0..20` |
+| 3 | 1 | u8 | `gameMode` | as §7.9 |
+| 4 | 4 | f32 | `attackDamage` | the held item's attack damage, half hearts, `[0, 1000]` |
+| 8 | 4 | f32 | `attackCharge` | the attack cooldown, `0..1` (1 = full strength) |
+| 12 | 4 | u32 | `flags` | bit 0 `DEAD`, bit 1 `SCREEN_OPEN` (inventory, chat, death screen). Other bits 0 |
+
 ## 8. Defensive rules (both sides)
 
 - Validate every size, offset and count read from shared memory before using it (§3.2, §4.2).
@@ -558,7 +630,8 @@ The stress sender uses `n = index mod 257`, so record sizes vary and wrap-around
   and read known prefixes.
 - Every change updates this file, both mirrors, the goldens, and gets an entry in `DECISIONS.md`.
 - **History:** v1.0 (2026-10-02) core messages 1–7. v1.1 (2026-10-05) co-op messages 8–13 (`DECISIONS.md`
-  D-016). A v1.0 peer skips them as unknown types, so v1.0 and v1.1 still link up.
+  D-016). A v1.0 peer skips them as unknown types, so v1.0 and v1.1 still link up. v1.2 (2026-10-06) the
+  passthrough messages 14–17 and the frame mapping (§11, `DECISIONS.md` D-027).
 
 ## 10. Golden vectors
 
@@ -566,3 +639,54 @@ The stress sender uses `n = index mod 257`, so record sizes vary and wrap-around
 are the **complete record** (header + payload + padding) with `session = 0x11223344`, `seq = 7`.
 The C++ and Java test suites both encode the documented field values and compare byte for byte,
 then decode the bytes and compare fields. This is how the two languages are proven to agree.
+
+## 11. The frame mapping (v1.2)
+
+Minecraft's rendered frame for the passthrough (brief §8) goes through a second named mapping,
+`Local\CraftV_Frame_v1`, pagefile-backed, created and written by MC and only read by the host. Layout adapted
+from minecraft-gta5-passthrough (rehan-remade, MIT). Little-endian; every slot is a seqlock.
+
+**Header (4096 bytes):**
+
+| Offset | Size | Type | Field | Notes |
+|---|---|---|---|---|
+| 0 | 4 | u32 | `magic` | `0x52465643`: bytes `43 56 46 52` = "CVFR" |
+| 4 | 4 | u32 | `version` | `1` |
+| 8 | 4 | u32 | `headerBytes` | `4096` |
+| 12 | 4 | u32 | `slotCount` | `3` |
+| 16 | 8 | u64 | `slotStride` | bytes per slot: `VIEW_MAX_PIXELS × 4 × 3` |
+| 24 | 4 | u32 | `maxWidth` | `3840` |
+| 28 | 4 | u32 | `maxHeight` | `2160` (and `width × height <= VIEW_MAX_PIXELS`) |
+| 32 | 8 | u64 | `publishCounter` | bumped after each completed slot |
+| 40 | 4 | i32 | `latestSlot` | `-1` until the first frame |
+| 44 | 4 | u32 | `pid` | MC's process id |
+| 256 + 128·i | 128 | | slot descriptor `i` | below |
+
+**Slot descriptor:**
+
+| Offset | Size | Type | Field | Notes |
+|---|---|---|---|---|
+| 0 | 8 | u64 | `seq` | odd while MC writes the slot; a reader re-checks it after copying |
+| 8 | 8 | u64 | `mcFrame` | |
+| 16 | 8 | u64 | `hostFrame` | the `CAMERA.frame` this was rendered with |
+| 24 | 4 | u32 | `width` | |
+| 28 | 4 | u32 | `height` | |
+| 32 | 4 | f32 | `near` | Minecraft's clip planes, metres |
+| 36 | 4 | f32 | `far` | |
+| 40 | 4 | f32 | `fovY` | degrees |
+| 44 | 4 | u32 | `flags` | bit 0 depth in `[0, 1]`, bit 1 rows bottom-up, bit 2 reversed Z (1 = near, 0 = far/empty) |
+| 48 | 8 | f64 | `x` | the camera pose rendered with (Minecraft coordinates and angles, as §7.15) |
+| 56 | 8 | f64 | `y` | |
+| 64 | 8 | f64 | `z` | |
+| 72 | 4 | f32 | `yaw` | |
+| 76 | 4 | f32 | `pitch` | |
+| 80 | 4 | f32 | `roll` | |
+| 84 | 4 | u32 | `firstPerson` | `1` or `0` |
+| 88 | 8 | u64 | `captureNanos` | `System.nanoTime()` (QueryPerformanceCounter's clock) |
+| 96 | 8 | u64 | `publishNanos` | |
+
+**Slot data** at `4096 + i × slotStride`, each layer `width × height × 4` bytes, in this order: the world colour
+(RGBA8, premultiplied alpha, empty pixels `0,0,0,0`), the world depth (f32), and the overlay (RGBA8, premultiplied:
+the owner's hand, the HUD and any screen). The host draws the world where it is nearer than its own depth and the
+overlay on top. MC publishes a slot by writing it with an odd `seq`, setting `seq` even, then `latestSlot`, then
+bumping `publishCounter`.

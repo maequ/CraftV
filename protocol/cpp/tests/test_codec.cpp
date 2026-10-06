@@ -442,3 +442,96 @@ TEST_CASE("codec: v1.1 validation rejects bad values")
 	info.addressBytes = 65;
 	CHECK(!codec::Valid(info));
 }
+
+TEST_CASE("codec: v1.2 direction rules and sizes (PROTOCOL.md §7 table)")
+{
+	for (auto type : { kMsgCamera, kMsgView, kMsgInput }) {
+		CHECK(codec::AllowedFrom(type, Role::kHost));
+		CHECK(!codec::AllowedFrom(type, Role::kMc));
+	}
+	CHECK(codec::AllowedFrom(kMsgOwnerState, Role::kMc));
+	CHECK(!codec::AllowedFrom(kMsgOwnerState, Role::kHost));
+	CHECK_EQ(codec::FixedPayloadBytes(kMsgCamera), std::uint32_t(96));
+	CHECK_EQ(codec::FixedPayloadBytes(kMsgView), std::uint32_t(16));
+	CHECK_EQ(codec::FixedPayloadBytes(kMsgInput), std::uint32_t(8));
+	CHECK_EQ(codec::FixedPayloadBytes(kMsgOwnerState), std::uint32_t(16));
+}
+
+TEST_CASE("codec: v1.2 goldens decode back to the documented fields")
+{
+	int seen = 0;
+	for (const auto& v : golden::AllVectors()) {
+		RecordHeader h;
+		std::memcpy(&h, v.record.data(), sizeof(h));
+		const std::uint8_t* p = v.record.data() + kRecordHeaderBytes;
+		if (v.name == "CAMERA") {
+			CameraMsg m;
+			REQUIRE(codec::Decode(h, p, m));
+			CHECK(m.frame == 123456u && m.z == 1447.25 && m.feetY == 29.625 && m.fovY == 50.0f);
+			CHECK_EQ(m.flags, std::uint32_t(kCameraFirstPerson | kCameraPassthrough));
+			++seen;
+		} else if (v.name == "VIEW") {
+			ViewMsg m;
+			REQUIRE(codec::Decode(h, p, m));
+			CHECK(m.width == 1920 && m.height == 1080 && m.hostWidth == 2560);
+			++seen;
+		} else if (v.name == "INPUT") {
+			InputMsg m;
+			REQUIRE(codec::Decode(h, p, m));
+			CHECK(m.kind == kInputButton && m.button == kButtonAttack && m.down == 1);
+			++seen;
+		} else if (v.name == "OWNER_STATE") {
+			OwnerStateMsg m;
+			REQUIRE(codec::Decode(h, p, m));
+			CHECK(m.held == kHeldPickaxe && m.health == 17 && m.attackCharge == 0.75f);
+			++seen;
+		}
+	}
+	CHECK_EQ(seen, 4);
+}
+
+TEST_CASE("codec: v1.2 validation rejects bad values")
+{
+	auto cam = golden::Camera();
+	CHECK(codec::Valid(cam));
+	auto bad = cam;
+	bad.fovY = 0.5f;
+	CHECK(!codec::Valid(bad));
+	bad = cam;
+	bad.pitch = 91.0f;
+	CHECK(!codec::Valid(bad));
+	bad = cam;
+	bad.flags = 1u << 3;
+	CHECK(!codec::Valid(bad));
+	bad = cam;
+	bad.feetY = 5000.0;
+	CHECK(!codec::Valid(bad));
+	bad = cam;
+	bad.roll = std::numeric_limits<float>::quiet_NaN();
+	CHECK(!codec::Valid(bad));
+
+	CHECK(codec::Valid(golden::View()));
+	CHECK(!codec::Valid(ViewMsg{ 3840, 2160, 3840, 2160 }));  // more pixels than VIEW_MAX_PIXELS
+	CHECK(!codec::Valid(ViewMsg{ 32, 1080, 0, 0 }));
+	CHECK(codec::Valid(ViewMsg{ 2560, 1080, 5120, 2160 }));
+
+	CHECK(codec::Valid(golden::Input()));
+	CHECK(codec::Valid(InputMsg{ kInputSlot, 0, 0, 8, 0 }));
+	CHECK(!codec::Valid(InputMsg{ kInputSlot, 0, 0, 9, 0 }));
+	CHECK(codec::Valid(InputMsg{ kInputScroll, 0, 0, -1, 0 }));
+	CHECK(!codec::Valid(InputMsg{ kInputScroll, 0, 0, 0, 0 }));
+	CHECK(!codec::Valid(InputMsg{ kInputButton, 8, 1, 0, 0 }));
+	CHECK(!codec::Valid(InputMsg{ 4, 0, 0, 0, 0 }));
+
+	auto owner = golden::OwnerState();
+	CHECK(codec::Valid(owner));
+	auto badOwner = owner;
+	badOwner.held = 8;
+	CHECK(!codec::Valid(badOwner));
+	badOwner = owner;
+	badOwner.attackCharge = 1.5f;
+	CHECK(!codec::Valid(badOwner));
+	badOwner = owner;
+	badOwner.flags = 4;
+	CHECK(!codec::Valid(badOwner));
+}

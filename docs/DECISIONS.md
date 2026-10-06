@@ -168,6 +168,16 @@ once. Each column is one straight-down ray from 1200 m to -250 m against map col
 means friends stand on roofs and bridges, which is the "blocky copy" a friend sees; underneath bridges isn't
 modelled yet (KNOWN_LIMITATIONS).
 
+### D-027: Protocol v1.2 for the passthrough, plus a separate frame mapping (2026-10-06)
+**Decision:** Four fixed-size messages: `CAMERA` (H→M, every host frame), `VIEW` (H→M, Minecraft's window size),
+`INPUT` (H→M, the owner's forwarded buttons, hotbar slot and scroll) and `OWNER_STATE` (M→H, held item, health,
+food, attack charge, for melee hits on GTA's people). Frames don't go through the rings: MC writes them into
+`Local\CraftV_Frame_v1` (PROTOCOL.md §11), the reference project's three-slot seqlock layout with CraftV's own
+magic. Its slots are sized for `VIEW_MAX_PIXELS = 2560 × 1440` per layer (about 133 MB in all) instead of 4K.
+**Reason:** The rings carry small messages with back-pressure; a 30 MB frame per tick doesn't belong there. Keeping the
+reference's frame layout lets its compositor and effect be ported nearly unchanged. Typed messages instead of the
+reference's JSON keep CraftV's rule of validating every field.
+
 ### D-026: Phase 3 is the passthrough: Sary plays as a Minecraft player in GTA (2026-10-05)
 **Decision:** Phase 3 draws the hidden Minecraft into GTA's picture with a ReShade add-on, like
 minecraft-gta5-passthrough (rehan-remade, MIT), instead of spawning GTA characters for friends. The camera,

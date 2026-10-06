@@ -610,6 +610,167 @@ public final class Messages {
 		}
 	}
 
+	// ---- §7.15 CAMERA (v1.2) ---------------------------------------------------------------------
+	public record Camera(long frame, long timeUs, double x, double y, double z, float yaw, float pitch, float roll, float fovY, double feetX, double feetY,
+		double feetZ, float bodyYaw, int flags, float nearClip, float farClip) implements Payload {
+		@Override
+		public int type() {
+			return MSG_CAMERA;
+		}
+
+		@Override
+		public int payloadBytes() {
+			return CAMERA_BYTES;
+		}
+
+		@Override
+		public void write(MemorySegment s, long off) {
+			s.set(I64, off, frame);
+			s.set(I64, off + 8, timeUs);
+			s.set(F64, off + 16, x);
+			s.set(F64, off + 24, y);
+			s.set(F64, off + 32, z);
+			s.set(F32, off + 40, yaw);
+			s.set(F32, off + 44, pitch);
+			s.set(F32, off + 48, roll);
+			s.set(F32, off + 52, fovY);
+			s.set(F64, off + 56, feetX);
+			s.set(F64, off + 64, feetY);
+			s.set(F64, off + 72, feetZ);
+			s.set(F32, off + 80, bodyYaw);
+			s.set(I32, off + 84, flags);
+			s.set(F32, off + 88, nearClip);
+			s.set(F32, off + 92, farClip);
+		}
+
+		public static Camera read(MemorySegment s, long off) {
+			return new Camera(s.get(I64, off), s.get(I64, off + 8), s.get(F64, off + 16), s.get(F64, off + 24), s.get(F64, off + 32), s.get(F32, off + 40),
+				s.get(F32, off + 44), s.get(F32, off + 48), s.get(F32, off + 52), s.get(F64, off + 56), s.get(F64, off + 64), s.get(F64, off + 72),
+				s.get(F32, off + 80), s.get(I32, off + 84), s.get(F32, off + 88), s.get(F32, off + 92));
+		}
+
+		public boolean firstPerson() {
+			return (flags & CAMERA_FIRST_PERSON) != 0;
+		}
+
+		public boolean passthrough() {
+			return (flags & CAMERA_PASSTHROUGH) != 0;
+		}
+
+		public boolean valid() {
+			if (!positionOk(x, y, z) || !positionOk(feetX, feetY, feetZ)) {
+				return false;
+			}
+			if (!Float.isFinite(yaw) || !Float.isFinite(pitch) || !Float.isFinite(roll) || !Float.isFinite(fovY) || !Float.isFinite(bodyYaw)
+				|| !Float.isFinite(nearClip) || !Float.isFinite(farClip)) {
+				return false;
+			}
+			return pitch >= -90.0F && pitch <= 90.0F && fovY >= MIN_FOV && fovY <= MAX_FOV && (flags & ~CAMERA_KNOWN_FLAGS) == 0 && nearClip >= 0.0F
+				&& farClip >= 0.0F;
+		}
+	}
+
+	// ---- §7.16 VIEW (v1.2) -----------------------------------------------------------------------
+	public record View(int width, int height, int hostWidth, int hostHeight) implements Payload {
+		@Override
+		public int type() {
+			return MSG_VIEW;
+		}
+
+		@Override
+		public int payloadBytes() {
+			return VIEW_BYTES;
+		}
+
+		@Override
+		public void write(MemorySegment s, long off) {
+			s.set(I32, off, width);
+			s.set(I32, off + 4, height);
+			s.set(I32, off + 8, hostWidth);
+			s.set(I32, off + 12, hostHeight);
+		}
+
+		public static View read(MemorySegment s, long off) {
+			return new View(s.get(I32, off), s.get(I32, off + 4), s.get(I32, off + 8), s.get(I32, off + 12));
+		}
+
+		public boolean valid() {
+			return width >= VIEW_MIN_SIDE && width <= VIEW_MAX_WIDTH && height >= VIEW_MIN_SIDE && height <= VIEW_MAX_HEIGHT
+				&& (long) width * height <= VIEW_MAX_PIXELS && hostWidth >= 0 && hostWidth <= HOST_MAX_SIDE && hostHeight >= 0 && hostHeight <= HOST_MAX_SIDE;
+		}
+	}
+
+	// ---- §7.17 INPUT (v1.2) ----------------------------------------------------------------------
+	public record Input(int kind, int button, int down, int value) implements Payload {
+		@Override
+		public int type() {
+			return MSG_INPUT;
+		}
+
+		@Override
+		public int payloadBytes() {
+			return INPUT_BYTES;
+		}
+
+		@Override
+		public void write(MemorySegment s, long off) {
+			s.set(U8, off, (byte) kind);
+			s.set(U8, off + 1, (byte) button);
+			s.set(U8, off + 2, (byte) down);
+			s.set(U8, off + 3, (byte) value);
+			s.set(I32, off + 4, 0);
+		}
+
+		public static Input read(MemorySegment s, long off) {
+			return new Input(Byte.toUnsignedInt(s.get(U8, off)), Byte.toUnsignedInt(s.get(U8, off + 1)), Byte.toUnsignedInt(s.get(U8, off + 2)),
+				s.get(U8, off + 3));
+		}
+
+		public boolean valid() {
+			return switch (kind) {
+				case INPUT_BUTTON -> button >= BUTTON_ATTACK && button <= BUTTON_CLOSE_SCREEN && (down == 0 || down == 1) && value == 0;
+				case INPUT_SLOT -> button == 0 && down == 0 && value >= 0 && value < HOTBAR_SLOTS;
+				case INPUT_SCROLL -> button == 0 && down == 0 && value != 0 && value >= -HOTBAR_SLOTS && value <= HOTBAR_SLOTS;
+				default -> false;
+			};
+		}
+	}
+
+	// ---- §7.18 OWNER_STATE (v1.2) ----------------------------------------------------------------
+	public record OwnerState(int held, int health, int food, int gameMode, float attackDamage, float attackCharge, int flags) implements Payload {
+		@Override
+		public int type() {
+			return MSG_OWNER_STATE;
+		}
+
+		@Override
+		public int payloadBytes() {
+			return OWNER_STATE_BYTES;
+		}
+
+		@Override
+		public void write(MemorySegment s, long off) {
+			s.set(U8, off, (byte) held);
+			s.set(U8, off + 1, (byte) health);
+			s.set(U8, off + 2, (byte) food);
+			s.set(U8, off + 3, (byte) gameMode);
+			s.set(F32, off + 4, attackDamage);
+			s.set(F32, off + 8, attackCharge);
+			s.set(I32, off + 12, flags);
+		}
+
+		public static OwnerState read(MemorySegment s, long off) {
+			return new OwnerState(Byte.toUnsignedInt(s.get(U8, off)), Byte.toUnsignedInt(s.get(U8, off + 1)), Byte.toUnsignedInt(s.get(U8, off + 2)),
+				Byte.toUnsignedInt(s.get(U8, off + 3)), s.get(F32, off + 4), s.get(F32, off + 8), s.get(I32, off + 12));
+		}
+
+		public boolean valid() {
+			return held >= HELD_EMPTY && held <= HELD_OTHER && health >= 0 && health <= 255 && food >= 0 && food <= MAX_FOOD && gameMode >= 0
+				&& gameMode <= GAME_MODE_MAX && Float.isFinite(attackDamage) && attackDamage >= 0.0F && attackDamage <= MAX_ATTACK_DAMAGE
+				&& Float.isFinite(attackCharge) && attackCharge >= 0.0F && attackCharge <= 1.0F && (flags & ~OWNER_KNOWN_FLAGS) == 0;
+		}
+	}
+
 	/** UTF-8 helpers shared by HELLO and LOG. */
 	public static final class Text {
 		static final int FNV_OFFSET_BASIS = 0x811C9DC5;

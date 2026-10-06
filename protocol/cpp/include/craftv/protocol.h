@@ -18,7 +18,7 @@ namespace craftv::proto
 	// ---- identity (PROTOCOL.md §2, §3) --------------------------------------------------------
 	inline constexpr std::uint32_t kMagic = 0x56465243;  // bytes 43 52 46 56 = "CRFV"
 	inline constexpr std::uint16_t kVersionMajor = 1;
-	inline constexpr std::uint16_t kVersionMinor = 1;
+	inline constexpr std::uint16_t kVersionMinor = 2;
 	inline constexpr wchar_t       kDefaultMappingName[] = L"Local\\CraftV_Shared_v1";
 
 	enum class Role : std::uint32_t
@@ -179,6 +179,10 @@ namespace craftv::proto
 		kMsgTerrainRequest = 11,
 		kMsgTerrainPatch = 12,
 		kMsgSessionInfo = 13,
+		kMsgCamera = 14,
+		kMsgView = 15,
+		kMsgInput = 16,
+		kMsgOwnerState = 17,
 		kMsgTestPattern = 0x7F00,
 	};
 	inline constexpr std::uint16_t kTypeVersion1 = 1;
@@ -483,6 +487,135 @@ namespace craftv::proto
 	static_assert(offsetof(SessionInfoMsg, gameMode) == 10);
 	static_assert(offsetof(SessionInfoMsg, addressBytes) == 12);
 	static_assert(offsetof(SessionInfoMsg, address) == 16);
+
+	// §7.15 (v1.2)
+	enum CameraFlags : std::uint32_t
+	{
+		kCameraFirstPerson = 1u << 0,
+		kCameraPassthrough = 1u << 1,  // the host composites MC's frame export (§11): render the owner's view for it
+		kCameraInVehicle = 1u << 2,
+	};
+	inline constexpr std::uint32_t kCameraKnownFlags = kCameraFirstPerson | kCameraPassthrough | kCameraInVehicle;
+	inline constexpr float         kMinFov = 1.0f;
+	inline constexpr float         kMaxFov = 179.0f;
+	struct CameraMsg
+	{
+		static constexpr MsgType kType = kMsgCamera;
+		std::uint64_t frame;
+		std::uint64_t timeUs;
+		double        x, y, z;
+		float         yaw, pitch, roll, fovY;
+		double        feetX, feetY, feetZ;
+		float         bodyYaw;
+		std::uint32_t flags;
+		float         nearClip, farClip;
+	};
+	static_assert(sizeof(CameraMsg) == 96);
+	static_assert(offsetof(CameraMsg, timeUs) == 8);
+	static_assert(offsetof(CameraMsg, x) == 16);
+	static_assert(offsetof(CameraMsg, yaw) == 40);
+	static_assert(offsetof(CameraMsg, fovY) == 52);
+	static_assert(offsetof(CameraMsg, feetX) == 56);
+	static_assert(offsetof(CameraMsg, bodyYaw) == 80);
+	static_assert(offsetof(CameraMsg, flags) == 84);
+	static_assert(offsetof(CameraMsg, nearClip) == 88);
+
+	// §7.16 (v1.2)
+	inline constexpr std::uint32_t kViewMinSide = 64;
+	inline constexpr std::uint32_t kViewMaxWidth = 3840;
+	inline constexpr std::uint32_t kViewMaxHeight = 2160;
+	inline constexpr std::uint64_t kViewMaxPixels = 2560ull * 1440;
+	inline constexpr std::uint32_t kHostMaxSide = 16384;
+	struct ViewMsg
+	{
+		static constexpr MsgType kType = kMsgView;
+		std::uint32_t width, height;
+		std::uint32_t hostWidth, hostHeight;
+	};
+	static_assert(sizeof(ViewMsg) == 16);
+	static_assert(offsetof(ViewMsg, hostWidth) == 8);
+
+	// §7.17 (v1.2)
+	enum InputKind : std::uint8_t
+	{
+		kInputButton = 1,
+		kInputSlot = 2,
+		kInputScroll = 3,
+	};
+	enum InputButton : std::uint8_t
+	{
+		kButtonAttack = 1,
+		kButtonUse = 2,
+		kButtonPick = 3,
+		kButtonDrop = 4,
+		kButtonInventory = 5,
+		kButtonSwapHands = 6,
+		kButtonCloseScreen = 7,
+	};
+	inline constexpr std::int8_t kHotbarSlots = 9;
+	struct InputMsg
+	{
+		static constexpr MsgType kType = kMsgInput;
+		std::uint8_t  kind;
+		std::uint8_t  button;
+		std::uint8_t  down;
+		std::int8_t   value;
+		std::uint32_t reserved0;
+	};
+	static_assert(sizeof(InputMsg) == 8);
+	static_assert(offsetof(InputMsg, value) == 3);
+
+	// §7.18 (v1.2)
+	enum HeldKind : std::uint8_t
+	{
+		kHeldEmpty = 0,
+		kHeldSword = 1,
+		kHeldAxe = 2,
+		kHeldPickaxe = 3,
+		kHeldShovel = 4,
+		kHeldHoe = 5,
+		kHeldBlock = 6,
+		kHeldOther = 7,
+	};
+	enum OwnerFlags : std::uint32_t
+	{
+		kOwnerDead = 1u << 0,
+		kOwnerScreenOpen = 1u << 1,
+	};
+	inline constexpr std::uint32_t kOwnerKnownFlags = kOwnerDead | kOwnerScreenOpen;
+	inline constexpr std::uint8_t  kMaxFood = 20;
+	inline constexpr float         kMaxAttackDamage = 1000.0f;
+	struct OwnerStateMsg
+	{
+		static constexpr MsgType kType = kMsgOwnerState;
+		std::uint8_t  held;
+		std::uint8_t  health;
+		std::uint8_t  food;
+		std::uint8_t  gameMode;
+		float         attackDamage;
+		float         attackCharge;
+		std::uint32_t flags;
+	};
+	static_assert(sizeof(OwnerStateMsg) == 16);
+	static_assert(offsetof(OwnerStateMsg, attackDamage) == 4);
+	static_assert(offsetof(OwnerStateMsg, flags) == 12);
+
+	// §11 (v1.2): the frame mapping MC writes for the passthrough
+	inline constexpr const wchar_t* kFrameMappingName = L"Local\\CraftV_Frame_v1";
+	inline constexpr std::uint32_t  kFrameMagic = 0x52465643;  // bytes 43 56 46 52 = "CVFR"
+	inline constexpr std::uint32_t  kFrameVersion = 1;
+	inline constexpr std::uint32_t  kFrameHeaderBytes = 4096;
+	inline constexpr std::uint32_t  kFrameSlotDescOffset = 256;
+	inline constexpr std::uint32_t  kFrameSlotDescBytes = 128;
+	inline constexpr std::uint32_t  kFrameSlots = 3;
+	inline constexpr std::uint64_t  kFrameLayerMaxBytes = kViewMaxPixels * 4;
+	inline constexpr std::uint64_t  kFrameSlotStride = kFrameLayerMaxBytes * 3;
+	enum FrameFlags : std::uint32_t
+	{
+		kFrameDepthZeroToOne = 1u << 0,
+		kFrameBottomUp = 1u << 1,
+		kFrameReversedZ = 1u << 2,
+	};
 
 	// §7.14 (test only)
 	inline constexpr std::uint32_t kTestPatternFixedBytes = 16;

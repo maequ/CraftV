@@ -34,6 +34,10 @@ namespace craftv::codec
 	bool Valid(const TerrainRequestMsg& a_msg);
 	bool Valid(const TerrainPatchMsg& a_msg);
 	bool Valid(const SessionInfoMsg& a_msg);
+	bool Valid(const CameraMsg& a_msg);
+	bool Valid(const ViewMsg& a_msg);
+	bool Valid(const InputMsg& a_msg);
+	bool Valid(const OwnerStateMsg& a_msg);
 
 	// Copies the known prefix of a payload into a_out and validates it. Shorter payloads are malformed;
 	// longer ones are accepted (forward compatibility, §9). The payload pointer may point into shared

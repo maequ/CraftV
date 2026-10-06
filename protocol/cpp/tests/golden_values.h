@@ -33,6 +33,10 @@ namespace craftv::golden
 	proto::TerrainRequestMsg    TerrainRequest();
 	proto::TerrainPatchMsg      TerrainPatch();
 	proto::SessionInfoMsg       SessionInfo();
+	proto::CameraMsg            Camera();
+	proto::ViewMsg              View();
+	proto::InputMsg             Input();
+	proto::OwnerStateMsg        OwnerState();
 
 	// Every golden record, in file order, encoded with the C++ codec.
 	std::vector<Vector> AllVectors();

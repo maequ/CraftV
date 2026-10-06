@@ -57,6 +57,9 @@ class GoldenVectorsTest {
 		return new Messages.TerrainPatch(-3, 7, 42, 0, ground, water, material);
 	}
 
+	static final Messages.Camera CAMERA = new Messages.Camera(123456L, 987654321L, -16.5, 31.625, 1447.25, 135.5F, -12.25F, 1.5F, 50.0F, -16.0, 29.625,
+		1446.0, 130.0F, CAMERA_FIRST_PERSON | CAMERA_PASSTHROUGH, 0.25F, 10000.0F);
+
 	static Map<String, Messages.Payload> documented() {
 		Map<String, Messages.Payload> m = new LinkedHashMap<>();
 		m.put("HELLO", Messages.Hello.of(ROLE_HOST, 4242, SESSION, "CraftV-Golden"));
@@ -72,6 +75,10 @@ class GoldenVectorsTest {
 		m.put("TERRAIN_REQUEST", new Messages.TerrainRequest(-3, 7, 42, 2));
 		m.put("TERRAIN_PATCH", terrainPatch());
 		m.put("SESSION_INFO", new Messages.SessionInfo(SESSION_OPEN | SESSION_AUTH, 25565, 2, 8, 1, "192.168.1.23:25565"));
+		m.put("CAMERA", CAMERA);
+		m.put("VIEW", new Messages.View(1920, 1080, 2560, 1440));
+		m.put("INPUT", new Messages.Input(INPUT_BUTTON, BUTTON_ATTACK, 1, 0));
+		m.put("OWNER_STATE", new Messages.OwnerState(HELD_PICKAXE, 17, 18, 0, 5.0F, 0.75F, 0));
 		m.put("TEST_PATTERN", new Messages.TestPattern(5));
 		return m;
 	}
@@ -158,6 +165,14 @@ class GoldenVectorsTest {
 					assertEquals("192.168.1.23:25565", m.address());
 					assertEquals(25565, m.port());
 				}
+				case "CAMERA" -> {
+					var m = Messages.Camera.read(s, p);
+					assertTrue(m.valid());
+					assertEquals(CAMERA, m);
+				}
+				case "VIEW" -> assertEquals(new Messages.View(1920, 1080, 2560, 1440), Messages.View.read(s, p));
+				case "INPUT" -> assertEquals(new Messages.Input(INPUT_BUTTON, BUTTON_ATTACK, 1, 0), Messages.Input.read(s, p));
+				case "OWNER_STATE" -> assertEquals(new Messages.OwnerState(HELD_PICKAXE, 17, 18, 0, 5.0F, 0.75F, 0), Messages.OwnerState.read(s, p));
 				default -> fail("unexpected golden " + e.getKey());
 			}
 		}
@@ -206,5 +221,27 @@ class GoldenVectorsTest {
 		String s = "a".repeat(LOG_TEXT_MAX_BYTES - 1) + "✓";
 		assertEquals(LOG_TEXT_MAX_BYTES - 1, Messages.Text.truncateUtf8(s, LOG_TEXT_MAX_BYTES).length);
 		assertEquals(SOFTWARE_MAX_BYTES, Messages.Text.truncateUtf8("x".repeat(60), SOFTWARE_MAX_BYTES).length);
+	}
+
+	@Test
+	void v12ValidationAndDirections() {
+		assertTrue(CAMERA.valid());
+		assertFalse(new Messages.Camera(1, 1, 0, 64, 0, 0, 0, 0, 0.5F, 0, 64, 0, 0, 0, 0, 0).valid(), "fov below 1");
+		assertFalse(new Messages.Camera(1, 1, 0, 64, 0, 0, 91, 0, 70, 0, 64, 0, 0, 0, 0, 0).valid(), "pitch above 90");
+		assertFalse(new Messages.Camera(1, 1, 0, 64, 0, 0, 0, 0, 70, 0, 64, 0, 0, 1 << 3, 0, 0).valid(), "unknown flag");
+		assertFalse(new Messages.Camera(1, 1, 0, 64, 0, 0, 0, Float.NaN, 70, 0, 64, 0, 0, 0, 0, 0).valid());
+		assertFalse(new Messages.View(3840, 2160, 3840, 2160).valid(), "more pixels than VIEW_MAX_PIXELS");
+		assertTrue(new Messages.View(2560, 1080, 5120, 2160).valid());
+		assertTrue(new Messages.Input(INPUT_SLOT, 0, 0, 8).valid());
+		assertFalse(new Messages.Input(INPUT_SLOT, 0, 0, 9).valid());
+		assertTrue(new Messages.Input(INPUT_SCROLL, 0, 0, -1).valid());
+		assertFalse(new Messages.Input(INPUT_SCROLL, 0, 0, 0).valid());
+		assertFalse(new Messages.Input(INPUT_BUTTON, 8, 1, 0).valid());
+		assertFalse(new Messages.OwnerState(8, 20, 20, 0, 1, 1, 0).valid());
+		assertFalse(new Messages.OwnerState(HELD_SWORD, 20, 20, 0, 1, 1.5F, 0).valid());
+		assertTrue(allowedFrom(MSG_CAMERA, ROLE_HOST));
+		assertFalse(allowedFrom(MSG_CAMERA, ROLE_MC));
+		assertTrue(allowedFrom(MSG_OWNER_STATE, ROLE_MC));
+		assertFalse(allowedFrom(MSG_OWNER_STATE, ROLE_HOST));
 	}
 }

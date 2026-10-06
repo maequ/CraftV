@@ -77,6 +77,14 @@ namespace craftv::codec
 			return sizeof(TerrainPatchMsg);
 		case kMsgSessionInfo:
 			return sizeof(SessionInfoMsg);
+		case kMsgCamera:
+			return sizeof(CameraMsg);
+		case kMsgView:
+			return sizeof(ViewMsg);
+		case kMsgInput:
+			return sizeof(InputMsg);
+		case kMsgOwnerState:
+			return sizeof(OwnerStateMsg);
 		default:
 			return 0;
 		}
@@ -101,9 +109,13 @@ namespace craftv::codec
 		case kMsgRemotePlayerLeave:
 		case kMsgTerrainRequest:
 		case kMsgSessionInfo:
-			return a_sender == Role::kMc;  // §7.8-7.11, §7.13
+		case kMsgOwnerState:
+			return a_sender == Role::kMc;  // §7.8-7.11, §7.13, §7.18
 		case kMsgTerrainPatch:
-			return a_sender == Role::kHost;  // §7.12
+		case kMsgCamera:
+		case kMsgView:
+		case kMsgInput:
+			return a_sender == Role::kHost;  // §7.12, §7.15-7.17
 		case kMsgPlayerState:
 			// MC -> host is reserved for Phase 3 (PROTOCOL.md §7.3); a v1.0 receiver only takes the host's.
 			return a_sender == Role::kHost;
@@ -230,6 +242,46 @@ namespace craftv::codec
 	bool Valid(const SessionInfoMsg& a_msg)
 	{
 		return (a_msg.flags & ~kSessionKnownFlags) == 0 && a_msg.gameMode <= kGameModeMax && a_msg.addressBytes <= kAddressMaxBytes;
+	}
+
+	bool Valid(const CameraMsg& a_msg)
+	{
+		if (!PositionOk(a_msg.x, a_msg.y, a_msg.z) || !PositionOk(a_msg.feetX, a_msg.feetY, a_msg.feetZ)) {
+			return false;
+		}
+		if (!Finite(a_msg.yaw) || !Finite(a_msg.pitch) || !Finite(a_msg.roll) || !Finite(a_msg.fovY) || !Finite(a_msg.bodyYaw) ||
+			!Finite(a_msg.nearClip) || !Finite(a_msg.farClip)) {
+			return false;
+		}
+		return a_msg.pitch >= -90.0f && a_msg.pitch <= 90.0f && a_msg.fovY >= kMinFov && a_msg.fovY <= kMaxFov &&
+		       (a_msg.flags & ~kCameraKnownFlags) == 0 && a_msg.nearClip >= 0.0f && a_msg.farClip >= 0.0f;
+	}
+
+	bool Valid(const ViewMsg& a_msg)
+	{
+		return a_msg.width >= kViewMinSide && a_msg.width <= kViewMaxWidth && a_msg.height >= kViewMinSide && a_msg.height <= kViewMaxHeight &&
+		       std::uint64_t(a_msg.width) * a_msg.height <= kViewMaxPixels && a_msg.hostWidth <= kHostMaxSide && a_msg.hostHeight <= kHostMaxSide;
+	}
+
+	bool Valid(const InputMsg& a_msg)
+	{
+		switch (a_msg.kind) {
+		case kInputButton:
+			return a_msg.button >= kButtonAttack && a_msg.button <= kButtonCloseScreen && a_msg.down <= 1 && a_msg.value == 0;
+		case kInputSlot:
+			return a_msg.button == 0 && a_msg.down == 0 && a_msg.value >= 0 && a_msg.value < kHotbarSlots;
+		case kInputScroll:
+			return a_msg.button == 0 && a_msg.down == 0 && a_msg.value != 0 && a_msg.value >= -kHotbarSlots && a_msg.value <= kHotbarSlots;
+		default:
+			return false;
+		}
+	}
+
+	bool Valid(const OwnerStateMsg& a_msg)
+	{
+		return a_msg.held <= kHeldOther && a_msg.food <= kMaxFood && a_msg.gameMode <= kGameModeMax && Finite(a_msg.attackDamage) &&
+		       a_msg.attackDamage >= 0.0f && a_msg.attackDamage <= kMaxAttackDamage && Finite(a_msg.attackCharge) && a_msg.attackCharge >= 0.0f &&
+		       a_msg.attackCharge <= 1.0f && (a_msg.flags & ~kOwnerKnownFlags) == 0;
 	}
 
 	void SetPlayerName(RemotePlayerJoinMsg& a_msg, const char* a_name)

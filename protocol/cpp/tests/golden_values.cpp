@@ -147,6 +147,54 @@ namespace craftv::golden
 		return m;
 	}
 
+	CameraMsg Camera()
+	{
+		CameraMsg m{};
+		m.frame = 123456;
+		m.timeUs = 987654321;
+		m.x = -16.5;
+		m.y = 31.625;
+		m.z = 1447.25;
+		m.yaw = 135.5f;
+		m.pitch = -12.25f;
+		m.roll = 1.5f;
+		m.fovY = 50.0f;
+		m.feetX = -16.0;
+		m.feetY = 29.625;
+		m.feetZ = 1446.0;
+		m.bodyYaw = 130.0f;
+		m.flags = kCameraFirstPerson | kCameraPassthrough;
+		m.nearClip = 0.25f;
+		m.farClip = 10000.0f;
+		return m;
+	}
+
+	ViewMsg View()
+	{
+		return ViewMsg{ 1920, 1080, 2560, 1440 };
+	}
+
+	InputMsg Input()
+	{
+		InputMsg m{};
+		m.kind = kInputButton;
+		m.button = kButtonAttack;
+		m.down = 1;
+		return m;
+	}
+
+	OwnerStateMsg OwnerState()
+	{
+		OwnerStateMsg m{};
+		m.held = kHeldPickaxe;
+		m.health = 17;
+		m.food = 18;
+		m.gameMode = 0;
+		m.attackDamage = 5.0f;
+		m.attackCharge = 0.75f;
+		return m;
+	}
+
 	namespace
 	{
 		template <class T>
@@ -174,6 +222,10 @@ namespace craftv::golden
 		all.push_back(Make("TERRAIN_REQUEST", TerrainRequest()));
 		all.push_back(Make("TERRAIN_PATCH", TerrainPatch()));
 		all.push_back(Make("SESSION_INFO", SessionInfo()));
+		all.push_back(Make("CAMERA", Camera()));
+		all.push_back(Make("VIEW", View()));
+		all.push_back(Make("INPUT", Input()));
+		all.push_back(Make("OWNER_STATE", OwnerState()));
 
 		std::uint8_t        payload[kTestPatternFixedBytes + kTestPatternMaxFill];
 		const std::uint32_t bytes = codec::BuildTestPattern(kTestPatternIndex, payload);

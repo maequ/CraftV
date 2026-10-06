@@ -31,7 +31,7 @@ public final class Proto {
 	// ---- identity (§2, §3) ----------------------------------------------------------------------
 	public static final int MAGIC = 0x56465243; // bytes 43 52 46 56 = "CRFV"
 	public static final int VERSION_MAJOR = 1;
-	public static final int VERSION_MINOR = 1;
+	public static final int VERSION_MINOR = 2;
 	public static final String DEFAULT_MAPPING_NAME = "Local\\CraftV_Shared_v1";
 
 	public static final int ROLE_NONE = 0;
@@ -106,8 +106,9 @@ public final class Proto {
 			return false;
 		}
 		return switch (type) {
-			case MSG_PLAYER_STATE, MSG_TERRAIN_PATCH -> senderRole == ROLE_HOST; // §7.3: MC -> host is reserved
-			case MSG_REMOTE_PLAYER_JOIN, MSG_REMOTE_PLAYER_STATE, MSG_REMOTE_PLAYER_LEAVE, MSG_TERRAIN_REQUEST, MSG_SESSION_INFO -> senderRole == ROLE_MC;
+			case MSG_PLAYER_STATE, MSG_TERRAIN_PATCH, MSG_CAMERA, MSG_VIEW, MSG_INPUT -> senderRole == ROLE_HOST; // §7.3: MC -> host is reserved
+			case MSG_REMOTE_PLAYER_JOIN, MSG_REMOTE_PLAYER_STATE, MSG_REMOTE_PLAYER_LEAVE, MSG_TERRAIN_REQUEST, MSG_SESSION_INFO, MSG_OWNER_STATE ->
+				senderRole == ROLE_MC;
 			default -> true;
 		};
 	}
@@ -131,6 +132,10 @@ public final class Proto {
 	public static final int MSG_TERRAIN_REQUEST = 11;
 	public static final int MSG_TERRAIN_PATCH = 12;
 	public static final int MSG_SESSION_INFO = 13;
+	public static final int MSG_CAMERA = 14; // v1.2 (§7.15-7.18)
+	public static final int MSG_VIEW = 15;
+	public static final int MSG_INPUT = 16;
+	public static final int MSG_OWNER_STATE = 17;
 	public static final int MSG_TEST_PATTERN = 0x7F00;
 	public static final int TYPE_VERSION_1 = 1;
 
@@ -146,6 +151,10 @@ public final class Proto {
 	public static final int TERRAIN_REQUEST_BYTES = 16;
 	public static final int TERRAIN_PATCH_BYTES = 1296;
 	public static final int SESSION_INFO_BYTES = 96;
+	public static final int CAMERA_BYTES = 96;
+	public static final int VIEW_BYTES = 16;
+	public static final int INPUT_BYTES = 8;
+	public static final int OWNER_STATE_BYTES = 16;
 
 	public static final int SOFTWARE_MAX_BYTES = 40;
 	public static final int PLAYER_ON_GROUND = 1;
@@ -184,6 +193,20 @@ public final class Proto {
 	public static final int SESSION_OPEN = 1, SESSION_AUTH = 1 << 1, SESSION_WHITELIST = 1 << 2;
 	public static final int SESSION_KNOWN_FLAGS = SESSION_OPEN | SESSION_AUTH | SESSION_WHITELIST;
 	public static final int ADDRESS_MAX_BYTES = 64;
+	// §7.15-7.18 passthrough (v1.2)
+	public static final int CAMERA_FIRST_PERSON = 1, CAMERA_PASSTHROUGH = 1 << 1, CAMERA_IN_VEHICLE = 1 << 2;
+	public static final int CAMERA_KNOWN_FLAGS = CAMERA_FIRST_PERSON | CAMERA_PASSTHROUGH | CAMERA_IN_VEHICLE;
+	public static final float MIN_FOV = 1.0F, MAX_FOV = 179.0F;
+	public static final int VIEW_MIN_SIDE = 64, VIEW_MAX_WIDTH = 3840, VIEW_MAX_HEIGHT = 2160, HOST_MAX_SIDE = 16384;
+	public static final long VIEW_MAX_PIXELS = 2560L * 1440;
+	public static final int INPUT_BUTTON = 1, INPUT_SLOT = 2, INPUT_SCROLL = 3;
+	public static final int BUTTON_ATTACK = 1, BUTTON_USE = 2, BUTTON_PICK = 3, BUTTON_DROP = 4, BUTTON_INVENTORY = 5, BUTTON_SWAP_HANDS = 6,
+		BUTTON_CLOSE_SCREEN = 7;
+	public static final int HOTBAR_SLOTS = 9;
+	public static final int HELD_EMPTY = 0, HELD_SWORD = 1, HELD_AXE = 2, HELD_PICKAXE = 3, HELD_SHOVEL = 4, HELD_HOE = 5, HELD_BLOCK = 6, HELD_OTHER = 7;
+	public static final int OWNER_DEAD = 1, OWNER_SCREEN_OPEN = 1 << 1, OWNER_KNOWN_FLAGS = OWNER_DEAD | OWNER_SCREEN_OPEN;
+	public static final int MAX_FOOD = 20;
+	public static final float MAX_ATTACK_DAMAGE = 1000.0F;
 
 	public static final int TEST_PATTERN_FIXED_BYTES = 16;
 	public static final int TEST_PATTERN_MAX_FILL = 256;
