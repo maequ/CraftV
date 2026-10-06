@@ -1,5 +1,9 @@
 package dev.craftv;
 
+import dev.craftv.terrain.TerrainIndex;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.Level;
 import static dev.craftv.link.Proto.*;
 
 import dev.craftv.link.Messages;
@@ -33,14 +37,33 @@ public final class BlockSync {
 	private BlockSync() {
 	}
 
+	/**
+	 * Whether a block should be solid in the host game (PROTOCOL.md §7.19 SOLID): a full collision cube that isn't
+	 * CraftV's terrain and stands above the terrain's surface (inside the ground the host's own ground is solid).
+	 */
+	public static boolean solidForHost(Level level, BlockPos pos, BlockState state) {
+		if (state.isAir() || !state.isCollisionShapeFullBlock(level, pos)) {
+			return false;
+		}
+		if (TerrainIndex.isTerrain(pos.getX(), pos.getY(), pos.getZ(), state)) {
+			return false;
+		}
+		TerrainIndex.Columns c = TerrainIndex.get(pos.getX() >> 4, pos.getZ() >> 4);
+		if (c == null) {
+			return true;
+		}
+		short ground = c.groundY()[Messages.TerrainPatch.column(pos.getX() & 15, pos.getZ() & 15)];
+		return ground == NO_GROUND || pos.getY() > ground;
+	}
+
 	/** From LevelChunkMixin, after a chunk's block actually changed (server side only). */
-	public static void onBlockChanged(BlockPos pos, BlockState newState) {
+	public static void onBlockChanged(Level level, BlockPos pos, BlockState newState) {
 		LinkService link = LinkService.get();
 		if (!link.connected() || SILENT.get() != null) {
-			return; // Phase 4 will resync on (re)connect; see KNOWN_LIMITATIONS.md
+			return; // the host asks for what it missed with BLOCK_REGION_REQUEST (§7.19)
 		}
 		int[] applying = APPLYING.get();
-		int flags = applying != null ? BLOCK_SET_ECHO : 0;
+		int flags = (applying != null ? BLOCK_SET_ECHO : 0) | (solidForHost(level, pos, newState) ? BLOCK_SET_SOLID : 0);
 		int requestId = applying != null ? applying[0] : 0;
 		link.send(new Messages.BlockSet(pos.getX(), pos.getY(), pos.getZ(), Block.getId(newState), flags, requestId));
 		if (applying == null) {
@@ -49,9 +72,53 @@ public final class BlockSync {
 		}
 	}
 
+	private static final int MAX_REGIONS_PER_TICK = 2;
+
+	/**
+	 * Answers the host's BLOCK_REGION_REQUESTs (PROTOCOL.md §7.19): every block of that chunk column that should be
+	 * solid in the host game, as BLOCK_SET SOLID|REGION. Server thread, a couple of chunks per tick.
+	 */
+	private static void answerRegions(MinecraftServer server, LinkService link) {
+		ServerLevel level = dev.craftv.terrain.TerrainService.mirror(server);
+		for (int n = 0; n < MAX_REGIONS_PER_TICK; n++) {
+			Messages.BlockRegionRequest r = link.pollRegionRequest();
+			if (r == null) {
+				return;
+			}
+			LevelChunk chunk = level.getChunk(r.chunkX(), r.chunkZ());
+			LevelChunkSection[] sections = chunk.getSections();
+			BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+			int sent = 0;
+			for (int si = 0; si < sections.length; si++) {
+				LevelChunkSection section = sections[si];
+				if (section.hasOnlyAir()) {
+					continue;
+				}
+				int baseY = level.getSectionYFromSectionIndex(si) << 4;
+				for (int y = 0; y < 16; y++) {
+					for (int z = 0; z < 16; z++) {
+						for (int x = 0; x < 16; x++) {
+							BlockState state = section.getBlockState(x, y, z);
+							if (state.isAir()) {
+								continue;
+							}
+							pos.set(r.chunkX() * 16 + x, baseY + y, r.chunkZ() * 16 + z);
+							if (solidForHost(level, pos, state)) {
+								link.send(new Messages.BlockSet(pos.getX(), pos.getY(), pos.getZ(), Block.getId(state), BLOCK_SET_SOLID | BLOCK_SET_REGION, r.requestId()));
+								sent++;
+							}
+						}
+					}
+				}
+			}
+			CraftLog.limited("region", 2000, "blocks: chunk " + r.chunkX() + ", " + r.chunkZ() + " has " + sent + " solid blocks for the host");
+		}
+	}
+
 	/** Server tick: apply what the host asked for. */
 	public static void applyHostOps(MinecraftServer server) {
 		LinkService link = LinkService.get();
+		answerRegions(server, link);
 		for (int i = 0; i < MAX_HOST_OPS_PER_TICK; i++) {
 			Messages.Payload op = link.pollHostBlockOp();
 			if (op == null) {

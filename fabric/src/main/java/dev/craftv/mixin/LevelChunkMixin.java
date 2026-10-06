@@ -25,6 +25,6 @@ public abstract class LevelChunkMixin {
 		if (self.getLevel().isClientSide()) {
 			return;
 		}
-		BlockSync.onBlockChanged(pos.immutable(), state);
+		BlockSync.onBlockChanged(self.getLevel(), pos.immutable(), state);
 	}
 }

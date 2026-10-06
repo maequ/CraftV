@@ -30,6 +30,18 @@ namespace craftv::host
 		double          meleeDamagePerHalfHeart = 10.0;  // game damage per Minecraft half heart of attack damage
 	};
 
+	// [Blocks]: Minecraft blocks made solid in the game (brief §9).
+	struct BlocksConfig
+	{
+		int   maxProps = 400;         // GTA crashes at ~1500 script objects (measured by minecraft-gta5-passthrough)
+		float spawnRadius = 48.0f;    // metres: blocks this near get collision, nearest first
+		float despawnRadius = 64.0f;  // farther props are removed
+		float forgetRadius = 160.0f;  // farther blocks are forgotten (asked for again on the way back)
+		int   regionRadius = 3;       // chunks around the player asked for with BLOCK_REGION_REQUEST
+		int   regionsPerTick = 2;
+		int   spawnsPerTick = 20;
+	};
+
 	struct Config
 	{
 		// Set by the ASI, not the .ini: the name in HELLO and the logs, e.g. "CraftV-GTA5 0.1.0".
@@ -43,6 +55,8 @@ namespace craftv::host
 		TerrainConfig terrain{};
 		// [Passthrough]
 		PassthroughConfig passthrough{};
+		// [Blocks]
+		BlocksConfig blocks{};
 		// [Debug]
 		bool          debugOverlay = true;
 		OverlayCorner overlayCorner = OverlayCorner::kTopRight;

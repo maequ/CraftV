@@ -156,6 +156,16 @@ namespace
 			return passthrough;
 		}
 		void Melee(float) override { ++melee; }
+
+		// ---- solid blocks: counted, so a run shows Minecraft answering BLOCK_REGION_REQUEST
+		int  props = 0, propsEver = 0;
+		bool BlockPropReady() override { return true; }
+		int  SpawnBlockProp(float, float, float, float) override
+		{
+			++props;
+			return ++propsEver;
+		}
+		void DeleteBlockProp(int) override { --props; }
 	};
 }
 
@@ -202,8 +212,9 @@ int wmain(int argc, wchar_t** argv)
 				for (const auto& l : game.lines) {
 					std::printf("@OVERLAY %s\n", l.c_str());
 				}
-				std::printf("@SIM probes=%llu collisionRequests=%llu\n", static_cast<unsigned long long>(game.probes),
-					static_cast<unsigned long long>(game.collisionRequests));
+				std::printf("@SIM probes=%llu collisionRequests=%llu props=%d known=%d regionsAsked=%llu\n", static_cast<unsigned long long>(game.probes),
+					static_cast<unsigned long long>(game.collisionRequests), game.props, plugin.SolidBlocks().Known(),
+					static_cast<unsigned long long>(plugin.SolidBlocks().RegionsAsked()));
 				std::fflush(stdout);
 			}
 		}

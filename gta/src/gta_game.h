@@ -29,6 +29,11 @@ namespace craftv::host
 		void Melee(float a_damage) override;
 		void Notify(const char* a_text) override;
 
+		// solid blocks (Phase 4): invisible, frozen collision boxes
+		bool BlockPropReady() override;
+		int  SpawnBlockProp(float a_x, float a_y, float a_floorZ, float a_size) override;
+		void DeleteBlockProp(int a_handle) override;
+
 		// the settings menu (F8), drawn with the game's own fonts, textures and sounds
 		void  DrawMenuText(float a_x, float a_y, const TextStyle& a_style, const char* a_text) override;
 		float TextWidth(const TextStyle& a_style, const char* a_text) override;

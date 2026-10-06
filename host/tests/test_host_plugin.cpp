@@ -120,6 +120,26 @@ namespace
 		void Melee(float a_damage) override { melee.push_back(a_damage); }
 		void Notify(const char* a_text) override { notes.emplace_back(a_text); }
 
+		// solid blocks
+		struct Prop
+		{
+			float x, y, floorZ;
+		};
+		std::vector<Prop> props;      // index + 1 = handle; floorZ < -9000 once deleted
+		int               livePropCount = 0;
+		bool BlockPropReady() override { return true; }
+		int  SpawnBlockProp(float a_x, float a_y, float a_floorZ, float) override
+		{
+			props.push_back({ a_x, a_y, a_floorZ });
+			++livePropCount;
+			return static_cast<int>(props.size());
+		}
+		void DeleteBlockProp(int a_handle) override
+		{
+			props[a_handle - 1].floorZ = -9999.0f;
+			--livePropCount;
+		}
+
 		// the settings menu
 		MenuInput                nextMenu{};
 		std::vector<std::string> menuTexts;
@@ -166,6 +186,7 @@ namespace
 		std::vector<CameraMsg>       cameras;
 		std::vector<ViewMsg>         views;
 		std::vector<InputMsg>        inputs;
+		std::vector<BlockRegionRequestMsg> regions;
 
 		explicit Rig(const wchar_t* a_tag, bool a_withMc = true) : name(UniqueName(a_tag))
 		{
@@ -205,6 +226,8 @@ namespace
 							views.push_back(view);
 						} else if (h.type == kMsgInput && codec::Decode(h, p, input)) {
 							inputs.push_back(input);
+						} else if (BlockRegionRequestMsg region; h.type == kMsgBlockRegionRequest && codec::Decode(h, p, region)) {
+							regions.push_back(region);
 						}
 					});
 				}
@@ -836,5 +859,69 @@ TEST_CASE("host settings menu: F8 opens it in the game's style; arrows change se
 	rig.game.menuTexts.clear();
 	rig.Tick(2);
 	CHECK(rig.game.menuTexts.empty());
+}
+
+// ---- solid blocks (Phase 4, PROTOCOL.md §7.19) ---------------------------------------------------
+TEST_CASE("host solid blocks: SOLID blocks near the player get a collision prop on the game's ground; others remove it")
+{
+	Rig rig(L"props");
+	rig.game.sample = StoryPlayer(0, 0, 50, 0);
+	rig.Tick(10);
+	REQUIRE(rig.mc->Connected());
+
+	// a block on CraftV's terrain top (y 50; the game's ground is 49.6 there): its floor goes to 49.6
+	REQUIRE(rig.mc->Send(BlockSetMsg{ 3, 50, -2, 1, kBlockSetSolid, 0 }));
+	REQUIRE(rig.mc->Send(BlockSetMsg{ 3, 51, -2, 1, kBlockSetSolid, 0 }));  // stacked on it
+	REQUIRE(rig.mc->Send(BlockSetMsg{ 5, 50, -2, 1, 0, 0 }));               // not solid (a torch): nothing
+	rig.Tick(3);
+	REQUIRE(rig.game.props.size() == 2);
+	CHECK(rig.plugin->SolidBlocks().Live() == 2);
+	CHECK(std::abs(rig.game.props[0].x - 3.5f) < 1e-4);
+	CHECK(std::abs(rig.game.props[0].y - 1.5f) < 1e-4);  // game y = -(z + 0.5)
+	const float floors[2] = { rig.game.props[0].floorZ, rig.game.props[1].floorZ };
+	CHECK(((std::abs(floors[0] - 49.6f) < 1e-3 && std::abs(floors[1] - 50.6f) < 1e-3) ||
+	       (std::abs(floors[1] - 49.6f) < 1e-3 && std::abs(floors[0] - 50.6f) < 1e-3)));
+
+	// broken (BLOCK_SET air): its prop goes
+	REQUIRE(rig.mc->Send(BlockSetMsg{ 3, 51, -2, 0, 0, 0 }));
+	rig.Tick(2);
+	CHECK(rig.game.livePropCount == 1);
+	CHECK(rig.plugin->SolidBlocks().Known() == 1);
+
+	// far blocks wait; walking away removes the near one's prop
+	REQUIRE(rig.mc->Send(BlockSetMsg{ 500, 50, 0, 1, kBlockSetSolid, 0 }));
+	rig.Tick(2);
+	CHECK(rig.game.livePropCount == 1);
+	rig.game.sample = StoryPlayer(480.0f, 0.0f, 50.0f, 0.0f);
+	rig.Tick(3);
+	CHECK(rig.game.livePropCount == 1);  // the near one went, the far one came
+	CHECK(std::abs(rig.game.props.back().x - 500.5f) < 1e-4);
+
+	// Minecraft restarts: every prop goes, nothing stays solid
+	rig.mc.reset();
+	rig.Tick(120);  // STALE after the 1 s timeout
+	CHECK(rig.game.livePropCount == 0);
+	CHECK(rig.plugin->SolidBlocks().Known() == 0);
+}
+
+TEST_CASE("host solid blocks: nearby chunks are asked for, at most maxProps live, nearest first")
+{
+	Rig rig(L"props2");
+	rig.config.blocks.maxProps = 3;
+	rig.plugin = std::make_unique<HostPlugin>(rig.game, rig.config);
+	rig.game.sample = StoryPlayer(0, 0, 50, 0);
+	rig.Tick(200);
+	REQUIRE(rig.mc->Connected());
+	CHECK(rig.regions.size() >= 9);  // the player's chunk and its ring first
+	CHECK(rig.regions[0].chunkX == 0 && rig.regions[0].chunkZ == 0);
+	for (int i = 0; i < 6; ++i) {
+		REQUIRE(rig.mc->Send(BlockSetMsg{ 10 - i, 50, 0, 1, kBlockSetSolid | kBlockSetRegion, rig.regions[0].requestId }));
+	}
+	rig.Tick(3);
+	CHECK(rig.game.livePropCount == 3);
+	CHECK(rig.plugin->SolidBlocks().CapHits() > 0);
+	for (const auto& p : rig.game.props) {
+		CHECK(p.x < 8.0f);  // the nearest three: x 5, 6, 7 (+0.5)
+	}
 }
 

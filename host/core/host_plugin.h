@@ -10,6 +10,7 @@
 //   - never throws, never blocks; no heap allocation after the first tick
 #pragma once
 
+#include "block_props.h"
 #include "config.h"
 #include "friends.h"
 #include "settings_menu.h"
@@ -66,6 +67,7 @@ namespace craftv::host
 		std::uint64_t                BlockMessagesReceived() const { return blockMessagesReceived_; }
 		const TerrainScanner&        Terrain() const { return terrain_; }
 		const Friends&               FriendsTable() const { return friends_; }
+		const BlockProps&            SolidBlocks() const { return *props_; }
 		bool                         HasSessionInfo() const { return hasSession_; }
 		const proto::SessionInfoMsg& Session() const { return session_; }
 		bool                         PassthroughActive() const { return passthroughActive_; }
@@ -119,6 +121,7 @@ namespace craftv::host
 		std::uint64_t             blockMessagesReceived_ = 0;
 		TerrainScanner            terrain_;
 		Friends                   friends_;
+		std::unique_ptr<BlockProps> props_;  // large fixed tables: allocated once, with the plugin
 		proto::SessionInfoMsg     session_{};
 		bool                      hasSession_ = false;
 		std::uint64_t             nowMs_ = 0;

@@ -67,6 +67,9 @@ namespace craftv::host
 		passthrough.maxPixels = static_cast<std::uint64_t>(std::clamp(pixels, 320.0 * 180.0, static_cast<double>(proto::kViewMaxPixels)));
 		passthrough.hideGtaHud = ReadBool(L"Passthrough", L"HideGtaHud", passthrough.hideGtaHud, a_iniPath);
 		passthrough.meleeDamagePerHalfHeart = std::clamp(ReadDouble(L"Passthrough", L"MeleeDamagePerHalfHeart", passthrough.meleeDamagePerHalfHeart, a_iniPath), 0.0, 1000.0);
+		blocks.maxProps = static_cast<int>(std::clamp(ReadDouble(L"Blocks", L"MaxProps", blocks.maxProps, a_iniPath), 0.0, 1000.0));
+		blocks.spawnRadius = static_cast<float>(std::clamp(ReadDouble(L"Blocks", L"Radius", blocks.spawnRadius, a_iniPath), 8.0, 200.0));
+		blocks.despawnRadius = blocks.spawnRadius + 16.0f;
 		debugOverlay = ReadBool(L"Debug", L"Overlay", debugOverlay, a_iniPath);
 		const std::wstring corner = ReadString(L"Debug", L"OverlayCorner", L"TopRight", a_iniPath);
 		overlayCorner = _wcsicmp(corner.c_str(), L"TopLeft") == 0 ? OverlayCorner::kTopLeft : OverlayCorner::kTopRight;

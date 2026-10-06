@@ -95,6 +95,12 @@ namespace craftv::host
 		constexpr int kMenuBlocked[] = { 27, 172, 173, 174, 175, 176, 177, 178, 199, 200, 201, 202, 19, 20, 37, 85, 24, 25, 140, 141, 142, 143, 257, 263, 264 };
 		char g_soundSet[] = "HUD_FRONTEND_DEFAULT_SOUNDSET";
 
+		// Solid blocks: the box closest to a 1 m block of the 16 measured in Sary's game (CraftV.log, 2026-10-06):
+		// 0.965 x 0.965 x 0.795 m, its origin at its bottom. Its top is put level with the block's top (that's what
+		// people stand on); it's 2 cm narrower each side and 20 cm short underneath.
+		constexpr const char* kBlockPropModel = "prop_box_wood01a";
+		constexpr float       kBlockPropHeight = 0.795f;
+
 		// _ADD_TEXT_COMPONENT_STRING takes at most 99 characters; longer lines go in as several components.
 		constexpr std::size_t kTextComponentChars = 90;
 		constexpr int         kFontChaletLondon = 0;
@@ -442,6 +448,39 @@ namespace craftv::host
 		a_out.right = pressed(kMenuRight);
 		a_out.accept = pressed(kMenuAccept) || pressed(kMenuSelect);
 		a_out.back = pressed(kMenuBack) || pressed(kMenuPhoneBack) || pressed(kMenuPause) || pressed(kMenuPauseAlt);
+	}
+
+	bool GtaGame::BlockPropReady()
+	{
+		const Hash model = Joaat(kBlockPropModel);
+		if (!STREAMING::IS_MODEL_VALID(model)) {
+			return false;
+		}
+		STREAMING::REQUEST_MODEL(model);
+		return STREAMING::HAS_MODEL_LOADED(model) != FALSE;
+	}
+
+	int GtaGame::SpawnBlockProp(float a_x, float a_y, float a_floorZ, float a_size)
+	{
+		const Object o = OBJECT::CREATE_OBJECT_NO_OFFSET(Joaat(kBlockPropModel), a_x, a_y, a_floorZ + a_size - kBlockPropHeight, FALSE, TRUE, FALSE);
+		if (o == 0) {
+			return 0;
+		}
+		ENTITY::SET_ENTITY_ROTATION(o, 0.0f, 0.0f, 0.0f, kRotationOrderZxy, TRUE);
+		ENTITY::FREEZE_ENTITY_POSITION(o, TRUE);
+		ENTITY::SET_ENTITY_CAN_BE_DAMAGED(o, FALSE);
+		ENTITY::SET_ENTITY_COLLISION(o, TRUE, TRUE);
+		ENTITY::SET_ENTITY_VISIBLE(o, FALSE, FALSE);  // Minecraft draws the block
+		return o;
+	}
+
+	void GtaGame::DeleteBlockProp(int a_handle)
+	{
+		Object o = a_handle;
+		if (ENTITY::DOES_ENTITY_EXIST(o)) {
+			ENTITY::SET_ENTITY_AS_MISSION_ENTITY(o, TRUE, TRUE);
+			OBJECT::DELETE_OBJECT(&o);
+		}
 	}
 
 	void GtaGame::Notify(const char* a_text)

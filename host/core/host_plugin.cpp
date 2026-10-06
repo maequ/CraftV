@@ -64,7 +64,8 @@ namespace craftv::host
 	}
 
 	HostPlugin::HostPlugin(IGame& a_game, const Config& a_config) :
-		game_(a_game), config_(a_config), terrain_(a_config.terrain), passthroughWanted_(a_config.passthrough.mode == PassthroughMode::kAuto)
+		game_(a_game), config_(a_config), terrain_(a_config.terrain), props_(std::make_unique<BlockProps>(a_config.blocks)),
+		passthroughWanted_(a_config.passthrough.mode == PassthroughMode::kAuto)
 	{
 	}
 
@@ -443,6 +444,10 @@ namespace craftv::host
 				if (const TerrainPatchMsg* patch = terrain_.Tick(game_, config_.world, sample_.x, sample_.y, sample_.z)) {
 					endpoint_->Send(*patch);  // if the ring is full, Minecraft asks again (§7.11)
 				}
+				// Friends' and the owner's blocks: solid near the player (brief §9).
+				if (config_.blocks.maxProps > 0) {
+					props_->Tick(game_, *endpoint_, config_.world, sample_.x, sample_.y);
+				}
 			}
 		}
 		wasUsable_ = usable;
@@ -457,6 +462,9 @@ namespace craftv::host
 	void HostPlugin::HandleEvents()
 	{
 		const std::uint32_t ev = endpoint_->TakeEvents();
+		if (ev & (kEvConnected | kEvPeerRestarted | kEvStale | kEvPeerDetached)) {
+			props_->Clear(game_);  // Minecraft is the authority: a new one is asked again; with none, nothing stays solid
+		}
 		if (ev & (kEvConnected | kEvPeerRestarted)) {
 			hasOwner_ = false;
 			teleportNext_ = true;  // a new Minecraft: snap its player onto ours
@@ -495,6 +503,7 @@ namespace craftv::host
 				return;
 			}
 			++blockMessagesReceived_;
+			props_->OnBlockSet(m, game_);
 			return;
 		}
 		case kMsgBlockBreakRequest:
@@ -633,8 +642,8 @@ namespace craftv::host
 				sample_.networkGameInProgress, sample_.networkSessionStarted, sample_.networkInSession, sample_.loadingScreen, sample_.screenFadedOut,
 				sample_.inVehicle, sample_.inAir, sample_.swimming);
 		} else {
-			std::snprintf(lines[2], sizeof(lines[2]), "ground sent %llu  queue %d  surface %s", static_cast<unsigned long long>(ts.served), terrain_.Queued(),
-				surface);
+			std::snprintf(lines[2], sizeof(lines[2]), "ground sent %llu  queue %d  surface %s  solid %d", static_cast<unsigned long long>(ts.served),
+				terrain_.Queued(), surface, props_->Live());
 		}
 
 		// Top right sits below GTA's own wanted stars, cash and weapon; top left is the old spot.
@@ -657,6 +666,10 @@ namespace craftv::host
 			} catch (...) {
 			}
 			playerHidden_ = false;
+		}
+		try {
+			props_->Clear(game_);  // no invisible walls left behind
+		} catch (...) {
 		}
 		passthroughActive_ = false;
 		if (state_ == PluginState::kFaulted) {

@@ -136,6 +136,14 @@ namespace craftv::host
 		// A short on-screen message (the game's notification feed).
 		virtual void Notify(const char* /*text*/) {}
 
+		// ---- solid blocks (Phase 4). Defaults: none.
+		// Whether the collision prop's model is streamed in (requests it until it is).
+		virtual bool BlockPropReady() { return false; }
+		// An invisible, frozen collision box for one block: x, y its centre, floorZ its bottom, size its edge (metres).
+		// Returns a handle, 0 if the game made none.
+		virtual int  SpawnBlockProp(float /*x*/, float /*y*/, float /*floorZ*/, float /*size*/) { return 0; }
+		virtual void DeleteBlockProp(int /*handle*/) {}
+
 		// ---- the settings menu (F8). Defaults: no menu.
 		virtual void DrawMenuText(float /*x*/, float /*y*/, const TextStyle& /*style*/, const char* /*text*/) {}
 		virtual float TextWidth(const TextStyle& a_style, const char* a_text)

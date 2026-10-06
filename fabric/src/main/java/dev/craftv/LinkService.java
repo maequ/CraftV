@@ -35,6 +35,7 @@ public final class LinkService {
 	private final AtomicReference<ReceivedCamera> latestCamera = new AtomicReference<>();
 	private final AtomicReference<Messages.View> latestView = new AtomicReference<>();
 	private final Queue<Messages.Input> inputs = new ConcurrentLinkedQueue<>();
+	private final Queue<Messages.BlockRegionRequest> regionRequests = new ConcurrentLinkedQueue<>();
 	private volatile Thread thread;
 	private volatile boolean running;
 	private volatile boolean inGame;
@@ -114,6 +115,7 @@ public final class LinkService {
 						case MSG_CAMERA -> acceptCamera(ep, bytes >= CAMERA_BYTES ? Messages.Camera.read(s, off) : null);
 						case MSG_VIEW -> acceptView(ep, bytes >= VIEW_BYTES ? Messages.View.read(s, off) : null);
 						case MSG_INPUT -> acceptInput(ep, bytes >= INPUT_BYTES ? Messages.Input.read(s, off) : null);
+						case MSG_BLOCK_REGION_REQUEST -> acceptRegion(ep, bytes >= BLOCK_REGION_REQUEST_BYTES ? Messages.BlockRegionRequest.read(s, off) : null);
 						case MSG_LOG -> {
 							Messages.Log log = bytes >= LOG_BYTES ? Messages.Log.read(s, off) : null;
 							if (log != null && log.valid()) {
@@ -194,6 +196,17 @@ public final class LinkService {
 		}
 		if (inputs.size() < INPUT_LIMIT) {
 			inputs.add(input);
+		}
+	}
+
+	private void acceptRegion(Endpoint ep, Messages.BlockRegionRequest r) {
+		if (r == null || !r.valid()) {
+			ep.countMalformed();
+			CraftLog.limited("badregion", 5000, "ignored an invalid BLOCK_REGION_REQUEST from the host");
+			return;
+		}
+		if (regionRequests.size() < TERRAIN_INBOX_LIMIT) {
+			regionRequests.add(r);
 		}
 	}
 
@@ -281,6 +294,11 @@ public final class LinkService {
 	/** The window size the host last asked for (§7.16), or null. */
 	public Messages.View latestView() {
 		return latestView.get();
+	}
+
+	/** The next BLOCK_REGION_REQUEST (§7.19), or null. Server thread. */
+	public Messages.BlockRegionRequest pollRegionRequest() {
+		return regionRequests.poll();
 	}
 
 	/** The next forwarded input (§7.17), or null. Client thread. */

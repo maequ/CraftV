@@ -4,6 +4,7 @@
 #   craftv_host_tests  tests of the core against a fake game (no game needed)
 
 add_library(craftv_host_core STATIC
+	core/block_props.cpp
 	core/config.cpp
 	core/host_log.cpp
 	core/host_plugin.cpp
