@@ -49,7 +49,9 @@ public final class TerrainService {
 	/**
 	 * Removes water that ran out of terrain lakes onto the land before terrain water stopped spreading (Sary's first
 	 * passthrough run): flowing (non-source) water above a terrain column's ground that isn't that column's own water.
-	 * Water friends place flows from a source and comes back from it. Server thread, on chunk load.
+	 * Water friends place flows from a source and comes back from it. Server thread, on chunk load: the chunk is still
+	 * loading then, so the blocks are only collected here and removed on the next server task (setting a block of a
+	 * loading chunk from its own load event waits for that load: a deadlock, seen in Sary's second run).
 	 */
 	public static void removeSpilledWater(ServerLevel level, LevelChunk chunk) {
 		TerrainIndex.Columns c = TerrainIndex.get(chunk.getPos().x(), chunk.getPos().z());
@@ -57,7 +59,7 @@ public final class TerrainService {
 			return;
 		}
 		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-		int removed = 0;
+		java.util.List<BlockPos> spilled = new java.util.ArrayList<>();
 		for (int lz = 0; lz < 16; lz++) {
 			for (int lx = 0; lx < 16; lx++) {
 				short ground = c.groundY()[Messages.TerrainPatch.column(lx, lz)];
@@ -68,9 +70,7 @@ public final class TerrainService {
 					pos.set(chunk.getPos().getMinBlockX() + lx, y, chunk.getPos().getMinBlockZ() + lz);
 					FluidState f = chunk.getFluidState(pos);
 					if (!f.isEmpty() && !f.isSource() && f.is(FluidTags.WATER) && c.kindAt(lx, y, lz) != TerrainColumns.Kind.WATER) {
-						BlockPos at = pos.immutable();
-						BlockSync.silently(() -> level.setBlock(at, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE));
-						removed++;
+						spilled.add(pos.immutable());
 					}
 				}
 			}
@@ -78,9 +78,20 @@ public final class TerrainService {
 		if (++spillScans == 1) {
 			CraftLog.info("terrain: checking loaded terrain chunks for spilled water");
 		}
-		if (removed > 0) {
-			CraftLog.info("terrain: removed " + removed + " spilled water blocks in chunk " + chunk.getPos().x() + ", " + chunk.getPos().z());
+		if (spilled.isEmpty()) {
+			return;
 		}
+		int cx = chunk.getPos().x(), cz = chunk.getPos().z();
+		level.getServer().execute(() -> {
+			BlockSync.silently(() -> {
+				for (BlockPos at : spilled) {
+					if (!level.getFluidState(at).isSource()) {
+						level.setBlock(at, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+					}
+				}
+			});
+			CraftLog.info("terrain: removed " + spilled.size() + " spilled water blocks in chunk " + cx + ", " + cz);
+		});
 	}
 
 	public static ServerLevel mirror(MinecraftServer server) {
