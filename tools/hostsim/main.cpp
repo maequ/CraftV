@@ -3,7 +3,11 @@
 // same map (reported with GTA material names), and the overlay is printed to the console. Run it against the
 // real Minecraft to test everything the ASI does except the natives (brief §0: test before asking Sary).
 //
-//   hostsim [--mapping NAME] [--seconds N] [--quiet]
+//   hostsim [--mapping NAME] [--seconds N] [--quiet] [--passthrough first|third]
+//
+// --passthrough: the game "has ReShade": the core runs the passthrough (brief §8) with a camera at the walking ped
+// (first person) or behind it (third), a 1280x720 picture, and the owner placing planks every few seconds, so
+// Minecraft renders and exports the owner's view (check it with framedump).
 #include "core/config.h"
 #include "core/host_log.h"
 #include "core/host_plugin.h"
@@ -109,6 +113,49 @@ namespace
 		}
 
 		void RequestCollision(float, float, float) override { ++collisionRequests; }
+
+		// ---- the passthrough
+		bool          passthrough = false, thirdPerson = false;
+		std::uint64_t inputTick = 0, melee = 0;
+		bool PassthroughAvailable() override { return passthrough; }
+		void SampleCamera(CameraSample& c) override
+		{
+			constexpr double kEye = 1.65, kBehind = 4.0, kAbove = 2.0, kPitch = -25.0;
+			GameSample s;
+			Sample(s);
+			const double h = s.heading * kPi / 180.0, fx = -std::sin(h), fy = std::cos(h);  // facing in game x/y
+			const double feet = s.z - kFeetOffset;
+			c = CameraSample{};
+			c.valid = true;
+			c.x = static_cast<float>(thirdPerson ? s.x - fx * kBehind : s.x);
+			c.y = static_cast<float>(thirdPerson ? s.y - fy * kBehind : s.y);
+			c.z = static_cast<float>(feet + (thirdPerson ? kAbove : kEye));
+			c.heading = s.heading;
+			c.pitch = static_cast<float>(kPitch);
+			c.fovY = 50.0f;
+			c.nearClip = 0.15f;
+			c.farClip = 10000.0f;
+			c.firstPerson = !thirdPerson;
+		}
+		void TakePassthroughInput(PassthroughInput& in) override
+		{
+			in = PassthroughInput{};
+			const std::uint64_t n = ++inputTick;
+			if (n == 30) {
+				in.slot = 4;  // the kit's planks
+			} else if (n % 150 == 0) {
+				in.usePressed = true;  // place one
+			} else if (n % 150 == 2) {
+				in.useReleased = true;
+			}
+		}
+		bool ScreenSize(int& w, int& h) override
+		{
+			w = 1280;
+			h = 720;
+			return passthrough;
+		}
+		void Melee(float) override { ++melee; }
 	};
 }
 
@@ -118,6 +165,7 @@ int wmain(int argc, wchar_t** argv)
 	config.software = "CraftV-HostSim 0.1.0";
 	double seconds = 0;
 	bool   quiet = false;
+	int    passthrough = 0;  // 1 first person, 2 third
 	for (int i = 1; i < argc; ++i) {
 		const std::wstring a = argv[i];
 		if (a == L"--mapping" && i + 1 < argc) {
@@ -126,14 +174,18 @@ int wmain(int argc, wchar_t** argv)
 			seconds = _wtof(argv[++i]);
 		} else if (a == L"--quiet") {
 			quiet = true;
+		} else if (a == L"--passthrough" && i + 1 < argc) {
+			passthrough = std::wstring(argv[++i]) == L"third" ? 2 : 1;
 		} else {
-			std::printf("hostsim [--mapping NAME] [--seconds N] [--quiet]\n");
+			std::printf("hostsim [--mapping NAME] [--seconds N] [--quiet] [--passthrough first|third]\n");
 			return 2;
 		}
 	}
 	HostLog::Open(L"logs\\hostsim.log");
 	::timeBeginPeriod(1);
 	SimGame    game;
+	game.passthrough = passthrough != 0;
+	game.thirdPerson = passthrough == 2;
 	HostPlugin plugin(game, config);
 	std::printf("CraftV host simulator: the GTA V plugin core with a simulated game. Ctrl+C to stop.\n");
 	const std::uint64_t start = clock::NowMs();
