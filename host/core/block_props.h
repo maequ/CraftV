@@ -44,7 +44,8 @@ namespace craftv::host
 		int  Find(std::int32_t a_x, std::int32_t a_y, std::int32_t a_z) const;
 		void Insert(std::int32_t a_x, std::int32_t a_y, std::int32_t a_z);
 		void Remove(int a_slot, IGame& a_game);
-		bool Spawn(Block& a_block, IGame& a_game, const WorldConfig& a_world);
+		enum class SpawnResult { kSpawned, kFailed, kOccupied };
+		SpawnResult Spawn(Block& a_block, IGame& a_game, const WorldConfig& a_world);
 		bool RegionAsked(std::int64_t a_key) const;
 		void Rehash();
 

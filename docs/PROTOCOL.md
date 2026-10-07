@@ -297,7 +297,7 @@ Sent right after attach and again whenever a new peer session is seen.
 | Offset | Size | Type | Field | Notes |
 |---|---|---|---|---|
 | 0 | 2 | u16 | `versionMajor` | `1` |
-| 2 | 2 | u16 | `versionMinor` | `4` (v1.4) |
+| 2 | 2 | u16 | `versionMinor` | `5` (v1.5) |
 | 4 | 4 | u32 | `role` | `1` host, `2` MC |
 | 8 | 4 | u32 | `pid` | |
 | 12 | 4 | u32 | `session` | same as the record header's |
@@ -598,6 +598,11 @@ The host window has the focus, so the host forwards the owner's Minecraft contro
 While a Minecraft screen is open (OWNER_STATE `SCREEN_OPEN`), BUTTON `ATTACK` and `USE` are the left and right mouse
 buttons on that screen, at the last CURSOR.
 
+**v1.5:** BUTTON `8` SNEAK, held while the host's player crouches. OPTION `7` game mode (`0` survival, `1` creative)
+and OPTION `8` refill (an action, `value` `1`: the owner's kit is topped up, hearts and hunger filled).
+
+MC (26.3) numbers mouse buttons the SDL way (left `1`, right `3`): the receiving side maps `ATTACK`/`USE` to those.
+
 **v1.4:**
 
 - **DAMAGE**: the host's player got hurt in the host game.
@@ -625,7 +630,7 @@ changes, at most 20 times a second, and at least once a second while connected.
 
 | Offset | Size | Type | Field | Notes |
 |---|---|---|---|---|
-| 0 | 1 | u8 | `held` | `0` empty hand, `1` sword, `2` axe, `3` pickaxe, `4` shovel, `5` hoe, `6` block, `7` other item, `8` light (v1.4: torch, lantern, glowstone) |
+| 0 | 1 | u8 | `held` | `0` empty hand, `1` sword, `2` axe, `3` pickaxe, `4` shovel, `5` hoe, `6` block, `7` other item, `8` light (v1.4: torch, lantern, glowstone), `16..23` one of CraftV's gun items (v1.5: `16` + the gun's index: pistol, SMG, assault rifle, shotgun, sniper rifle, RPG, minigun, grenade) |
 | 1 | 1 | u8 | `health` | half hearts, rounded up, `0..255` (20 = full) |
 | 2 | 1 | u8 | `food` | `0..20` |
 | 3 | 1 | u8 | `gameMode` | as §7.9 |
@@ -660,7 +665,7 @@ Something in Minecraft the host game shows too.
 
 | Offset | Size | Type | Field | Notes |
 |---|---|---|---|---|
-| 0 | 1 | u8 | `kind` | `1` EXPLOSION, `2` PROJECTILE |
+| 0 | 1 | u8 | `kind` | `1` EXPLOSION, `2` PROJECTILE, `3` SHOT (v1.5) |
 | 1 | 3 | | reserved | `0` |
 | 4 | 4 | f32 | `power` | EXPLOSION: Minecraft's radius (TNT 4). PROJECTILE: the damage it would do, in half hearts. `[0, 1000]` |
 | 8 | 8 | f64 | `x` | Minecraft position |
@@ -670,6 +675,8 @@ Something in Minecraft the host game shows too.
 | 36 | 4 | | reserved | `0` |
 
 - EXPLOSION: sent once, when the explosion goes off.
+- SHOT (v1.5): sent once, to the GTA player who let go of a drawn bow; `power` is the arrow's damage in half hearts.
+  That host hits whatever its crosshair is on, at once. Their own arrow then sends them no PROJECTILE events.
 - PROJECTILE: sent every tick for each flying arrow within 128 blocks of a GTA player.
 
 ## 8. Defensive rules (both sides)
@@ -697,7 +704,8 @@ Something in Minecraft the host game shows too.
   D-016). A v1.0 peer skips them as unknown types, so v1.0 and v1.1 still link up. v1.2 (2026-10-06) the
   passthrough messages 14–17 and the frame mapping (§11, `DECISIONS.md` D-027). v1.3 (2026-10-06)
   `BLOCK_REGION_REQUEST` and the `SOLID`/`REGION` block flags (Phase 4, D-029). v1.4 (2026-10-07) `WORLD_EVENT`, INPUT
-  `DAMAGE`/`OPTION`, the `LIGHT` block flag, the `PHONE`/`SPRINTING` camera flags and held `LIGHT` (D-031).
+  `DAMAGE`/`OPTION`, the `LIGHT` block flag, the `PHONE`/`SPRINTING` camera flags and held `LIGHT` (D-031). v1.5
+  (2026-10-07) held guns `16..23`, BUTTON `SNEAK`, OPTION game mode and refill, WORLD_EVENT `SHOT` (D-032).
 
 ## 10. Golden vectors
 

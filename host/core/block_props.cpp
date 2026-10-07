@@ -97,7 +97,7 @@ namespace craftv::host
 		}
 	}
 
-	bool BlockProps::Spawn(Block& a_block, IGame& a_game, const WorldConfig& a_world)
+	BlockProps::SpawnResult BlockProps::Spawn(Block& a_block, IGame& a_game, const WorldConfig& a_world)
 	{
 		// The block's floor in game coordinates (a point: no feet offset), moved by the terrain's rounding in that
 		// column so the block stands on the game's real ground, as the passthrough's view lift shows it.
@@ -112,12 +112,15 @@ namespace craftv::host
 				floor += shift;
 			}
 		}
+		if (!a_game.BlockSpaceFree(x, y, static_cast<float>(floor), static_cast<float>(1.0 / s))) {
+			return SpawnResult::kOccupied;  // a car or someone is in it: tried again later
+		}
 		a_block.handle = a_game.SpawnBlockProp(x, y, static_cast<float>(floor), static_cast<float>(1.0 / s));
 		if (a_block.handle == 0) {
-			return false;
+			return SpawnResult::kFailed;
 		}
 		++live_;
-		return true;
+		return SpawnResult::kSpawned;
 	}
 
 	bool BlockProps::RegionAsked(std::int64_t a_key) const
@@ -225,8 +228,12 @@ namespace craftv::host
 				}
 				break;
 			}
-			if (!a_game.BlockPropReady() || !Spawn(blocks_[candidates[k]], a_game, a_world)) {
-				break;  // the model is still streaming in, or the game has no room: next frame
+			if (!a_game.BlockPropReady()) {
+				break;  // the model is still streaming in: next frame
+			}
+			const SpawnResult r = Spawn(blocks_[candidates[k]], a_game, a_world);
+			if (r == SpawnResult::kFailed) {
+				break;  // the game has no room: next frame
 			}
 		}
 	}

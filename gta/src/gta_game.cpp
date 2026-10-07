@@ -11,6 +11,11 @@
 #include "natives.h"
 #pragma warning(pop)
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+
 #include <cmath>
 #include <cstring>
 
@@ -56,9 +61,36 @@ namespace craftv::host
 			68, 69, 70, 91, 92, 99, 100, 114, 115, 116,   // vehicle and passenger weapons
 		};
 		constexpr int kControlAttack = 24, kControlAim = 25;
+		// With one of CraftV's gun items in hand these stay on: the game's own aim, fire, melee and reload.
+		constexpr int kGunControls[] = { 24, 25, 257, 140, 141, 142, 143, 263, 264, 45 };
+		// CraftV's gun items, in the order of the Minecraft side's table (PROTOCOL.md §7.18, held 16+).
+		constexpr Hash kGuns[] = {
+			0x1B06D571,  // WEAPON_PISTOL
+			0x2BE6766B,  // WEAPON_SMG
+			0xBFEFFF6D,  // WEAPON_ASSAULTRIFLE
+			0x1D073A89,  // WEAPON_PUMPSHOTGUN
+			0x05FC3C11,  // WEAPON_SNIPERRIFLE
+			0xB1CA77B1,  // WEAPON_RPG
+			0x42BF8A85,  // WEAPON_MINIGUN
+			0x93E220BD,  // WEAPON_GRENADE
+		};
+		constexpr int kGunAmmo = 9999;
+		constexpr int kControlDuck = 36;                // Left Ctrl: GTA's stealth, Minecraft's sneak here
+		constexpr int kControlSprint = 21;              // Shift: faster flying
+		constexpr int kControlMoveLr = 30, kControlMoveUd = 31;
+		char          g_stealthAction[] = "DEFAULT_ACTION";
+		char          g_phoneScript[] = "cellphone_flashhand";  // runs while the phone is out
+		constexpr float kFlySpeed = 12.0f, kFlyFastSpeed = 40.0f;  // metres per second
+		// Shape tests that hit people and cars: map, vehicles, peds (both kinds), objects.
+		constexpr int   kRayEverything = 1 | 2 | 4 | 8 | 16;
+		constexpr float kShotRange = 250.0f;
+		constexpr float kDegToRadF = 3.14159265f / 180.0f;
 		constexpr int kControlJump = 22;  // Space: GTA's jump (and climb), replaced by Minecraft's straight jump
 		constexpr float kGravity = 9.81f;
-		constexpr int   kJumpPushFrames = 3;  // the push is repeated a few frames: the ped's ground task eats a single one
+		constexpr int   kJumpPushFrames = 12;   // frames a jump lasts before the player may land and jump again
+		constexpr int   kJumpBoostFrames = 5;   // the first frames of it keep pushing up (the ground task eats a single push)
+		constexpr int   kJumpGroundFrames = 3;  // frames on the ground before the next jump: no jumping in the air
+		constexpr float kJumpLift = 0.08f;      // metres: lifts the player off the ground so the push isn't cancelled
 		// Minecraft arrows: people this close to an arrow's path are hit (metres, around the ped's middle).
 		constexpr float kArrowReach = 0.9f, kArrowHeight = 1.1f;
 		// ADD_EXPLOSION's types (eExplosionType): 0 grenade, 2 sticky bomb, 4 rocket. TNT (power 4) is a sticky bomb.
@@ -84,8 +116,9 @@ namespace craftv::host
 			ENTITY::APPLY_FORCE_TO_ENTITY(a_entity, 1, a_x, a_y, a_z, 0.0f, 0.0f, 0.0f, 0, FALSE, TRUE, TRUE, FALSE, TRUE);
 		}
 		// Melee reach and knock-back. ASSUMPTION: tuned by eye in the reference; to check in game.
-		constexpr float kMeleeReach = 3.5f, kMeleeHeight = 2.5f, kMeleeCone = 0.3f;  // cos of the half angle
-		constexpr float kCarReach = 5.5f, kCarHeight = 3.0f, kCarCone = 0.2f;
+		// Minecraft's reach is 3 blocks from the eyes: the crosshair's target must be this close to the player's middle.
+		constexpr float kMeleeReach = 3.2f, kCarReach = 4.0f;
+		constexpr float kStumbleDamage = 30.0f;  // weaker (uncharged, spammed) hits only hurt; no stumble
 		// A hit stumbles the person back a little (Minecraft's knock-back); only a strong hit knocks them down. Then
 		// most run, some fight back. Cars dent where they're hit and get shoved; their driver drives off.
 		constexpr float kPushPerDamage = 0.06f, kPushUp = 1.5f, kCarPushPerDamage = 0.35f, kCarDentPerDamage = 6.0f;
@@ -152,7 +185,10 @@ namespace craftv::host
 		s.inVehicle = PED::IS_PED_IN_ANY_VEHICLE(ped, FALSE) != FALSE;
 		s.swimming = PED::IS_PED_SWIMMING(ped) != FALSE;
 		s.sprinting = AI::IS_PED_SPRINTING(ped) != FALSE;
-		s.phone = PED::IS_PED_RUNNING_MOBILE_PHONE_TASK(ped) != FALSE;
+		// The phone task alone missed Sary's phone in game (2026-10-07): its script running is the other sign.
+		s.phone = PED::IS_PED_RUNNING_MOBILE_PHONE_TASK(ped) != FALSE || SCRIPT::_GET_NUMBER_OF_INSTANCES_OF_STREAMED_SCRIPT(GAMEPLAY::GET_HASH_KEY(g_phoneScript)) > 0;
+		s.parachute = PED::GET_PED_PARACHUTE_STATE(ped) >= 0;  // -1: no parachute
+		s.ragdoll = PED::IS_PED_RAGDOLL(ped) != FALSE;
 		s.health = ENTITY::GET_ENTITY_HEALTH(ped);
 		s.maxHealth = ENTITY::GET_ENTITY_MAX_HEALTH(ped);
 		s.camPitch = CAM::GET_GAMEPLAY_CAM_ROT(kRotationOrderZxy).x;
@@ -236,13 +272,33 @@ namespace craftv::host
 	void GtaGame::TakePassthroughInput(PassthroughInput& a_out)
 	{
 		a_out = PassthroughInput{};
+		const Ped ped = PLAYER::PLAYER_PED_ID();
 		for (int control : kDisabledControls) {
-			CONTROLS::DISABLE_CONTROL_ACTION(0, control, TRUE);
+			bool gunControl = false;
+			for (int g : kGunControls) {
+				gunControl = gunControl || (gun_ >= 0 && g == control);
+			}
+			if (!gunControl) {
+				CONTROLS::DISABLE_CONTROL_ACTION(0, control, TRUE);
+			}
 		}
-		a_out.attackPressed = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kControlAttack) != FALSE;
-		a_out.attackReleased = CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, kControlAttack) != FALSE;
-		a_out.usePressed = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kControlAim) != FALSE;
-		a_out.useReleased = CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, kControlAim) != FALSE;
+		if (gun_ >= 0) {
+			// The game's gun of that kind, kept in hand (a respawn or character switch takes it away)
+			const Hash want = kGuns[gun_];
+			Hash       current = 0;
+			WEAPON::GET_CURRENT_PED_WEAPON(ped, &current, TRUE);
+			if (current != want) {
+				if (!WEAPON::HAS_PED_GOT_WEAPON(ped, want, FALSE)) {
+					WEAPON::GIVE_WEAPON_TO_PED(ped, want, kGunAmmo, FALSE, TRUE);
+				}
+				WEAPON::SET_CURRENT_PED_WEAPON(ped, want, TRUE);
+			}
+		} else {
+			a_out.attackPressed = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kControlAttack) != FALSE;
+			a_out.attackReleased = CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, kControlAttack) != FALSE;
+			a_out.usePressed = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kControlAim) != FALSE;
+			a_out.useReleased = CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, kControlAim) != FALSE;
+		}
 		for (int c : kControlNext) {
 			a_out.scroll += CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, c) ? 1 : 0;
 		}
@@ -255,9 +311,11 @@ namespace craftv::host
 				a_out.slot = i;
 			}
 		}
+		// Ctrl is Minecraft's sneak (GTA's stealth toggle is off; SetCrouch makes the player creep while it's held)
+		CONTROLS::DISABLE_CONTROL_ACTION(0, kControlDuck, TRUE);
+		a_out.sneak = CONTROLS::IS_DISABLED_CONTROL_PRESSED(0, kControlDuck) != FALSE;
 		if (playerHidden_) {
 			// Kept hidden every frame: switching character, respawning or a cutscene gives a new or visible ped.
-			const Ped ped = PLAYER::PLAYER_PED_ID();
 			ENTITY::SET_ENTITY_VISIBLE(ped, FALSE, FALSE);
 		}
 	}
@@ -270,10 +328,15 @@ namespace craftv::host
 		a_out.cursorValid = true;
 		a_out.cursorX = CONTROLS::GET_DISABLED_CONTROL_NORMAL(0, kCursorX);
 		a_out.cursorY = CONTROLS::GET_DISABLED_CONTROL_NORMAL(0, kCursorY);
-		a_out.attackPressed = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kCursorAccept) != FALSE;
-		a_out.attackReleased = CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, kCursorAccept) != FALSE;
-		a_out.usePressed = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kCursorCancel) != FALSE;
-		a_out.useReleased = CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, kCursorCancel) != FALSE;
+		// The mouse buttons straight from Windows: GTA's cursor-accept control missed left clicks in Sary's game
+		// (2026-10-07: only right click moved items). GTA has the focus, so these are the player's clicks.
+		const bool left = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0, right = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+		a_out.attackPressed = left && !screenLeft_;
+		a_out.attackReleased = !left && screenLeft_;
+		a_out.usePressed = right && !screenRight_;
+		a_out.useReleased = !right && screenRight_;
+		screenLeft_ = left;
+		screenRight_ = right;
 		a_out.closeScreen = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kPause) || CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kPauseAlt);
 		if (playerHidden_) {
 			ENTITY::SET_ENTITY_VISIBLE(PLAYER::PLAYER_PED_ID(), FALSE, FALSE);
@@ -285,7 +348,7 @@ namespace craftv::host
 		playerHidden_ = a_hidden;
 		const Ped ped = PLAYER::PLAYER_PED_ID();
 		ENTITY::SET_ENTITY_VISIBLE(ped, a_hidden ? FALSE : TRUE, FALSE);
-		if (a_hidden) {
+		if (a_hidden && gun_ < 0) {
 			WEAPON::SET_CURRENT_PED_WEAPON(ped, kWeaponUnarmed, TRUE);  // Minecraft's item is what the player holds
 		}
 	}
@@ -316,64 +379,107 @@ namespace craftv::host
 		compositor::set_host_pose(a_yaw, a_pitch, a_roll, a_fovY, a_x, a_y, a_z);
 	}
 
-	// A Minecraft swing (the reference project's melee): people in front of the player within reach ragdoll, take the
-	// damage and are pushed away; cars get a shove.
+	// What the crosshair is on: a ray from the camera through the middle of the screen (people, cars, the map).
+	GtaGame::RayHit GtaGame::CrosshairRay(float a_range)
+	{
+		RayHit        r{};
+		const Vector3 c = CAM::_GET_GAMEPLAY_CAM_COORDS();
+		const Vector3 rot = CAM::_GET_GAMEPLAY_CAM_ROT(kRotationOrderZxy);
+		const float   p = rot.x * kDegToRadF, h = rot.z * kDegToRadF;
+		const float   dx = -std::sin(h) * std::cos(p), dy = std::cos(h) * std::cos(p), dz = std::sin(p);
+		const int     ray = WORLDPROBE::_CAST_RAY_POINT_TO_POINT(c.x, c.y, c.z, c.x + dx * a_range, c.y + dy * a_range, c.z + dz * a_range, kRayEverything,
+			PLAYER::PLAYER_PED_ID(), kShapeTestOptions);
+		BOOL    hit = FALSE;
+		Vector3 end{}, normal{};
+		Entity  entity = 0;
+		if (WORLDPROBE::_GET_RAYCAST_RESULT(ray, &hit, &end, &normal, &entity) != kShapeTestReady || !hit) {
+			return r;
+		}
+		r.hit = true;
+		r.x = end.x;
+		r.y = end.y;
+		r.z = end.z;
+		r.dx = dx;
+		r.dy = dy;
+		if (entity != 0 && ENTITY::DOES_ENTITY_EXIST(entity)) {
+			r.ped = ENTITY::IS_ENTITY_A_PED(entity) ? entity : 0;
+			r.vehicle = ENTITY::IS_ENTITY_A_VEHICLE(entity) ? entity : 0;
+		}
+		return r;
+	}
+
+	// Hurts a person the way Minecraft hits do: a weak hit only hurts, a strong one (or an arrow) stumbles or knocks them
+	// down and pushes them back. Then most run, some fight back.
+	void GtaGame::HurtPed(int a_ped, float a_damage, float a_fx, float a_fy, bool a_arrow)
+	{
+		const Ped q = a_ped, me = PLAYER::PLAYER_PED_ID();
+		if (q == me || ENTITY::IS_ENTITY_DEAD(q)) {
+			return;
+		}
+		if (a_arrow || a_damage >= kStumbleDamage) {
+			const int ms = a_arrow || a_damage >= kKnockDownDamage ? kKnockDownMs : kStumbleMs;
+			PED::SET_PED_TO_RAGDOLL(q, ms, ms, 0, FALSE, FALSE, FALSE);
+			const float push = 2.0f + a_damage * kPushPerDamage;
+			ApplyForce(q, a_fx * push, a_fy * push, kPushUp);
+		}
+		ApplyDamageToPed(q, static_cast<int>(a_damage + 0.5f));
+		if (!ENTITY::IS_ENTITY_DEAD(q) && !PED::IS_PED_IN_ANY_VEHICLE(q, FALSE)) {
+			if (!a_arrow && GAMEPLAY::GET_RANDOM_INT_IN_RANGE(0, 100) < kFightBackPercent) {
+				AI::TASK_COMBAT_PED(q, me, 0, 16);
+			} else {
+				AI::TASK_SMART_FLEE_PED(q, me, 100.0f, static_cast<Any>(-1), FALSE, FALSE);  // -1: no time limit
+			}
+		}
+	}
+
+	void GtaGame::HurtVehicle(int a_vehicle, float a_damage, float a_x, float a_y, float a_z, float a_fx, float a_fy)
+	{
+		const Vehicle v = a_vehicle;
+		const Ped     me = PLAYER::PLAYER_PED_ID();
+		const Vector3 local = ENTITY::GET_OFFSET_FROM_ENTITY_GIVEN_WORLD_COORDS(v, a_x, a_y, a_z);  // where it was hit
+		VEHICLE::SET_VEHICLE_DAMAGE(v, local.x, local.y, local.z, a_damage * kCarDentPerDamage, 0.8f, TRUE);
+		ApplyForce(v, a_fx * a_damage * kCarPushPerDamage, a_fy * a_damage * kCarPushPerDamage, 0.0f);
+		const Ped driver = VEHICLE::GET_PED_IN_VEHICLE_SEAT(v, -1);
+		if (driver != 0 && driver != me && !ENTITY::IS_ENTITY_DEAD(driver)) {
+			AI::TASK_SMART_FLEE_PED(driver, me, 200.0f, static_cast<Any>(-1), FALSE, FALSE);
+		}
+	}
+
+	// A Minecraft swing: the person or car under the crosshair, if it's within Minecraft's reach of the player. (It used
+	// to hit everyone in a cone in front of the player, which reached people Sary wasn't aiming at.)
 	void GtaGame::Melee(float a_damage)
 	{
-		const Ped     me = PLAYER::PLAYER_PED_ID();
-		const Vector3 at = ENTITY::GET_ENTITY_COORDS(me, TRUE);
-		const float   h = CAM::GET_GAMEPLAY_CAM_ROT(kRotationOrderZxy).z * kDegToRad;
-		const float   fx = -std::sin(h), fy = std::cos(h);
-		int           handles[kMaxWorldEntities];
-		const int     peds = worldGetAllPeds(handles, kMaxWorldEntities);
-		int           hit = 0;
-		for (int i = 0; i < peds; ++i) {
-			const Ped q = handles[i];
-			if (q == me || ENTITY::IS_ENTITY_DEAD(q)) {
-				continue;
-			}
-			const Vector3 o = ENTITY::GET_ENTITY_COORDS(q, TRUE);
-			const float   dx = o.x - at.x, dy = o.y - at.y, d = std::sqrt(dx * dx + dy * dy);
-			if (d > kMeleeReach || std::fabs(o.z - at.z) > kMeleeHeight || (d > 0.3f && (dx * fx + dy * fy) / d < kMeleeCone)) {
-				continue;
-			}
-			const bool down = a_damage >= kKnockDownDamage;
-			const int  ms = down ? kKnockDownMs : kStumbleMs;
-			PED::SET_PED_TO_RAGDOLL(q, ms, ms, 0, FALSE, FALSE, FALSE);
-			ApplyDamageToPed(q, static_cast<int>(a_damage + 0.5f));
-			const float push = 2.0f + a_damage * kPushPerDamage;
-			ApplyForce(q, fx * push, fy * push, kPushUp);
-			if (!ENTITY::IS_ENTITY_DEAD(q) && !PED::IS_PED_IN_ANY_VEHICLE(q, FALSE)) {
-				if (GAMEPLAY::GET_RANDOM_INT_IN_RANGE(0, 100) < kFightBackPercent) {
-					AI::TASK_COMBAT_PED(q, me, 0, 16);
-				} else {
-					AI::TASK_SMART_FLEE_PED(q, me, 100.0f, static_cast<Any>(-1), FALSE, FALSE);  // -1: no time limit
-				}
-			}
-			++hit;
+		const RayHit r = CrosshairRay(40.0f);
+		if (!r.hit || (r.ped == 0 && r.vehicle == 0)) {
+			return;
 		}
-		const int cars = worldGetAllVehicles(handles, kMaxWorldEntities);
-		for (int i = 0; i < cars; ++i) {
-			const Vehicle v = handles[i];
-			const Vector3 o = ENTITY::GET_ENTITY_COORDS(v, TRUE);
-			const float   dx = o.x - at.x, dy = o.y - at.y, d = std::sqrt(dx * dx + dy * dy);
-			if (d > kCarReach || std::fabs(o.z - at.z) > kCarHeight || (d > 0.5f && (dx * fx + dy * fy) / d < kCarCone)) {
-				continue;
-			}
-			const Vector3 local = ENTITY::GET_OFFSET_FROM_ENTITY_GIVEN_WORLD_COORDS(v, at.x, at.y, at.z);  // the side facing the player
-			const float   len = std::sqrt(local.x * local.x + local.y * local.y);
-			const float   dentX = len > 0.01f ? local.x / len : 0.0f, dentY = len > 0.01f ? local.y / len : 0.0f;
-			VEHICLE::SET_VEHICLE_DAMAGE(v, dentX, dentY, 0.2f, a_damage * kCarDentPerDamage, 0.8f, TRUE);
-			ApplyForce(v, fx * a_damage * kCarPushPerDamage, fy * a_damage * kCarPushPerDamage, 0.0f);
-			const Ped driver = VEHICLE::GET_PED_IN_VEHICLE_SEAT(v, -1);
-			if (driver != 0 && driver != me && !ENTITY::IS_ENTITY_DEAD(driver)) {
-				AI::TASK_SMART_FLEE_PED(driver, me, 200.0f, static_cast<Any>(-1), FALSE, FALSE);
-			}
-			++hit;
+		const Vector3 at = ENTITY::GET_ENTITY_COORDS(PLAYER::PLAYER_PED_ID(), TRUE);
+		const float   dx = r.x - at.x, dy = r.y - at.y, dz = r.z - at.z, d = std::sqrt(dx * dx + dy * dy + dz * dz);
+		if (d > (r.ped != 0 ? kMeleeReach : kCarReach)) {
+			return;
 		}
-		if (hit > 0) {
-			HostLog::Info("melee: %d hit (people and cars) for %.0f", hit, a_damage);
+		if (r.ped != 0) {
+			HurtPed(r.ped, a_damage, r.dx, r.dy, false);
+		} else {
+			HurtVehicle(r.vehicle, a_damage, r.x, r.y, r.z, r.dx, r.dy);
 		}
+		HostLog::Info("melee: hit a %s %.1f m away for %.0f", r.ped != 0 ? "person" : "car", d, a_damage);
+	}
+
+	// A Minecraft bow shot: whatever the crosshair is on gets hit at once, like a bullet.
+	int GtaGame::Shoot(float a_damage)
+	{
+		const RayHit r = CrosshairRay(kShotRange);
+		if (!r.hit || (r.ped == 0 && r.vehicle == 0)) {
+			return 0;
+		}
+		if (r.ped != 0) {
+			HurtPed(r.ped, a_damage, r.dx, r.dy, true);
+		} else {
+			HurtVehicle(r.vehicle, a_damage, r.x, r.y, r.z, r.dx, r.dy);
+		}
+		HostLog::Info("bow: hit a %s for %.0f", r.ped != 0 ? "person" : "car", a_damage);
+		return 1;
 	}
 
 	void GtaGame::MeasurePropCandidates()
@@ -526,7 +632,10 @@ namespace craftv::host
 		UI::_DRAW_NOTIFICATION(FALSE, FALSE);
 	}
 
-	// Minecraft's jump: straight up, no run-up, no climbing. GTA's own jump is off while this is on.
+	// Minecraft's jump: straight up, no run-up, no climbing, only from the ground. GTA's own jump is off while this is on.
+	// The first version only pushed the player up for 3 frames: the game's ground movement ate most of it (a small hop)
+	// and the player never counted as in the air, so Space worked again and again. Now the player is lifted off the
+	// ground first, pushed up for longer, and can't jump again until standing on the ground for a moment.
 	void GtaGame::TickJump(bool a_minecraft, float a_heightMetres)
 	{
 		if (!a_minecraft) {
@@ -534,29 +643,30 @@ namespace craftv::host
 			return;
 		}
 		CONTROLS::DISABLE_CONTROL_ACTION(0, kControlJump, TRUE);
-		const Ped ped = PLAYER::PLAYER_PED_ID();
-		const float up = std::sqrt(2.0f * kGravity * a_heightMetres);
+		const Ped     ped = PLAYER::PLAYER_PED_ID();
+		const Vector3 v = ENTITY::GET_ENTITY_VELOCITY(ped);
+		const float   up = std::sqrt(2.0f * kGravity * a_heightMetres);
+		const bool    grounded = !ENTITY::IS_ENTITY_IN_AIR(ped) && !PED::IS_PED_FALLING(ped) && !PED::IS_PED_RAGDOLL(ped) && !PED::IS_PED_SWIMMING(ped) &&
+		                      !PED::IS_PED_CLIMBING(ped) && PED::IS_PED_ON_FOOT(ped) && std::fabs(v.z) < 0.6f;
+		groundedFrames_ = grounded && jumpFrames_ == 0 ? groundedFrames_ + 1 : 0;
 		if (jumpFrames_ > 0) {
 			--jumpFrames_;
-			const Vector3 v = ENTITY::GET_ENTITY_VELOCITY(ped);
-			if (v.z < up * 0.9f) {
+			if (v.z < up * 0.85f && jumpFrames_ > kJumpPushFrames - kJumpBoostFrames) {
 				ENTITY::SET_ENTITY_VELOCITY(ped, v.x, v.y, up);
 			}
 			return;
 		}
-		if (!CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kControlJump)) {
-			return;
-		}
-		if (ENTITY::IS_ENTITY_IN_AIR(ped) || PED::IS_PED_RAGDOLL(ped) || PED::IS_PED_SWIMMING(ped) || PED::IS_PED_CLIMBING(ped) || PED::IS_PED_FALLING(ped) ||
-			!PED::IS_PED_ON_FOOT(ped)) {
+		if (!CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kControlJump) || groundedFrames_ < kJumpGroundFrames) {
 			return;  // Minecraft can't jump in the air either
 		}
-		const Vector3 v = ENTITY::GET_ENTITY_VELOCITY(ped);
+		const Vector3 p = ENTITY::GET_ENTITY_COORDS(ped, TRUE);
+		ENTITY::SET_ENTITY_COORDS_NO_OFFSET(ped, p.x, p.y, p.z + kJumpLift, FALSE, FALSE, FALSE);  // off the ground: the push sticks
 		ENTITY::SET_ENTITY_VELOCITY(ped, v.x, v.y, up);
 		jumpFrames_ = kJumpPushFrames;
+		groundedFrames_ = 0;
 		if (jumpsLogged_ < 3) {
 			++jumpsLogged_;
-			HostLog::Info("jump: Minecraft jump, %.1f m/s up (check in game that the player leaves the ground)", up);
+			HostLog::Info("jump: Minecraft jump, %.1f m/s up", up);
 		}
 	}
 
@@ -641,5 +751,115 @@ namespace craftv::host
 	{
 		// DRAW_RECT takes the centre.
 		GRAPHICS::DRAW_RECT(a_x + a_w * 0.5f, a_y + a_h * 0.5f, a_w, a_h, a_color.r, a_color.g, a_color.b, a_color.a);
+	}
+
+	void GtaGame::SetGun(int a_index)
+	{
+		const Ped ped = PLAYER::PLAYER_PED_ID();
+		const int index = a_index >= 0 && a_index < static_cast<int>(sizeof(kGuns) / sizeof(kGuns[0])) ? a_index : -1;
+		if (gun_ >= 0 && gun_ != index && gunGiven_) {
+			WEAPON::REMOVE_WEAPON_FROM_PED(ped, kGuns[gun_]);  // only the guns CraftV gave: the player's own stay
+		}
+		gun_ = index;
+		gunGiven_ = false;
+		if (index < 0) {
+			WEAPON::SET_CURRENT_PED_WEAPON(ped, kWeaponUnarmed, TRUE);  // Minecraft's item is what the player holds
+			return;
+		}
+		const Hash want = kGuns[index];
+		if (!WEAPON::HAS_PED_GOT_WEAPON(ped, want, FALSE)) {
+			WEAPON::GIVE_WEAPON_TO_PED(ped, want, kGunAmmo, FALSE, TRUE);
+			gunGiven_ = true;
+		} else {
+			WEAPON::SET_PED_AMMO(ped, want, kGunAmmo);
+		}
+		WEAPON::SET_CURRENT_PED_WEAPON(ped, want, TRUE);
+	}
+
+	void GtaGame::SetCrouch(bool a_crouching)
+	{
+		if (a_crouching == crouching_) {
+			return;
+		}
+		crouching_ = a_crouching;
+		PED::SET_PED_STEALTH_MOVEMENT(PLAYER::PLAYER_PED_ID(), a_crouching ? TRUE : FALSE, g_stealthAction);
+	}
+
+	// Flying (experimental): the player is held in the air and moved with the movement keys, the way trainers fly.
+	void GtaGame::TickFly(bool a_on)
+	{
+		const Ped ped = PLAYER::PLAYER_PED_ID();
+		if (!a_on) {
+			if (flying_) {
+				flying_ = false;
+				ENTITY::FREEZE_ENTITY_POSITION(ped, FALSE);
+			}
+			return;
+		}
+		if (!flying_) {
+			flying_ = true;
+			ENTITY::FREEZE_ENTITY_POSITION(ped, TRUE);
+		}
+		for (int c : { kControlJump, kControlDuck, kControlSprint, kControlMoveLr, kControlMoveUd }) {
+			CONTROLS::DISABLE_CONTROL_ACTION(0, c, TRUE);
+		}
+		const float forward = -CONTROLS::GET_DISABLED_CONTROL_NORMAL(0, kControlMoveUd);  // -1 is forward
+		const float right = CONTROLS::GET_DISABLED_CONTROL_NORMAL(0, kControlMoveLr);
+		const float rise = (CONTROLS::IS_DISABLED_CONTROL_PRESSED(0, kControlJump) ? 1.0f : 0.0f) - (CONTROLS::IS_DISABLED_CONTROL_PRESSED(0, kControlDuck) ? 1.0f : 0.0f);
+		const float speed = (CONTROLS::IS_DISABLED_CONTROL_PRESSED(0, kControlSprint) ? kFlyFastSpeed : kFlySpeed) * GAMEPLAY::GET_FRAME_TIME();
+		const float h = CAM::_GET_GAMEPLAY_CAM_ROT(kRotationOrderZxy).z;
+		const float fx = -std::sin(h * kDegToRadF), fy = std::cos(h * kDegToRadF);
+		Vector3     p = ENTITY::GET_ENTITY_COORDS(ped, TRUE);
+		p.x += (fx * forward + fy * right) * speed;
+		p.y += (fy * forward - fx * right) * speed;
+		p.z += rise * speed;
+		ENTITY::SET_ENTITY_COORDS_NO_OFFSET(ped, p.x, p.y, p.z, FALSE, FALSE, FALSE);
+		if (forward != 0.0f || right != 0.0f) {
+			ENTITY::SET_ENTITY_HEADING(ped, h);
+		}
+	}
+
+	void GtaGame::SetInvincible(bool a_on)
+	{
+		PLAYER::SET_PLAYER_INVINCIBLE(PLAYER::PLAYER_ID(), a_on ? TRUE : FALSE);
+	}
+
+	void GtaGame::SetCompositorMask(float a_x0, float a_y0, float a_x1, float a_y1)
+	{
+		compositor::set_mask(a_x0, a_y0, a_x1, a_y1);
+	}
+
+	void GtaGame::SetCompositorTranslation(bool a_on)
+	{
+		compositor::set_translation(a_on);
+	}
+
+	// A solid block's space must be clear: cars (by their model's box) and people standing in it.
+	bool GtaGame::BlockSpaceFree(float a_x, float a_y, float a_floorZ, float a_size)
+	{
+		const float cz = a_floorZ + a_size * 0.5f, half = a_size * 0.5f;
+		int         handles[kMaxWorldEntities];
+		const int   cars = worldGetAllVehicles(handles, kMaxWorldEntities);
+		for (int i = 0; i < cars; ++i) {
+			const Vehicle v = handles[i];
+			const Vector3 o = ENTITY::GET_ENTITY_COORDS(v, TRUE);
+			if (std::fabs(o.x - a_x) > 8.0f || std::fabs(o.y - a_y) > 8.0f || std::fabs(o.z - cz) > 8.0f) {
+				continue;
+			}
+			Vector3 mn{}, mx{};
+			GAMEPLAY::GET_MODEL_DIMENSIONS(ENTITY::GET_ENTITY_MODEL(v), &mn, &mx);
+			const Vector3 l = ENTITY::GET_OFFSET_FROM_ENTITY_GIVEN_WORLD_COORDS(v, a_x, a_y, cz);  // the block's centre, in the car's frame
+			if (l.x + half > mn.x && l.x - half < mx.x && l.y + half > mn.y && l.y - half < mx.y && l.z + half > mn.z && l.z - half < mx.z) {
+				return false;
+			}
+		}
+		const int peds = worldGetAllPeds(handles, kMaxWorldEntities);
+		for (int i = 0; i < peds; ++i) {
+			const Vector3 o = ENTITY::GET_ENTITY_COORDS(handles[i], TRUE);  // the ped's middle, about 1 m up
+			if (std::fabs(o.x - a_x) < half + 0.35f && std::fabs(o.y - a_y) < half + 0.35f && o.z - 1.0f < a_floorZ + a_size && o.z + 1.0f > a_floorZ) {
+				return false;
+			}
+		}
+		return true;
 	}
 }

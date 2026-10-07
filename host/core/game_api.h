@@ -33,7 +33,9 @@ namespace craftv::host
 		bool  inVehicle = false;       // IS_PED_IN_ANY_VEHICLE
 		bool  swimming = false;        // IS_PED_SWIMMING
 		bool  sprinting = false;       // IS_PED_SPRINTING
-		bool  phone = false;           // IS_PED_RUNNING_MOBILE_PHONE_TASK
+		bool  phone = false;           // IS_PED_RUNNING_MOBILE_PHONE_TASK, or the phone's script running
+		bool  parachute = false;       // GET_PED_PARACHUTE_STATE: skydiving or under a parachute
+		bool  ragdoll = false;         // IS_PED_RAGDOLL
 		int   health = 0;              // GET_ENTITY_HEALTH (GTA V: the player dies at 100)
 		int   maxHealth = 0;           // GET_ENTITY_MAX_HEALTH
 
@@ -100,6 +102,7 @@ namespace craftv::host
 		bool closeScreen = false;                            // Esc while a Minecraft screen is open
 		bool cursorValid = false;                            // while a Minecraft screen is open:
 		float cursorX = 0, cursorY = 0;                      //   the mouse over the picture, 0..1
+		bool sneak = false;                                  // the crouch key is held (on foot)
 	};
 
 	class IGame
@@ -142,8 +145,24 @@ namespace craftv::host
 			float /*nearClip*/, float /*farClip*/)
 		{
 		}
-		// A Minecraft melee swing: hurt and knock back the people in front of the player, shove cars.
+		// A Minecraft melee swing: hurt and knock back the person or car under the crosshair, if it's within reach.
 		virtual void Melee(float /*damage*/) {}
+		// The owner holds one of the game's guns (CraftV's gun items, 0..kHeldGunCount-1), or none (-1). With a gun the
+		// game's own aim, fire and reload work and TakePassthroughInput doesn't report the mouse to Minecraft.
+		virtual void SetGun(int /*index*/) {}
+		// Every frame on foot: Minecraft's sneak. The game's player creeps (stealth) while it's held.
+		virtual void SetCrouch(bool /*crouching*/) {}
+		// Every frame while flying is on: the player floats and moves with the movement keys (Space up, crouch down).
+		virtual void TickFly(bool /*on*/) {}
+		// Creative mode: the game's player can't get hurt.
+		virtual void SetInvincible(bool /*on*/) {}
+		// A Minecraft bow shot: hits the person or car under the crosshair (like a bullet). Returns how many it hit.
+		virtual int Shoot(float /*damage*/) { return 0; }
+		// The compositor leaves this part of the screen (0..1, x0 y0 x1 y1) to the game, e.g. its phone. All zero: none.
+		virtual void SetCompositorMask(float /*x0*/, float /*y0*/, float /*x1*/, float /*y1*/) {}
+		// Whether the compositor re-projects Minecraft's frame for camera moves too (off in vehicles: the player moves
+		// with the camera there, and moving the picture made him lag behind the car).
+		virtual void SetCompositorTranslation(bool /*on*/) {}
 		// A short on-screen message (the game's notification feed).
 		virtual void Notify(const char* /*text*/) {}
 		// Every frame on foot while the passthrough is on: with a_minecraft, the game's own jump is replaced by a
@@ -165,6 +184,8 @@ namespace craftv::host
 		// An invisible, frozen collision box for one block: x, y its centre, floorZ its bottom, size its edge (metres).
 		// Returns a handle, 0 if the game made none.
 		virtual int  SpawnBlockProp(float /*x*/, float /*y*/, float /*floorZ*/, float /*size*/) { return 0; }
+		// Whether a block's space is clear of cars and people: a frozen box spawned inside a car throws it across the map.
+		virtual bool BlockSpaceFree(float /*x*/, float /*y*/, float /*floorZ*/, float /*size*/) { return true; }
 		virtual void DeleteBlockProp(int /*handle*/) {}
 
 		// ---- the settings menu (F8). Defaults: no menu.

@@ -95,7 +95,7 @@ GTA's depth buffer, and the natives (camera, controls, hiding the ped, melee).
 
 1. Follow `gta/INSTALL.txt` (dist\CraftV): CraftV.asi + CraftV.ini, ReShade with add-on support renamed to
    ReShade64.asi, the "Minecraft view (ReShade)" files, Windowed Borderless with Pause On Focus Loss off.
-2. Minecraft is running. Start GTA, load story mode.
+2. Minecraft is running (`scripts\dev-run.ps1 -NoMock`). Start GTA, load story mode.
 3. Expected: the overlay's first line ends in `MC view`. Your GTA character is gone and Minecraft's hand, hotbar,
    hearts and hunger are on screen. The hotbar holds a sword, pickaxe, axe, shovel, planks, stone bricks, glass,
    torches and steak.

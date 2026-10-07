@@ -114,6 +114,8 @@ namespace craftv::host
 		void SetPassthrough(bool a_on);
 		void TickMenu();
 		void ApplyMenu(int a_row, int a_direction);
+		void TickFall();
+		void TickBody(const PassthroughInput& a_in, bool a_screenOpen);
 		void SendOptions();
 		void TickHealth();
 		void OnWorldEvent(const proto::WorldEventMsg& a_msg);
@@ -170,6 +172,15 @@ namespace craftv::host
 		int                       arrowNext_ = 0;
 		int                       explosionsThisTick_ = 0;
 		std::uint64_t             ignoreDamageUntilMs_ = 0;  // a Minecraft explosion already hurt the player in Minecraft
+		bool                      fly_ = false;          // F8 > Fly (experimental): the player floats, Space up, crouch down
+		bool                      crouching_ = false;    // Minecraft's sneak is held
+		int                       gun_ = -1;             // the game's gun in the owner's hand, -1 none
+		bool                      invincible_ = false;   // creative: the game's player can't get hurt
+		bool                      phoneShown_ = false;   // the game's phone is out: the compositor leaves its corner alone
+		int                       translationOn_ = -1;   // the compositor's camera-move re-projection, -1 not set yet
+		bool                      airborne_ = false;     // falls: in the air since fallTopZ_ (the highest point)
+		double                    fallTopZ_ = 0.0;
+		std::uint64_t             fallGraceUntilMs_ = 0;  // the game's own fall damage is Minecraft's now: not counted twice
 		std::uint64_t             explosions_ = 0, arrowHits_ = 0, damageSent_ = 0;
 		std::uint64_t             lastTickUs_ = 0;
 		double                    frameMsAvg_ = 0.0, frameMsMax_ = 0.0;

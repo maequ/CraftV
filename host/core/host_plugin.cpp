@@ -36,6 +36,10 @@ namespace craftv::host
 		constexpr Rgba          kHeldTorch{ 255, 190, 110, 255 };
 		constexpr int           kMaxExplosionsPerTick = 8;
 		constexpr double        kGtaDeadHealth = 100.0;  // GTA V's player dies at 100 health
+		constexpr double        kSafeFallBlocks = 3.0;   // Minecraft: falls up to 3 blocks don't hurt, then half a heart a block
+		constexpr std::uint64_t kFallGraceMs = 800;      // after landing, the game's own fall damage is ignored (Minecraft's counts)
+		// The game's phone, bottom right: the compositor leaves this to the game (16:9; narrower screens move its left edge).
+		constexpr float         kPhoneWidth169 = 0.27f, kPhoneTop = 0.45f;
 
 		// Overlay layout (screen fractions).
 		constexpr float kOverlayMargin = 0.01f;
@@ -170,6 +174,16 @@ namespace craftv::host
 		}
 		passthroughActive_ = a_on;
 		game_.SetCompositorActive(a_on);
+		if (!a_on) {
+			// back to plain GTA: its own weapons, feet on the ground, standing
+			gun_ = -1;
+			game_.SetGun(-1);
+			game_.TickFly(false);
+			crouching_ = false;
+			game_.SetCrouch(false);
+			phoneShown_ = false;
+			game_.SetCompositorMask(0.0f, 0.0f, 0.0f, 0.0f);
+		}
 		viewSent_ = ViewMsg{};  // size Minecraft's window again next time
 		HostLog::Info("passthrough %s", a_on ? "on: Minecraft draws the player, hand and HUD into the game's picture" : "off");
 	}
@@ -227,6 +241,13 @@ namespace craftv::host
 		}
 		PassthroughInput in;
 		const bool       screenOpen = hasOwner_ && (owner_.flags & kOwnerScreenOpen) != 0;
+		// One of CraftV's gun items in hand: the game's gun of that kind, with the game's own aim and fire.
+		const bool alive = hasOwner_ && (owner_.flags & kOwnerDead) == 0;
+		const int  gun = alive && !screenOpen && !menu_.Open() && !sample_.inVehicle && HeldIsGun(owner_.held) ? owner_.held - kHeldGunFirst : -1;
+		if (gun != gun_) {
+			gun_ = gun;
+			game_.SetGun(gun);
+		}
 		if (screenOpen) {
 			game_.TakeScreenInput(in);  // the inventory: the mouse works it
 		} else {
@@ -240,7 +261,8 @@ namespace craftv::host
 		}
 		// The inventory opens on foot (holding the player still in a moving car would crash it); it closes anywhere.
 		in.inventory = in.inventory || (inventoryKey && !menu_.Open() && (screenOpen || !sample_.inVehicle));
-		if (!screenOpen && !menu_.Open() && !sample_.inVehicle) {
+		TickBody(in, screenOpen);
+		if (!screenOpen && !menu_.Open() && !sample_.inVehicle && !fly_) {
 			game_.TickJump(config_.minecraft.minecraftJump, static_cast<float>(config_.minecraft.jumpHeight));
 		}
 		if (in.inventory) {
@@ -273,7 +295,7 @@ namespace craftv::host
 		if (in.scroll != 0) {
 			endpoint_->Send(InputMsg{ kInputScroll, 0, 0, static_cast<std::int8_t>(std::clamp(in.scroll, -int(kHotbarSlots), int(kHotbarSlots))), 0 });
 		}
-		if (in.attackPressed && !screenOpen && hasOwner_ && (owner_.flags & kOwnerDead) == 0) {
+		if (in.attackPressed && !screenOpen && gun_ < 0 && hasOwner_ && (owner_.flags & kOwnerDead) == 0) {
 			const float damage = MeleeDamage(owner_, config_.passthrough.meleeDamagePerHalfHeart);
 			if (damage > 0.0f) {
 				game_.Melee(damage);
@@ -283,6 +305,7 @@ namespace craftv::host
 		if (config_.passthrough.hideGtaHud) {
 			game_.HideHudThisFrame();
 		}
+		TickFall();
 		TickHealth();
 		if (config_.minecraft.torchLight) {
 			lights_.Draw(game_, config_.world, sample_.x, sample_.y, sample_.z, kLightRadius);
@@ -330,7 +353,9 @@ namespace craftv::host
 			return;
 		}
 		const double perHalfHeart = (sample_.maxHealth - kGtaDeadHealth) / 20.0;  // the game's 100 health over 10 hearts
-		if (lastHealth_ >= 0 && sample_.health < lastHealth_ && nowMs_ >= ignoreDamageUntilMs_) {
+		// While falling (and just after landing) the game's own fall damage is left out: TickFall counts falls Minecraft's way.
+		const bool fallOwned = config_.minecraft.fallDamage && (airborne_ || nowMs_ < fallGraceUntilMs_);
+		if (lastHealth_ >= 0 && sample_.health < lastHealth_ && nowMs_ >= ignoreDamageUntilMs_ && !fallOwned) {
 			damageCarry_ += (lastHealth_ - sample_.health) / perHalfHeart;
 		}
 		if (damageCarry_ >= 1.0) {
@@ -347,6 +372,68 @@ namespace craftv::host
 		lastHealth_ = sample_.maxHealth;
 	}
 
+	// The body each frame: crouching (Minecraft's sneak), flying, creative's invincibility, the phone's corner of the
+	// screen, and whether the compositor follows camera moves (not in cars: Steve moves with the camera there).
+	void HostPlugin::TickBody(const PassthroughInput& a_in, bool a_screenOpen)
+	{
+		const bool onFoot = !sample_.inVehicle;
+		game_.TickFly(fly_ && onFoot);
+		const bool crouch = a_in.sneak && onFoot && !fly_ && !a_screenOpen;
+		if (crouch != crouching_ && endpoint_->Send(InputMsg{ kInputButton, kButtonSneak, static_cast<std::uint8_t>(crouch ? 1 : 0), 0, 0 })) {
+			crouching_ = crouch;
+		}
+		game_.SetCrouch(crouching_);
+		const bool creative = hasOwner_ && owner_.gameMode == 1;
+		if (creative != invincible_) {
+			invincible_ = creative;
+			game_.SetInvincible(creative);
+		}
+		if (sample_.phone != phoneShown_) {
+			phoneShown_ = sample_.phone;
+			HostLog::Info("phone %s", phoneShown_ ? "out: Steve holds it up; Minecraft stays off its corner of the screen" : "away");
+			if (phoneShown_) {
+				int w = 0, h = 0;
+				const float aspect = game_.ScreenSize(w, h) && h > 0 ? static_cast<float>(w) / static_cast<float>(h) : 16.0f / 9.0f;
+				const float width = std::min(0.5f, kPhoneWidth169 * (16.0f / 9.0f) / aspect);
+				game_.SetCompositorMask(1.0f - width, kPhoneTop, 1.0f, 1.0f);
+			} else {
+				game_.SetCompositorMask(0.0f, 0.0f, 0.0f, 0.0f);
+			}
+		}
+		const int translation = onFoot ? 1 : 0;
+		if (translation != translationOn_) {
+			translationOn_ = translation;
+			game_.SetCompositorTranslation(translation != 0);
+		}
+	}
+
+	// Falls hurt the Minecraft way: from the highest point in the air to where the player lands, past 3 blocks half a
+	// heart a block. Landing in water, in a car, under a parachute, flying or in creative doesn't hurt.
+	void HostPlugin::TickFall()
+	{
+		const bool air = !sample_.inVehicle && !sample_.swimming && !sample_.parachute && !fly_ && (sample_.inAir || sample_.falling || sample_.ragdoll);
+		if (air) {
+			fallTopZ_ = airborne_ ? std::max(fallTopZ_, static_cast<double>(sample_.z)) : static_cast<double>(sample_.z);
+			airborne_ = true;
+			return;
+		}
+		if (!airborne_) {
+			return;
+		}
+		airborne_ = false;
+		fallGraceUntilMs_ = nowMs_ + kFallGraceMs;
+		const bool creative = hasOwner_ && owner_.gameMode == 1;
+		if (!config_.minecraft.fallDamage || creative || sample_.swimming || sample_.inVehicle || fly_ || !hasOwner_ || (owner_.flags & kOwnerDead) != 0) {
+			return;
+		}
+		const double blocks = (fallTopZ_ - sample_.z) * config_.world.blocksPerMetre;
+		const int    half = static_cast<int>(std::ceil(blocks - kSafeFallBlocks));
+		if (half >= 1 && endpoint_->Send(InputMsg{ kInputDamage, kDamageFall, 0, static_cast<std::int8_t>(std::min(half, 127)), 0 })) {
+			++damageSent_;
+			HostLog::Info("fall: %.1f blocks, %d half hearts", blocks, half);
+		}
+	}
+
 	void HostPlugin::OnWorldEvent(const WorldEventMsg& a_msg)
 	{
 		double x, y, z;
@@ -361,6 +448,13 @@ namespace craftv::host
 					ignoreDamageUntilMs_ = nowMs_ + 600;  // Minecraft's own blast already cost hearts: don't count the game's copy too
 				}
 				HostLog::Info("explosion from Minecraft at %.1f %.1f %.1f (power %.1f)", x, y, z, a_msg.power);
+			}
+			return;
+		}
+		if (a_msg.kind == kEventShot) {
+			// The owner's bow: it hits what the crosshair is on, at once, like a gun (the arrow in Minecraft is for show).
+			if (config_.minecraft.arrowsHurt && game_.Shoot(static_cast<float>(a_msg.power * config_.passthrough.meleeDamagePerHalfHeart)) > 0) {
+				++arrowHits_;
 			}
 			return;
 		}
@@ -434,6 +528,9 @@ namespace craftv::host
 		enum MenuRowId
 		{
 			kRowView,
+			kRowCreative,
+			kRowFly,
+			kRowRefill,
 			kRowQuality,
 			kRowFrameRate,
 			kRowCrosshair,
@@ -446,6 +543,7 @@ namespace craftv::host
 			kRowExplosions,
 			kRowArrows,
 			kRowTorches,
+			kRowFallDamage,
 			kRowInventoryKey,
 			kRowHits,
 			kRowHideGtaHud,
@@ -491,6 +589,9 @@ namespace craftv::host
 		}
 		const MenuRow rows[kRowCount] = {
 			{ "Minecraft view", OnOff(passthroughWanted_), "Minecraft drawn into GTA. F7 also switches it.", true },
+			{ "Creative mode", OnOff(hasOwner_ && owner_.gameMode == 1), "Unlimited blocks, and you can't get hurt in Minecraft or GTA.", true },
+			{ "Fly (experimental)", OnOff(fly_), "Float around: move keys to fly, Space up, Ctrl down, Shift faster.", true },
+			{ "Refill kit", "Press Enter", "Tops up your kit and ammo, and fills your hearts and hunger.", true },
 			{ "Minecraft quality", kQuality[quality].name, "How sharp Minecraft looks. Lower runs faster.", true },
 			{ "Minecraft frame rate", kFrameRates[rate].name, "Higher is smoother when you turn the camera; costs some FPS.", true },
 			{ "Crosshair", OnOff(mc.crosshair), "Minecraft's + in the middle of the screen, in third person too.", true },
@@ -503,6 +604,7 @@ namespace craftv::host
 			{ "TNT in GTA", OnOff(mc.explosions), "Minecraft explosions blow up GTA too (cars, people).", true },
 			{ "Arrows hurt people", OnOff(mc.arrowsHurt), "Minecraft arrows hit GTA's people.", true },
 			{ "Torch light", OnOff(mc.torchLight), "Minecraft torches (and one in your hand) light up GTA.", true },
+			{ "Fall damage", OnOff(mc.fallDamage), "Falls cost hearts the Minecraft way: more than 3 blocks down.", true },
 			{ "Inventory key", kInventoryKeys[key].name, "Opens Minecraft's inventory. Esc closes it.", true },
 			{ "Hit strength", kHits[hits].name, "How hard your Minecraft hits are on people and cars.", true },
 			{ "Hide GTA HUD", OnOff(config_.passthrough.hideGtaHud), "Hide GTA's minimap and HUD in the Minecraft view.", true },
@@ -529,6 +631,21 @@ namespace craftv::host
 		case kRowView:
 			passthroughWanted_ = !passthroughWanted_;
 			config_.passthrough.mode = passthroughWanted_ ? PassthroughMode::kAuto : PassthroughMode::kOff;
+			break;
+		case kRowCreative:
+			endpoint_->Send(InputMsg{ kInputOption, kOptionGameMode, 0, static_cast<std::int8_t>(hasOwner_ && owner_.gameMode == 1 ? 0 : 1), 0 });
+			break;
+		case kRowFly:
+			fly_ = !fly_;
+			game_.Notify(fly_ ? "CraftV: flying. Space up, Ctrl down, Shift faster" : "CraftV: flying off");
+			break;
+		case kRowRefill:
+			if (endpoint_->Send(InputMsg{ kInputOption, kOptionRefill, 0, 1, 0 })) {
+				game_.Notify("CraftV: kit refilled");
+			}
+			break;
+		case kRowFallDamage:
+			mc.fallDamage = !mc.fallDamage;
 			break;
 		case kRowQuality: {
 			const int i = Nearest(kQuality, [&](const Step& s) { return Distance(static_cast<double>(s.value), static_cast<double>(config_.passthrough.maxPixels)); });

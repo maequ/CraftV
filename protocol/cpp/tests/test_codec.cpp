@@ -520,13 +520,18 @@ TEST_CASE("codec: v1.2 validation rejects bad values")
 	CHECK(!codec::Valid(InputMsg{ kInputSlot, 0, 0, 9, 0 }));
 	CHECK(codec::Valid(InputMsg{ kInputScroll, 0, 0, -1, 0 }));
 	CHECK(!codec::Valid(InputMsg{ kInputScroll, 0, 0, 0, 0 }));
-	CHECK(!codec::Valid(InputMsg{ kInputButton, 8, 1, 0, 0 }));
+	CHECK(codec::Valid(InputMsg{ kInputButton, kButtonSneak, 1, 0, 0 }));  // v1.5
+	CHECK(!codec::Valid(InputMsg{ kInputButton, 9, 1, 0, 0 }));
 	CHECK(!codec::Valid(InputMsg{ 7, 0, 0, 0, 0 }));
 
 	auto owner = golden::OwnerState();
 	CHECK(codec::Valid(owner));
 	auto badOwner = owner;
 	badOwner.held = 9;
+	CHECK(!codec::Valid(badOwner));
+	badOwner.held = kHeldGunFirst + kHeldGunCount - 1;  // v1.5: the last gun
+	CHECK(codec::Valid(badOwner));
+	badOwner.held = kHeldGunFirst + kHeldGunCount;
 	CHECK(!codec::Valid(badOwner));
 	badOwner = owner;
 	badOwner.attackCharge = 1.5f;
@@ -575,7 +580,9 @@ TEST_CASE("codec: v1.4 WORLD_EVENT, INPUT DAMAGE/OPTION and the new flags")
 	CHECK_EQ(codec::FixedPayloadBytes(kMsgWorldEvent), std::uint32_t(40));
 	CHECK(codec::Valid(golden::WorldEvent()));
 	auto ev = golden::WorldEvent();
-	ev.kind = 3;
+	ev.kind = kEventShot;  // v1.5
+	CHECK(codec::Valid(ev));
+	ev.kind = 4;
 	CHECK(!codec::Valid(ev));
 	ev = golden::WorldEvent();
 	ev.power = -1.0f;

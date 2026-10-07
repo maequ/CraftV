@@ -58,6 +58,7 @@ namespace craftv::host
 		bool   arrowsHurt = true;     // Minecraft arrows hurt the game's people
 		bool   torchLight = true;     // Minecraft torches light up the game
 		int    inventoryKey = 0x45;   // a Windows virtual key: E (0x45), Tab (0x09) or I (0x49)
+		bool   fallDamage = true;     // falls cost hearts the way Minecraft counts them (past 3 blocks)
 	};
 
 	struct Config

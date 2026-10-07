@@ -31,7 +31,7 @@ public final class Proto {
 	// ---- identity (§2, §3) ----------------------------------------------------------------------
 	public static final int MAGIC = 0x56465243; // bytes 43 52 46 56 = "CRFV"
 	public static final int VERSION_MAJOR = 1;
-	public static final int VERSION_MINOR = 4;
+	public static final int VERSION_MINOR = 5;
 	public static final String DEFAULT_MAPPING_NAME = "Local\\CraftV_Shared_v1";
 
 	public static final int ROLE_NONE = 0;
@@ -211,17 +211,19 @@ public final class Proto {
 	public static final int DAMAGE_GENERIC = 0, DAMAGE_MELEE = 1, DAMAGE_BULLET = 2, DAMAGE_EXPLOSION = 3, DAMAGE_VEHICLE = 4, DAMAGE_FALL = 5, DAMAGE_FIRE = 6,
 		DAMAGE_DROWN = 7, DAMAGE_CAUSE_MAX = 7;
 	public static final int OPTION_CROSSHAIR = 1, OPTION_HAND = 2, OPTION_OUTLINE = 3, OPTION_FRAME_RATE = 4, OPTION_HUD = 5, OPTION_VEHICLE_BODY = 6,
-		OPTION_MAX = 6;
+		OPTION_GAME_MODE = 7, OPTION_REFILL = 8, OPTION_MAX = 8; // v1.5: game mode, refill
 	public static final int BUTTON_ATTACK = 1, BUTTON_USE = 2, BUTTON_PICK = 3, BUTTON_DROP = 4, BUTTON_INVENTORY = 5, BUTTON_SWAP_HANDS = 6,
-		BUTTON_CLOSE_SCREEN = 7;
+		BUTTON_CLOSE_SCREEN = 7, BUTTON_SNEAK = 8; // v1.5: sneak
 	public static final int HOTBAR_SLOTS = 9;
 	public static final int HELD_EMPTY = 0, HELD_SWORD = 1, HELD_AXE = 2, HELD_PICKAXE = 3, HELD_SHOVEL = 4, HELD_HOE = 5, HELD_BLOCK = 6, HELD_OTHER = 7, HELD_LIGHT = 8,
 		HELD_MAX = HELD_LIGHT;
+	/** v1.5: one of the host game's guns: HELD_GUN_FIRST + the gun's index. */
+	public static final int HELD_GUN_FIRST = 16, HELD_GUN_COUNT = 8;
 	public static final int OWNER_DEAD = 1, OWNER_SCREEN_OPEN = 1 << 1, OWNER_KNOWN_FLAGS = OWNER_DEAD | OWNER_SCREEN_OPEN;
 	public static final int MAX_FOOD = 20;
 	public static final float MAX_ATTACK_DAMAGE = 1000.0F;
 	// §7.20 WORLD_EVENT (v1.4)
-	public static final int EVENT_EXPLOSION = 1, EVENT_PROJECTILE = 2, EVENT_KIND_MAX = 2;
+	public static final int EVENT_EXPLOSION = 1, EVENT_PROJECTILE = 2, EVENT_SHOT = 3, EVENT_KIND_MAX = 3; // v1.5: shot
 	public static final float MAX_EVENT_POWER = 1000.0F;
 	// §11 the frame mapping (v1.2)
 	public static final String FRAME_MAPPING_NAME = "Local\\CraftV_Frame_v1";

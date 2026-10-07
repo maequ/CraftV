@@ -22,6 +22,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(AvatarRenderer.class)
 abstract class AvatarRendererMixin {
+	private static final float SEATED_SCALE = 0.78F;
+	private static final int GRENADE = 7; // Guns.IDS: thrown, not aimed
+
 	@Inject(method = "extractRenderState(Lnet/minecraft/world/entity/Avatar;Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;F)V",
 		at = @At("TAIL"))
 	private void craftv$hostPose(Avatar entity, AvatarRenderState state, float partialTicks, CallbackInfo ci) {
@@ -29,12 +32,21 @@ abstract class AvatarRendererMixin {
 		if (c == null || !(entity instanceof LocalPlayer)) {
 			return;
 		}
-		state.pose = Pose.STANDING;
+		boolean crouching = entity.isCrouching() && (c.flags() & CAMERA_IN_VEHICLE) == 0;
+		state.pose = crouching ? Pose.CROUCHING : Pose.STANDING; // Ctrl in the host game is Minecraft's sneak (v1.5)
+		state.isCrouching = crouching;
 		if ((c.flags() & CAMERA_IN_VEHICLE) != 0) {
 			state.isPassenger = true;
+			// Steve is taller than a car's seat allows: his head came out of the roof (Sary, 2026-10-07). Smaller while seated.
+			state.scale *= SEATED_SCALE;
+		}
+		int gun = dev.craftv.coop.Guns.index(entity.getMainHandItem());
+		if (gun >= 0 && gun != GRENADE && !crouching) {
+			state.rightArmPose = HumanoidModel.ArmPose.CROSSBOW_HOLD; // both arms up, aiming: GTA's gun is in his hands
 		}
 		if ((c.flags() & CAMERA_PHONE) != 0) {
-			state.rightArmPose = HumanoidModel.ArmPose.SPYGLASS;
+			state.rightArmPose = HumanoidModel.ArmPose.SPYGLASS; // the phone held up to his face
+			state.leftArmPose = HumanoidModel.ArmPose.EMPTY;
 		}
 	}
 }

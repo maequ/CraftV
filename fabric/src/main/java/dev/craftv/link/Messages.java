@@ -741,7 +741,7 @@ public final class Messages {
 
 		public boolean valid() {
 			return switch (kind) {
-				case INPUT_BUTTON -> button >= BUTTON_ATTACK && button <= BUTTON_CLOSE_SCREEN && (down == 0 || down == 1) && value == 0;
+				case INPUT_BUTTON -> button >= BUTTON_ATTACK && button <= BUTTON_SNEAK && (down == 0 || down == 1) && value == 0;
 				case INPUT_SLOT -> button == 0 && down == 0 && value >= 0 && value < HOTBAR_SLOTS;
 				case INPUT_SCROLL -> button == 0 && down == 0 && value != 0 && value >= -HOTBAR_SLOTS && value <= HOTBAR_SLOTS;
 				case INPUT_CURSOR -> button == 0 && down == 0 && value == 0;
@@ -781,7 +781,7 @@ public final class Messages {
 		}
 
 		public boolean valid() {
-			return held >= HELD_EMPTY && held <= HELD_MAX && health >= 0 && health <= 255 && food >= 0 && food <= MAX_FOOD && gameMode >= 0
+			return (held >= HELD_EMPTY && held <= HELD_MAX || held >= HELD_GUN_FIRST && held < HELD_GUN_FIRST + HELD_GUN_COUNT) && health >= 0 && health <= 255 && food >= 0 && food <= MAX_FOOD && gameMode >= 0
 				&& gameMode <= GAME_MODE_MAX && Float.isFinite(attackDamage) && attackDamage >= 0.0F && attackDamage <= MAX_ATTACK_DAMAGE
 				&& Float.isFinite(attackCharge) && attackCharge >= 0.0F && attackCharge <= 1.0F && (flags & ~OWNER_KNOWN_FLAGS) == 0;
 		}

@@ -245,7 +245,8 @@ class GoldenVectorsTest {
 		assertFalse(new Messages.Input(INPUT_SLOT, 0, 0, 9).valid());
 		assertTrue(new Messages.Input(INPUT_SCROLL, 0, 0, -1).valid());
 		assertFalse(new Messages.Input(INPUT_SCROLL, 0, 0, 0).valid());
-		assertFalse(new Messages.Input(INPUT_BUTTON, 8, 1, 0).valid());
+		assertTrue(new Messages.Input(INPUT_BUTTON, BUTTON_SNEAK, 1, 0).valid()); // v1.5
+		assertFalse(new Messages.Input(INPUT_BUTTON, 9, 1, 0).valid());
 		assertFalse(new Messages.OwnerState(9, 20, 20, 0, 1, 1, 0).valid());
 		assertTrue(new Messages.OwnerState(HELD_LIGHT, 20, 20, 0, 1, 1, 0).valid());
 		assertFalse(new Messages.OwnerState(HELD_SWORD, 20, 20, 0, 1, 1.5F, 0).valid());
@@ -259,7 +260,8 @@ class GoldenVectorsTest {
 	void v14ValidationAndDirections() {
 		assertTrue(allowedFrom(MSG_WORLD_EVENT, ROLE_MC));
 		assertFalse(allowedFrom(MSG_WORLD_EVENT, ROLE_HOST));
-		assertFalse(new Messages.WorldEvent(3, 1, 0, 64, 0, 0).valid());
+		assertTrue(new Messages.WorldEvent(EVENT_SHOT, 1, 0, 64, 0, 0).valid()); // v1.5
+		assertFalse(new Messages.WorldEvent(4, 1, 0, 64, 0, 0).valid());
 		assertFalse(new Messages.WorldEvent(EVENT_EXPLOSION, -1, 0, 64, 0, 0).valid());
 		assertTrue(new Messages.Input(INPUT_DAMAGE, DAMAGE_BULLET, 0, 6).valid());
 		assertFalse(new Messages.Input(INPUT_DAMAGE, DAMAGE_BULLET, 0, 0).valid());

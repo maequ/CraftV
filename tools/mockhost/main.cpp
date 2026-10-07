@@ -274,8 +274,8 @@ namespace
 				Out("commands: status | friends | ground X Z | terrain on|off | setblock X Y Z ID | break X Y Z | place X Y Z FACE [ID] | center X Y Z |"
 					" radius R | speed S | walk | stop | kill-link | resume-link | restart | quit");
 				Out("passthrough (v1.2): cam on|off|first|third | pitch DEG | view W H | press attack|use|pick|drop|inventory|swap|close |"
-					" hold attack|use | release attack|use | slot N | scroll D");
-				Out("v1.4: hurt HALF_HEARTS | option ID VALUE (1 crosshair, 2 hand, 3 outline, 4 frame rate/10, 5 hud, 6 vehicle body)");
+					" hold attack|use|sneak | release attack|use|sneak | slot N | scroll D");
+				Out("v1.4: hurt HALF_HEARTS | option ID VALUE (1 crosshair, 2 hand, 3 outline, 4 frame rate/10, 5 hud, 6 vehicle body, 7 creative, 8 refill)");
 			} else if (cmd == "status") {
 				PrintStatus();
 			} else if (cmd == "friends") {
@@ -388,13 +388,13 @@ namespace
 			} else if (cmd == "press" || cmd == "hold" || cmd == "release") {
 				std::string name;
 				in >> name;
-				static const char* buttons[] = { "", "attack", "use", "pick", "drop", "inventory", "swap", "close" };
+				static const char* buttons[] = { "", "attack", "use", "pick", "drop", "inventory", "swap", "close", "sneak" };
 				std::uint8_t button = 0;
-				for (std::uint8_t i = 1; i <= kButtonCloseScreen; ++i) {
+				for (std::uint8_t i = 1; i <= kButtonSneak; ++i) {
 					if (name == buttons[i]) button = i;
 				}
 				if (!button) {
-					Out("usage: press|hold|release attack|use|pick|drop|inventory|swap|close");
+					Out("usage: press|hold|release attack|use|pick|drop|inventory|swap|close|sneak");
 					return;
 				}
 				InputMsg down{ kInputButton, button, 1, 0, 0 }, up{ kInputButton, button, 0, 0, 0 };
@@ -407,6 +407,12 @@ namespace
 				in >> v;
 				InputMsg msg{ cmd == "slot" ? kInputSlot : kInputScroll, 0, 0, static_cast<std::int8_t>(v), 0u };
 				Out("%s INPUT %s %d", codec::Valid(msg) && endpoint_->Send(msg) ? "sent" : "NOT sent (slot 0..8, scroll -9..9 non-zero)", cmd.c_str(), v);
+			} else if (cmd == "cursor") {
+				float cx = 0, cy = 0;
+				in >> cx >> cy;
+				const auto q = [](float v) { return static_cast<std::uint32_t>(std::clamp(v, 0.0f, 1.0f) * 65535.0f + 0.5f); };
+				InputMsg msg{ kInputCursor, 0, 0, 0, q(cx) | (q(cy) << 16) };
+				Out("%s INPUT CURSOR %.3f %.3f", endpoint_->Send(msg) ? "sent" : "NOT sent", cx, cy);
 			} else if (cmd == "camrig") {
 				in >> camBehind_ >> camAbove_ >> camOrbit_ >> camFov_;
 				Out("camera rig: %.1f m back, %.1f m up, %.0f deg round, fov %.0f", camBehind_, camAbove_, camOrbit_, camFov_);
@@ -424,7 +430,7 @@ namespace
 				int id = 0, value = 0;
 				in >> id >> value;
 				InputMsg msg{ kInputOption, static_cast<std::uint8_t>(id), 0, static_cast<std::int8_t>(value), 0u };
-				Out("%s INPUT OPTION %d = %d", codec::Valid(msg) && endpoint_->Send(msg) ? "sent" : "NOT sent (option 1..6, value 0..127)", id, value);
+				Out("%s INPUT OPTION %d = %d", codec::Valid(msg) && endpoint_->Send(msg) ? "sent" : "NOT sent (option 1..8, value 0..127)", id, value);
 			} else if (cmd == "quit" || cmd == "exit") {
 				quit_ = true;
 			} else {
@@ -556,7 +562,8 @@ namespace
 					}
 					static const char* held[] = { "empty hand", "sword", "axe", "pickaxe", "shovel", "hoe", "block", "other item", "light" };
 					if (++ownerStates_ <= 3 || ownerStates_ % 20 == 0) {
-						Out("@OWNER held=%s damage=%.1f charge=%.2f health=%u food=%u gameMode=%u flags=%u", held[m.held], m.attackDamage, m.attackCharge,
+						static const char* guns[] = { "gun: pistol", "gun: SMG", "gun: assault rifle", "gun: shotgun", "gun: sniper rifle", "gun: RPG", "gun: minigun", "gun: grenade" };
+						Out("@OWNER held=%s damage=%.1f charge=%.2f health=%u food=%u gameMode=%u flags=%u", HeldIsGun(m.held) ? guns[m.held - kHeldGunFirst] : m.held <= kHeldMax ? held[m.held] : "?", m.attackDamage, m.attackCharge,
 							m.health, m.food, m.gameMode, m.flags);
 					}
 					return;

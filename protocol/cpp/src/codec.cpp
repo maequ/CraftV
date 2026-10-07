@@ -273,7 +273,7 @@ namespace craftv::codec
 	{
 		switch (a_msg.kind) {
 		case kInputButton:
-			return a_msg.button >= kButtonAttack && a_msg.button <= kButtonCloseScreen && a_msg.down <= 1 && a_msg.value == 0;
+			return a_msg.button >= kButtonAttack && a_msg.button <= kButtonSneak && a_msg.down <= 1 && a_msg.value == 0;
 		case kInputSlot:
 			return a_msg.button == 0 && a_msg.down == 0 && a_msg.value >= 0 && a_msg.value < kHotbarSlots;
 		case kInputScroll:
@@ -291,7 +291,7 @@ namespace craftv::codec
 
 	bool Valid(const OwnerStateMsg& a_msg)
 	{
-		return a_msg.held <= kHeldMax && a_msg.food <= kMaxFood && a_msg.gameMode <= kGameModeMax && Finite(a_msg.attackDamage) &&
+		return (a_msg.held <= kHeldMax || HeldIsGun(a_msg.held)) && a_msg.food <= kMaxFood && a_msg.gameMode <= kGameModeMax && Finite(a_msg.attackDamage) &&
 		       a_msg.attackDamage >= 0.0f && a_msg.attackDamage <= kMaxAttackDamage && Finite(a_msg.attackCharge) && a_msg.attackCharge >= 0.0f &&
 		       a_msg.attackCharge <= 1.0f && (a_msg.flags & ~kOwnerKnownFlags) == 0;
 	}

@@ -41,6 +41,9 @@ namespace
 	std::atomic<float> g_hostFar{10000.0f};
 	std::atomic<uint32_t> g_bbWidth{0}, g_bbHeight{0};
 	std::atomic<bool> g_cameraLocked{false};
+	std::atomic<bool> g_translation{true}; // re-project camera moves too (off in vehicles)
+	std::mutex g_maskLock;
+	float g_mask[4] = {0, 0, 0, 0};
 
 	struct Pose
 	{
@@ -293,6 +296,11 @@ namespace
 			runtime->set_uniform_value_float(v, g_mcNear, g_mcFar, float(g_mcFlags));
 		if (const effect_uniform_variable v = runtime->find_uniform_variable(kEffect, "HostPlanes"); v.handle != 0)
 			runtime->set_uniform_value_float(v, g_hostNear.load(), g_hostFar.load());
+		if (const effect_uniform_variable v = runtime->find_uniform_variable(kEffect, "McMask"); v.handle != 0)
+		{
+			std::lock_guard<std::mutex> lock(g_maskLock);
+			runtime->set_uniform_value_float(v, g_mask[0], g_mask[1], g_mask[2], g_mask[3]);
+		}
 
 		// Re-projection from Minecraft's pose to GTA's latest (extrapolated by the effect's PosePrediction frames).
 		Pose host, prev;
@@ -322,6 +330,12 @@ namespace
 		float t[3] = {0, 0, 0};
 		if (warp)
 		{
+			if (!g_translation)
+			{
+				host.x = g_mcPose.x; // the player moves with the camera (a car): only turns are re-projected
+				host.y = g_mcPose.y;
+				host.z = g_mcPose.z;
+			}
 			warp_matrix(host, g_mcPose, m);
 			// T = R_mc^T (host position - Minecraft's camera position), in Minecraft's camera space
 			float rm[3][3];
@@ -416,6 +430,20 @@ namespace compositor
 	{
 		g_poseLag = frames;
 	}
+
+	void set_mask(float x0, float y0, float x1, float y1)
+	{
+		std::lock_guard<std::mutex> lock(g_maskLock);
+		g_mask[0] = x0;
+		g_mask[1] = y0;
+		g_mask[2] = x1;
+		g_mask[3] = y1;
+	}
+
+	void set_translation(bool on)
+	{
+		g_translation = on;
+	}
 }
 
 #else
@@ -430,6 +458,8 @@ namespace compositor
 	void set_host_pose(float, float, float, float, double, double, double) {}
 	void set_pose_lag(int) {}
 	void set_camera_locked(bool) {}
+	void set_mask(float, float, float, float) {}
+	void set_translation(bool) {}
 	void backbuffer_size(int &width, int &height) { width = height = 0; }
 }
 

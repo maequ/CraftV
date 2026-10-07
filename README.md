@@ -45,13 +45,18 @@ Help, bug reports, clips and people to play with are on the [Discord server](htt
   blocks, torches, food, redstone and a crafting table. Running uses up hunger and you eat with right click.
   If you get hurt in GTA you lose Minecraft hearts. If you die in Minecraft you get wasted in GTA.
 - **Fight people and cars.** Hit someone in GTA with the sword and they get hurt and knocked back. Some run
-  away and some fight back. Cars get dented too. Arrows hit people. TNT explodes in GTA, so cars blow up.
+  away and some fight back. Cars get dented too. The bow hits whatever your crosshair is on. TNT explodes in
+  GTA, so cars blow up.
+- **Use GTA's guns.** Your kit has GTA's guns as Minecraft items: pistol, SMG, assault rifle, shotgun, sniper
+  rifle, RPG, minigun and grenades. Pick one in the hotbar and you're holding GTA's real gun. Steve aims it.
 - **Build anywhere.** Put blocks on the street, on roofs, anywhere. They're solid in GTA: people and cars bump into
   them and you can stand on them. Torches light up the street at night.
-- **Jump like in Minecraft.** Space does a straight jump up instead of GTA's jump.
+- **Move like Minecraft.** Space does a straight jump up instead of GTA's jump, Ctrl crouches, and falls
+  cost hearts once they're more than 3 blocks.
 - **Play with friends.** A friend with plain Minecraft joins your world and walks around a blocky copy of
   Los Santos. A friend with their own GTA V and CraftV plays exactly like you, in the same world.
-- **Change settings in game.** Press F8 for CraftV's menu. It looks like GTA's own menus.
+- **Change settings in game.** Press F8 for CraftV's menu. It looks like GTA's own menus. It also has
+  creative mode, flying and a button that refills your kit.
 
 ## Tested so far
 
@@ -60,13 +65,16 @@ These have been tested in a real game (GTA V Legacy, build 3725):
 - Minecraft drawn into GTA, with the hand, hotbar and HUD
 - Placing blocks on GTA's streets
 - Hitting people in GTA
+- TNT blowing up in GTA
 - A friend joining from plain Minecraft
 - Copying GTA's ground into Minecraft
 
 These have been tested only without GTA (automated tests, two copies of Minecraft on one PC, a fake GTA):
 
 - Steve in cars, and the phone pose
-- The Minecraft jump
+- The Minecraft jump, crouching and fall damage
+- GTA's guns as Minecraft items
+- Creative mode, flying and refilling the kit
 - GTA damage costing hearts, and getting wasted when you die in Minecraft
 - TNT and arrows in GTA, and torch light
 - Solid blocks
@@ -152,11 +160,14 @@ Turning **Depth of Field** off is also a good idea. GTA blurs its own picture, b
 | Mouse wheel or 1 to 9 | Pick a hotbar slot |
 | E | Open Minecraft's inventory. Use the mouse in it. Esc closes it |
 | Space | Minecraft jump |
+| Ctrl | Crouch (sneak) |
+| R | Reload, while holding one of the guns |
 | F7 | Turn the Minecraft view on or off |
 | F8 | CraftV settings |
 
-Walking, driving and the camera are normal GTA controls. GTA's own guns are turned off while the Minecraft view
-is on. Your weapons are Minecraft's: the sword, the bow and TNT.
+Walking, driving and the camera are normal GTA controls. GTA's weapon wheel is off while the Minecraft view is
+on: your weapons are in the hotbar. Pick a gun and GTA's aim and fire work (right mouse aims, left mouse shoots).
+Pick the sword, the bow or TNT and the mouse does Minecraft things again.
 
 ## Playing with friends
 
@@ -191,6 +202,9 @@ in `CraftV.ini` next to `CraftV.asi`, so you can also change it there.
 | Setting | Options | What it does |
 |---|---|---|
 | Minecraft view | On, Off | Minecraft drawn into GTA. F7 does the same |
+| Creative mode | On, Off | Unlimited blocks, and you can't get hurt in Minecraft or GTA |
+| Fly (experimental) | On, Off | Float around. Movement keys to fly, Space up, Ctrl down, Shift faster |
+| Refill kit | | Tops up your kit, fills your hearts and hunger |
 | Minecraft quality | Low, Medium, High, Very high, Max | How sharp Minecraft looks. Lower runs faster |
 | Minecraft frame rate | 60, 90, 120, 144, Unlimited | Higher looks smoother when you turn the camera fast |
 | Crosshair | On, Off | Minecraft's + in the middle of the screen, also in third person |
@@ -203,6 +217,7 @@ in `CraftV.ini` next to `CraftV.asi`, so you can also change it there.
 | TNT in GTA | On, Off | Minecraft explosions also happen in GTA |
 | Arrows hurt people | On, Off | Minecraft arrows hit people in GTA |
 | Torch light | On, Off | Torches light up GTA |
+| Fall damage | On, Off | Falls cost hearts the Minecraft way |
 | Inventory key | E, Tab, I | The key that opens the inventory |
 | Hit strength | Weak, Normal, Strong, Brutal | How much your hits hurt people in GTA |
 | Hide GTA HUD | On, Off | Hides GTA's minimap and HUD |
@@ -246,7 +261,7 @@ With their own GTA V and CraftV, they get everything you get.
 
 **Is my normal Minecraft affected?** No, as long as you gave the Fabric installation its own game directory.
 
-**Can I use GTA's guns?** Not while the Minecraft view is on. Press F7 to switch back to normal GTA.
+**Can I use GTA's guns?** Yes. They're in your kit as Minecraft items. Pick one in the hotbar.
 
 **What happens to my GTA health?** With GTA damage on, Minecraft's hearts decide. GTA's health is kept full,
 and every hit in GTA costs hearts instead.
@@ -258,6 +273,7 @@ and every hit in GTA costs hearts instead.
 - Inside buildings and under bridges, the copied ground is the roof.
 - At most 400 blocks near you are solid in GTA. GTA crashes if a mod makes too many objects.
 - Running two games at once costs FPS.
+- Friends playing plain Minecraft (without the CraftV mod) see CraftV's gun items as a purple and black block.
 
 The full list is in [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 

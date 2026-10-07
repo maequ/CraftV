@@ -5,7 +5,8 @@ and hunger, the blocks you place, and your friends with their own skins.
 
 1) Update CraftV (every new build)
    Copy CraftV.asi and CraftV.ini into the game folder (the one with GTA5.exe), replacing the
-   old ones.
+   old ones. Also copy the reshade-shaders folder from "Minecraft view (ReShade)" again when a
+   build changes it (this one does: Minecraft now stays off GTA's phone).
 
 2) One time: install ReShade (it draws Minecraft into GTA's picture)
    a. Download ReShade from the official site only: https://reshade.me
@@ -27,9 +28,13 @@ and hunger, the blocks you place, and your friends with their own skins.
    The CraftV overlay (top right) says "MC view" while it's on. F7 turns it on and off.
    Left mouse: break blocks and hit (people in GTA get hurt too). Right mouse: place, use, eat, draw the bow.
    Mouse wheel and 1-9: the hotbar. E: Minecraft's inventory (use the mouse; Esc closes it).
-   Space: a straight Minecraft jump. F8: CraftV's settings (crosshair, hand, frame rate, jump, damage...).
-   You're in Survival: running costs hunger, eat with right mouse. Getting hurt in GTA costs hearts, and dying
-   in Minecraft gets you wasted. TNT blows up GTA too, arrows hurt people, torches light up the street.
+   Space: a straight Minecraft jump. Ctrl: crouch (sneak). F8: CraftV's settings.
+   Guns: your kit has GTA's guns as Minecraft items (pistol, SMG, assault rifle, shotgun, sniper,
+   RPG, minigun, grenade). Pick one in the hotbar and it's GTA's real gun: right mouse aims, left
+   mouse shoots, R reloads. The bow hits what your crosshair is on.
+   F8 also has Creative mode, Fly (experimental) and Refill kit.
+   You're in Survival: running costs hunger, eat with right mouse. Getting hurt in GTA costs hearts, falls
+   cost hearts the Minecraft way (more than 3 blocks), and dying in Minecraft gets you wasted. TNT blows up GTA too, arrows hurt people, torches light up the street.
    Blocks you and friends build are solid in GTA (people, cars and you bump into them).
 
 If something's wrong, send CraftV.log (next to GTA5.exe).

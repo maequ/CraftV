@@ -161,58 +161,120 @@ public final class CoopServer {
 		CraftLog.info("friend joined: " + player.getGameProfile().name() + " (" + player.getUUID() + ")");
 	}
 
-	/** The owner's starter hotbar (brief §8: Survival with a kit). */
+	/** The owner's starter hotbar (brief §8: Survival with a kit): GTA's guns next to Minecraft's tools. */
 	static void giveKit(ServerPlayer player) {
 		Inventory inv = player.getInventory();
 		inv.setItem(0, new ItemStack(Items.DIAMOND_SWORD));
-		inv.setItem(1, new ItemStack(Items.DIAMOND_PICKAXE));
-		inv.setItem(2, new ItemStack(Items.BOW));
-		inv.setItem(3, new ItemStack(Items.TNT, 16));
-		inv.setItem(4, new ItemStack(Items.FLINT_AND_STEEL));
-		inv.setItem(5, new ItemStack(Items.OAK_PLANKS, 64));
-		inv.setItem(6, new ItemStack(Items.STONE_BRICKS, 64));
+		inv.setItem(1, Guns.stack(0)); // pistol
+		inv.setItem(2, Guns.stack(2)); // assault rifle
+		inv.setItem(3, new ItemStack(Items.BOW));
+		inv.setItem(4, new ItemStack(Items.TNT, 16));
+		inv.setItem(5, new ItemStack(Items.FLINT_AND_STEEL));
+		inv.setItem(6, new ItemStack(Items.OAK_PLANKS, 64));
 		inv.setItem(7, new ItemStack(Items.TORCH, 64));
 		inv.setItem(8, new ItemStack(Items.COOKED_BEEF, 32));
 		player.addTag(KIT_EXTRAS_TAG);
+		player.addTag(KIT_GUNS_TAG);
 		addRest(player);
-		CraftLog.info(player.getGameProfile().name() + ": gave the starter kit (sword, pickaxe, bow, TNT, flint and steel, planks, stone bricks, torches, steak, and more in the inventory)");
+		CraftLog.info(player.getGameProfile().name() + ": gave the starter kit (sword, pistol, assault rifle, bow, TNT, flint and steel, planks, torches, steak, and more in the inventory)");
 	}
 
 	private static final String KIT_EXTRAS_TAG = "craftv_kit_v2";
+	private static final String KIT_GUNS_TAG = "craftv_kit_v3";
+	/** Kit items Sary called useless (2026-10-07): the guns take their place in older kits. */
+	private static final List<net.minecraft.world.item.Item> KIT_JUNK = List.of(Items.COAL, Items.FURNACE, Items.OAK_LOG, Items.STONE_BUTTON,
+		Items.LANTERN);
 
-	/** Players who got the first kit (2026-10-06) get what it lacked once: a bow, arrows, TNT and redstone. */
+	/** Owners with an older kit get what it lacked, once: v2 a bow, arrows, TNT and redstone; v3 the guns, minus the junk. */
 	static void giveKitExtras(ServerPlayer player) {
-		if (player.entityTags().contains(KIT_EXTRAS_TAG)) {
+		Inventory inv = player.getInventory();
+		if (!player.entityTags().contains(KIT_EXTRAS_TAG)) {
+			player.addTag(KIT_EXTRAS_TAG);
+			inv.add(new ItemStack(Items.BOW));
+			inv.add(new ItemStack(Items.TNT, 16));
+			inv.add(new ItemStack(Items.FLINT_AND_STEEL));
+			addRest(player);
+			CraftLog.info(player.getGameProfile().name() + ": gave the new kit extras (bow, arrows, TNT, flint and steel, redstone, crafting table)");
+			player.addTag(KIT_GUNS_TAG); // addRest has the guns
 			return;
 		}
-		player.addTag(KIT_EXTRAS_TAG);
-		Inventory inv = player.getInventory();
-		inv.add(new ItemStack(Items.BOW));
-		inv.add(new ItemStack(Items.TNT, 16));
-		inv.add(new ItemStack(Items.FLINT_AND_STEEL));
-		addRest(player);
-		CraftLog.info(player.getGameProfile().name() + ": gave the new kit extras (bow, arrows, TNT, flint and steel, redstone, crafting table)");
+		if (!player.entityTags().contains(KIT_GUNS_TAG)) {
+			player.addTag(KIT_GUNS_TAG);
+			for (int i = 0; i < inv.getContainerSize(); i++) {
+				if (KIT_JUNK.contains(inv.getItem(i).getItem())) {
+					inv.setItem(i, ItemStack.EMPTY);
+				}
+			}
+			for (int g = 0; g < Guns.IDS.length; g++) {
+				inv.add(Guns.stack(g));
+			}
+			CraftLog.info(player.getGameProfile().name() + ": gave the guns (pistol to grenade), took out coal, furnace, logs, buttons and lanterns");
+		}
 	}
 
-	/** The rest of the kit, in the inventory: things to craft with, redstone that does something, arrows. */
+	/** The rest of the kit, in the inventory: the other guns, tools, building blocks, redstone that does something, arrows. */
 	private static void addRest(ServerPlayer player) {
 		Inventory inv = player.getInventory();
-		inv.add(new ItemStack(Items.ARROW, 64));
-		inv.add(new ItemStack(Items.DIAMOND_AXE));
-		inv.add(new ItemStack(Items.DIAMOND_SHOVEL));
-		inv.add(new ItemStack(Items.CRAFTING_TABLE));
-		inv.add(new ItemStack(Items.FURNACE));
-		inv.add(new ItemStack(Items.GLASS, 64));
-		inv.add(new ItemStack(Items.REDSTONE, 64));
-		inv.add(new ItemStack(Items.REDSTONE_TORCH, 16));
-		inv.add(new ItemStack(Items.REDSTONE_LAMP, 16));
-		inv.add(new ItemStack(Items.LEVER, 8));
-		inv.add(new ItemStack(Items.STONE_BUTTON, 8));
-		inv.add(new ItemStack(Items.LANTERN, 8));
-		inv.add(new ItemStack(Items.SHIELD));
-		inv.add(new ItemStack(Items.WATER_BUCKET));
-		inv.add(new ItemStack(Items.COAL, 32));
-		inv.add(new ItemStack(Items.OAK_LOG, 32));
+		for (ItemStack stack : rest()) {
+			inv.add(stack);
+		}
+	}
+
+	private static List<ItemStack> rest() {
+		List<ItemStack> r = new ArrayList<>();
+		for (int g : new int[] { 1, 3, 4, 5, 6, 7 }) { // SMG, shotgun, sniper rifle, RPG, minigun, grenade
+			r.add(Guns.stack(g));
+		}
+		r.add(new ItemStack(Items.ARROW, 64));
+		r.add(new ItemStack(Items.DIAMOND_PICKAXE));
+		r.add(new ItemStack(Items.DIAMOND_AXE));
+		r.add(new ItemStack(Items.DIAMOND_SHOVEL));
+		r.add(new ItemStack(Items.STONE_BRICKS, 64));
+		r.add(new ItemStack(Items.GLASS, 64));
+		r.add(new ItemStack(Items.WATER_BUCKET));
+		r.add(new ItemStack(Items.SHIELD));
+		r.add(new ItemStack(Items.CRAFTING_TABLE));
+		r.add(new ItemStack(Items.REDSTONE, 64));
+		r.add(new ItemStack(Items.REDSTONE_TORCH, 16));
+		r.add(new ItemStack(Items.REDSTONE_LAMP, 16));
+		r.add(new ItemStack(Items.LEVER, 8));
+		return r;
+	}
+
+	/** F8 > Refill kit: every kit item that's missing comes back, every stack is topped up, hearts and hunger full. */
+	public static void refill(ServerPlayer player) {
+		Inventory inv = player.getInventory();
+		List<ItemStack> kit = new ArrayList<>(List.of(new ItemStack(Items.DIAMOND_SWORD), Guns.stack(0), Guns.stack(2), new ItemStack(Items.BOW),
+			new ItemStack(Items.TNT, 16), new ItemStack(Items.FLINT_AND_STEEL), new ItemStack(Items.OAK_PLANKS, 64), new ItemStack(Items.TORCH, 64),
+			new ItemStack(Items.COOKED_BEEF, 32)));
+		kit.addAll(rest());
+		for (ItemStack want : kit) {
+			boolean has = false;
+			for (int i = 0; i < inv.getContainerSize() && !has; i++) {
+				ItemStack s = inv.getItem(i);
+				int gun = Guns.index(want);
+				has = gun >= 0 ? Guns.index(s) == gun : s.is(want.getItem());
+			}
+			if (!has) {
+				inv.add(want);
+			}
+		}
+		for (int i = 0; i < inv.getContainerSize(); i++) {
+			ItemStack s = inv.getItem(i);
+			if (!s.isEmpty() && s.isStackable()) {
+				s.setCount(s.getMaxStackSize());
+			}
+		}
+		player.setHealth(player.getMaxHealth());
+		player.getFoodData().setFoodLevel(20);
+		player.getFoodData().setSaturation(20.0F);
+		CraftLog.info(player.getGameProfile().name() + ": kit refilled");
+	}
+
+	/** F8 > Creative mode. */
+	public static void setCreative(ServerPlayer player, boolean creative) {
+		player.setGameMode(creative ? net.minecraft.world.level.GameType.CREATIVE : net.minecraft.world.level.GameType.SURVIVAL);
+		CraftLog.info(player.getGameProfile().name() + ": " + (creative ? "creative" : "survival") + " (from GTA's F8 menu)");
 	}
 
 	private static ServerPlayer owner(MinecraftServer server) {
@@ -226,6 +288,10 @@ public final class CoopServer {
 
 	private static void tick(MinecraftServer server) {
 		try {
+			if (server.getGameRules().get(net.minecraft.world.level.gamerules.GameRules.SHOW_ADVANCEMENT_MESSAGES)) {
+				// no "has made the advancement [Stone Age]" lines over GTA's picture (Sary, 2026-10-07)
+				server.getGameRules().set(net.minecraft.world.level.gamerules.GameRules.SHOW_ADVANCEMENT_MESSAGES, false, server);
+			}
 			terrain.tick(server);
 			GuestSync.tick(server);
 			GtaWorld.tick(server);

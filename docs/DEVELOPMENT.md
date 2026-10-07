@@ -24,13 +24,12 @@ A Fabric mod and a GTA V ASI plugin talk through shared memory.
 | 5 | Friends from anywhere (no port forwarding), whitelist | Not started |
 | 6 | A better blocky Los Santos (buildings) | Not started |
 
-The full plan is in [docs/BRIEF.md](BRIEF.md).
+Why things are built the way they are is in [docs/DECISIONS.md](DECISIONS.md).
 
 ## Repository
 
 | Path | What |
 |---|---|
-| `docs/BRIEF.md` | The build plan (phases, rules) |
 | `docs/PROTOCOL.md` | The shared-memory spec (v1.1): the source of truth |
 | `docs/TESTING.md` | How to test each phase |
 | `docs/DECISIONS.md`, `docs/KNOWN_LIMITATIONS.md`, `docs/REFERENCE_NOTES.md` | Why things are the way they are |

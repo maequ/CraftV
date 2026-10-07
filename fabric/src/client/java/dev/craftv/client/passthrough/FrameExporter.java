@@ -25,6 +25,13 @@ import org.joml.Vector4f;
 public final class FrameExporter {
 	private static final int RING = 3;
 	private static final long STUCK_NANOS = 1_000_000_000L;
+	/**
+	 * A capture still waiting for its fence callback this long is published straight away (its GPU copies are long done):
+	 * the callbacks run in a queue with Minecraft's own fenced tasks, and when they lagged every ring slot stayed busy and
+	 * frames only went out when one timed out after a second. Sary saw the HUD and inventory at about 3 FPS (2026-10-07).
+	 */
+	private static final long FORCE_NANOS = 40_000_000L;
+	private static int published, forced;
 	private static final Vector4f TRANSPARENT = new Vector4f(0.0F, 0.0F, 0.0F, 0.0F);
 	private static final ValueLayout.OfInt INT = ValueLayout.JAVA_INT_UNALIGNED;
 	private static final ValueLayout.OfLong LONG = ValueLayout.JAVA_LONG_UNALIGNED;
@@ -57,6 +64,7 @@ public final class FrameExporter {
 		float far;
 		long frame;
 		long captureNanos;
+		boolean overlayQueued;
 
 		void allocate(int w, int h) {
 			free();
@@ -132,7 +140,10 @@ public final class FrameExporter {
 			c = ring[ringNext] = new Capture();
 		}
 		long now = System.nanoTime();
-		if (c.busy && now - c.busySince < STUCK_NANOS) {
+		if (c.busy && c.overlayQueued && now - c.busySince >= FORCE_NANOS) {
+			forced++;
+			publish(c); // the fence callback is late: don't wait for it
+		} else if (c.busy && now - c.busySince < STUCK_NANOS) {
 			return;
 		}
 		if (c.width != w || c.height != h || c.color == null) {
@@ -145,6 +156,7 @@ public final class FrameExporter {
 		c.far = far;
 		c.frame = ++frameCounter;
 		c.captureNanos = now;
+		c.overlayQueued = false;
 		CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
 		encoder.copyTextureToBuffer(target.getColorTexture(), c.color, 0L, () -> {
 		}, 0);
@@ -171,6 +183,7 @@ public final class FrameExporter {
 				publish(c);
 			}
 		}, 0);
+		c.overlayQueued = true;
 		ringNext = (ringNext + 1) % RING;
 	}
 
@@ -214,11 +227,19 @@ public final class FrameExporter {
 			m.set(INT, 40, slot);
 			VarHandle.fullFence();
 			m.set(LONG, 32, ++publishCounter);
+			published++;
 		} catch (RuntimeException e) {
 			CraftLog.limited("frameexport", 5000, "passthrough: frame export failed: " + e);
 		} finally {
 			c.busy = false;
 		}
+	}
+
+	/** Frames handed to the host since the last call, and how many of them didn't wait for their fence. For the log. */
+	public static String takeStats() {
+		String s = published + " frames to the host" + (forced > 0 ? " (" + forced + " without waiting for the GPU callback)" : "");
+		published = forced = 0;
+		return s;
 	}
 
 	private static void copy(GpuBuffer buffer, MemorySegment dst, long offset, long n) {

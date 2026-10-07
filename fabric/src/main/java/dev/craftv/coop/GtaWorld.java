@@ -37,6 +37,11 @@ public final class GtaWorld {
 	/** GTA players hear about explosions and arrows this close to them (blocks). */
 	private static final double EVENT_RADIUS = 128.0;
 	private static final int MAX_ARROWS_PER_TICK = 64;
+	/** A GTA player's own arrows fly this much faster (flatter, more like a shot); their GTA hits what its crosshair is on. */
+	private static final double SHOT_SPEEDUP = 2.5;
+	private static final int MAX_SHOTS_REMEMBERED = 256;
+	/** Arrows already announced as a GTA player's shot (v1.5 EVENT_SHOT), oldest first. */
+	private static final java.util.LinkedHashSet<Integer> SHOTS = new java.util.LinkedHashSet<>();
 
 	private static final Map<UUID, Integer> STATES = new ConcurrentHashMap<>();
 	private static final Map<UUID, Vec3> LAST_POS = new ConcurrentHashMap<>();
@@ -73,6 +78,7 @@ public final class GtaWorld {
 		STATES.clear();
 		LAST_POS.clear();
 		PENDING.clear();
+		SHOTS.clear();
 	}
 
 	/**
@@ -120,6 +126,8 @@ public final class GtaWorld {
 		List<Messages.WorldEvent> events = new ArrayList<>(PENDING);
 		PENDING.clear();
 		java.util.Set<Integer> seen = new java.util.HashSet<>();
+		List<Object[]> shots = new ArrayList<>();
+		Map<Integer, UUID> arrowOwners = new java.util.HashMap<>();
 		for (ServerPlayer p : gta) {
 			AABB near = p.getBoundingBox().inflate(EVENT_RADIUS);
 			for (AbstractArrow arrow : level.getEntitiesOfClass(AbstractArrow.class, near, a -> !((AbstractArrowAccessor) a).craftv$isInGround())) {
@@ -129,20 +137,49 @@ public final class GtaWorld {
 				if (!seen.add(arrow.getId())) {
 					continue; // near two GTA players: one event, sent to both
 				}
+				if (arrow.getOwner() instanceof ServerPlayer shooter && gta.contains(shooter) && SHOTS.add(arrow.getId())) {
+					// A GTA player let go of their bow: faster and flatter here, and their GTA hits what its crosshair is on
+					dev.craftv.OwnerAim.Aim aim = dev.craftv.OwnerAim.of(shooter);
+					double speed = arrow.getDeltaMovement().length();
+					// the owner in third person: along the camera's ray (the crosshair), not where their head faces
+					arrow.setDeltaMovement((aim != null ? aim.dir().scale(speed) : arrow.getDeltaMovement()).scale(SHOT_SPEEDUP));
+					arrow.syncVelocity = true;
+					float shot = (float) Math.min(Math.ceil(arrow.getDeltaMovement().length() / SHOT_SPEEDUP * ((AbstractArrowAccessor) arrow).craftv$getBaseDamage()), MAX_EVENT_POWER);
+					shots.add(new Object[] { shooter, new Messages.WorldEvent(EVENT_SHOT, shot, arrow.getX(), arrow.getY(), arrow.getZ(), arrow.getId()) });
+					if (SHOTS.size() > MAX_SHOTS_REMEMBERED) {
+						SHOTS.remove(SHOTS.iterator().next());
+					}
+				}
 				double speed = arrow.getDeltaMovement().length();
 				float damage = (float) Math.min(Math.ceil(speed * ((AbstractArrowAccessor) arrow).craftv$getBaseDamage()), MAX_EVENT_POWER);
 				events.add(new Messages.WorldEvent(EVENT_PROJECTILE, damage, arrow.getX(), arrow.getY(), arrow.getZ(), arrow.getId()));
+				if (arrow.getOwner() != null) {
+					arrowOwners.put(arrow.getId(), arrow.getOwner().getUUID());
+				}
+			}
+		}
+		LinkService link = LinkService.get();
+		for (Object[] shot : shots) {
+			ServerPlayer shooter = (ServerPlayer) shot[0];
+			Messages.WorldEvent e = (Messages.WorldEvent) shot[1];
+			CraftLog.limited("gtashot", 2000, shooter.getGameProfile().name() + " shot an arrow: their GTA hits what its crosshair is on (" + e.power() + " damage)");
+			if (CoopServer.isOwner(server, shooter)) {
+				link.send(e);
+			} else if (ServerPlayNetworking.canSend(shooter, CraftNet.Event.TYPE)) {
+				ServerPlayNetworking.send(shooter, new CraftNet.Event(e.kind(), e.power(), e.x(), e.y(), e.z(), e.id()));
 			}
 		}
 		if (events.isEmpty()) {
 			return;
 		}
-		LinkService link = LinkService.get();
 		for (ServerPlayer p : gta) {
 			boolean owner = CoopServer.isOwner(server, p);
 			for (Messages.WorldEvent e : events) {
 				if (p.distanceToSqr(e.x(), e.y(), e.z()) > EVENT_RADIUS * EVENT_RADIUS) {
 					continue;
+				}
+				if (e.kind() == EVENT_PROJECTILE && p.getUUID().equals(arrowOwners.get(e.id()))) {
+					continue; // their own arrow: their shot already hit what they aimed at
 				}
 				if (owner) {
 					link.send(e);

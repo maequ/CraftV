@@ -18,7 +18,7 @@ namespace craftv::proto
 	// ---- identity (PROTOCOL.md §2, §3) --------------------------------------------------------
 	inline constexpr std::uint32_t kMagic = 0x56465243;  // bytes 43 52 46 56 = "CRFV"
 	inline constexpr std::uint16_t kVersionMajor = 1;
-	inline constexpr std::uint16_t kVersionMinor = 4;
+	inline constexpr std::uint16_t kVersionMinor = 5;
 	inline constexpr wchar_t       kDefaultMappingName[] = L"Local\\CraftV_Shared_v1";
 
 	enum class Role : std::uint32_t
@@ -573,8 +573,10 @@ namespace craftv::proto
 		kOptionFrameRate = 4,  // Minecraft's frame rate while composited, in tens (6 = 60); 0 = unlimited
 		kOptionHud = 5,        // 0 hidden, 1 shown (hotbar, hearts, hunger)
 		kOptionVehicleBody = 6,  // 0 the host shows its own driver, 1 the owner is drawn seated in host vehicles
+		kOptionGameMode = 7,     // v1.5: 0 survival, 1 creative (the owner's game mode)
+		kOptionRefill = 8,       // v1.5: an action, value 1: top the owner's kit up, heal and feed them
 	};
-	inline constexpr std::uint8_t kOptionMax = kOptionVehicleBody;
+	inline constexpr std::uint8_t kOptionMax = kOptionRefill;
 	enum InputButton : std::uint8_t
 	{
 		kButtonAttack = 1,
@@ -584,6 +586,7 @@ namespace craftv::proto
 		kButtonInventory = 5,
 		kButtonSwapHands = 6,
 		kButtonCloseScreen = 7,
+		kButtonSneak = 8,  // v1.5: held while the host's player crouches
 	};
 	inline constexpr std::int8_t kHotbarSlots = 9;
 	struct InputMsg
@@ -612,6 +615,10 @@ namespace craftv::proto
 		kHeldLight = 8,  // v1.4: a torch, lantern or glowstone: the host lights up around the player
 	};
 	inline constexpr std::uint8_t kHeldMax = kHeldLight;
+	// v1.5: one of the host game's guns (CraftV's gun items): kHeldGunFirst + the gun's index (see the host's gun table)
+	inline constexpr std::uint8_t kHeldGunFirst = 16;
+	inline constexpr std::uint8_t kHeldGunCount = 8;
+	inline constexpr bool         HeldIsGun(std::uint8_t a_held) { return a_held >= kHeldGunFirst && a_held < kHeldGunFirst + kHeldGunCount; }
 	enum OwnerFlags : std::uint32_t
 	{
 		kOwnerDead = 1u << 0,
@@ -651,8 +658,9 @@ namespace craftv::proto
 	{
 		kEventExplosion = 1,   // TNT, a creeper...: power = Minecraft's explosion radius
 		kEventProjectile = 2,  // an arrow (or trident...) in flight, every tick: power = the damage it would do, id = its entity
+		kEventShot = 3,        // v1.5: the owner let go of a drawn bow: power = the arrow's damage; the host hits what its crosshair is on
 	};
-	inline constexpr std::uint8_t kEventKindMax = kEventProjectile;
+	inline constexpr std::uint8_t kEventKindMax = kEventShot;
 	inline constexpr float        kMaxEventPower = 1000.0f;
 	struct WorldEventMsg
 	{

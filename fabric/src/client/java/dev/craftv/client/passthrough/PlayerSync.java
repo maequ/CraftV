@@ -27,10 +27,15 @@ public final class PlayerSync {
 	public static void frame() {
 		Messages.Camera c = HostCamera.frame();
 		Minecraft minecraft = Minecraft.getInstance();
+		ClientInput.applyCursor(minecraft);
 		LocalPlayer player = minecraft.player;
 		if (c == null || player == null) {
+			dev.craftv.OwnerAim.set(null);
 			return;
 		}
+		// third person: buckets and bows aim along the camera's ray (what's under the crosshair), not from the head
+		dev.craftv.OwnerAim.set(c.firstPerson() ? null
+			: new dev.craftv.OwnerAim.Aim(player.getUUID(), new net.minecraft.world.phys.Vec3(c.x(), c.y(), c.z()), net.minecraft.world.phys.Vec3.directionFromRotation(c.pitch(), c.yaw())));
 		// First person looks where the camera looks. Third person: the host camera orbits freely, so the head follows the
 		// body (the host's player faces where they walk), not the camera; it twisted round otherwise.
 		float yaw = c.firstPerson() ? c.yaw() : c.bodyYaw();

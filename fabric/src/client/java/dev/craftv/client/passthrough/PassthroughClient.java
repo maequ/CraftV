@@ -118,7 +118,7 @@ public final class PassthroughClient {
 		boolean screen = minecraft.gui.screen() != null;
 		if (on && (now >= nextFpsLog || screen != screenWasOpen)) {
 			nextFpsLog = now + FPS_LOG_NANOS;
-			CraftLog.info("passthrough: Minecraft at " + minecraft.getFps() + " fps (cap " + compositingFps() + ")"
+			CraftLog.info("passthrough: Minecraft at " + minecraft.getFps() + " fps (cap " + compositingFps() + "), " + FrameExporter.takeStats()
 				+ (screen ? ", screen open: " + minecraft.gui.screen().getClass().getSimpleName() : ""));
 		}
 		screenWasOpen = screen;
@@ -206,6 +206,10 @@ public final class PassthroughClient {
 	static int heldKind(ItemStack stack) {
 		if (stack.isEmpty()) {
 			return HELD_EMPTY;
+		}
+		int gun = dev.craftv.coop.Guns.index(stack);
+		if (gun >= 0) {
+			return HELD_GUN_FIRST + gun; // v1.5: GTA's gun of that kind
 		}
 		if (stack.getItem() instanceof BlockItem item) {
 			// a torch, lantern or glowstone: GTA lights up around the player (PROTOCOL.md §7.18 LIGHT)

@@ -22,6 +22,10 @@ namespace compositor
 	void set_pose_lag(int frames);
 	/// Composite Minecraft's picture as rendered, without re-projecting it to GTA's newer pose.
 	void set_camera_locked(bool locked);
+	/// Leave this part of the screen (0..1: x0, y0, x1, y1) to GTA, e.g. its phone. All zero: composite everywhere.
+	void set_mask(float x0, float y0, float x1, float y1);
+	/// Whether camera moves are re-projected too (turns always are). Off in vehicles, where the player moves with the camera.
+	void set_translation(bool on);
 	/// GTA's backbuffer size as ReShade sees it (0 until the first frame).
 	void backbuffer_size(int &width, int &height);
 }

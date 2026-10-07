@@ -1,15 +1,18 @@
 {
-  "required": true,
-  "package": "dev.craftv.mixin",
-  "compatibilityLevel": "JAVA_25",
-  "mixins": [
-    "EntityInWallMixin",
-    "AbstractArrowAccessor",
-    "FlowingFluidMixin",
-    "GtaPlayerPhysicsMixin",
-    "LevelChunkMixin",
-    "OwnerSafetyMixin",
-    "ServerExplosionMixin"
-  ],
-  "injectors": { "defaultRequire": 1 }
+	"required": true,
+	"package": "dev.craftv.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"EntityInWallMixin",
+		"AbstractArrowAccessor",
+		"FlowingFluidMixin",
+		"GtaPlayerPhysicsMixin",
+		"LevelChunkMixin",
+		"OwnerSafetyMixin",
+		"ServerExplosionMixin",
+		"ItemPovMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
 }

@@ -35,6 +35,7 @@ public final class LinkService {
 	private final AtomicReference<ReceivedCamera> latestCamera = new AtomicReference<>();
 	private final AtomicReference<Messages.View> latestView = new AtomicReference<>();
 	private final Queue<Messages.Input> inputs = new ConcurrentLinkedQueue<>();
+	private volatile Messages.Input latestCursor;
 	private final Queue<Messages.BlockRegionRequest> regionRequests = new ConcurrentLinkedQueue<>();
 	private volatile Thread thread;
 	private volatile boolean running;
@@ -194,9 +195,17 @@ public final class LinkService {
 			CraftLog.limited("badinput", 5000, "ignored an invalid INPUT from the host");
 			return;
 		}
+		if (input.kind() == dev.craftv.link.Proto.INPUT_CURSOR) {
+			latestCursor = input; // applied every frame, not just every tick (dragging items looked choppy)
+		}
 		if (inputs.size() < INPUT_LIMIT) {
 			inputs.add(input);
 		}
+	}
+
+	/** The host's newest cursor position (INPUT CURSOR), or null. Any thread. */
+	public Messages.Input latestCursor() {
+		return latestCursor;
 	}
 
 	private void acceptRegion(Endpoint ep, Messages.BlockRegionRequest r) {

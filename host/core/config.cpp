@@ -83,6 +83,7 @@ namespace craftv::host
 		mc.explosions = ReadBool(L"Minecraft", L"Explosions", mc.explosions, a_iniPath);
 		mc.arrowsHurt = ReadBool(L"Minecraft", L"ArrowsHurt", mc.arrowsHurt, a_iniPath);
 		mc.torchLight = ReadBool(L"Minecraft", L"TorchLight", mc.torchLight, a_iniPath);
+		mc.fallDamage = ReadBool(L"Minecraft", L"FallDamage", mc.fallDamage, a_iniPath);
 		const std::wstring key = ReadString(L"Minecraft", L"InventoryKey", L"E", a_iniPath);
 		mc.inventoryKey = _wcsicmp(key.c_str(), L"Tab") == 0 ? 0x09 : _wcsicmp(key.c_str(), L"I") == 0 ? 0x49 : 0x45;
 		debugOverlay = ReadBool(L"Debug", L"Overlay", debugOverlay, a_iniPath);
@@ -128,6 +129,7 @@ namespace craftv::host
 		ok = Write(L"Minecraft", L"Explosions", b(mc.explosions), iniPath) && ok;
 		ok = Write(L"Minecraft", L"ArrowsHurt", b(mc.arrowsHurt), iniPath) && ok;
 		ok = Write(L"Minecraft", L"TorchLight", b(mc.torchLight), iniPath) && ok;
+		ok = Write(L"Minecraft", L"FallDamage", b(mc.fallDamage), iniPath) && ok;
 		ok = Write(L"Minecraft", L"InventoryKey", mc.inventoryKey == 0x09 ? L"Tab" : mc.inventoryKey == 0x49 ? L"I" : L"E", iniPath) && ok;
 		return ok;
 	}

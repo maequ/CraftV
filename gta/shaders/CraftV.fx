@@ -24,6 +24,12 @@ uniform float2 HostPlanes = float2(0.15, 10000.0);
 
 // Set true by the add-on only while it has uploaded a Minecraft frame; until then GTA passes through untouched.
 uniform bool McActive = false;
+// CraftV: a part of the screen left to GTA (x0, y0, x1, y1 in 0..1), e.g. its phone; all zero = none.
+uniform float4 McMask = float4(0.0, 0.0, 0.0, 0.0);
+bool in_mask(float2 uv)
+{
+	return McMask.z > McMask.x && uv.x >= McMask.x && uv.x <= McMask.z && uv.y >= McMask.y && uv.y <= McMask.w;
+}
 
 uniform bool HostReversedZ < ui_label = "GTA depth is reversed"; > = true;
 uniform float DepthBias < ui_type = "drag"; ui_min = 0.0; ui_max = 1.0; ui_step = 0.005; ui_label = "Depth bias (m)";
@@ -157,7 +163,7 @@ void PS_Composite(float4 pos : SV_Position, float2 uv : TEXCOORD, out float4 out
 	const float3 host = tex2D(ReShade::BackBuffer, uv).rgb;
 	outInfo = 0.0;
 	outColor = float4(host, 1.0);
-	if (!McActive)
+	if (!McActive || in_mask(uv))
 		return;
 	const float2 ouv = float2(uv.x, 1.0 - uv.y); // Minecraft's rows are bottom-up
 
@@ -265,7 +271,7 @@ float4 PS_Bright(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 /// top (neither shaken nor warped).
 float3 PS_Final(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 {
-	if (!McActive)
+	if (!McActive || in_mask(uv))
 		return tex2D(ReShade::BackBuffer, uv).rgb;
 	const float aspect = BUFFER_WIDTH * BUFFER_RCP_HEIGHT;
 	const float t = Timer * 0.001;

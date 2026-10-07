@@ -36,8 +36,9 @@ abstract class GameRendererMixin {
 	@Inject(method = "renderItemInHand", at = @At("HEAD"), cancellable = true)
 	private void craftv$handOff(net.minecraft.client.renderer.state.level.CameraRenderState camera, net.minecraft.client.renderer.state.level.PlayerRenderState player,
 		com.mojang.renderpearl.api.textures.GpuTextureView target, CallbackInfo ci) {
-		if (HostCamera.frame() != null && !dev.craftv.client.passthrough.ViewOptions.hand) {
-			ci.cancel(); // the host's settings hide the first-person hand
+		var c = HostCamera.frame();
+		if (c != null && (!dev.craftv.client.passthrough.ViewOptions.hand || (c.flags() & dev.craftv.link.Proto.CAMERA_PHONE) != 0)) {
+			ci.cancel(); // the host's settings hide the first-person hand, and the host's phone is in it now
 		}
 	}
 

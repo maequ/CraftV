@@ -28,6 +28,16 @@ public final class ClientInput {
 		}
 	}
 
+	/** Every frame while a screen is open: the newest cursor position, so the inventory follows the mouse smoothly. */
+	public static void applyCursor(Minecraft minecraft) {
+		Messages.Input in = LinkService.get().latestCursor();
+		if (in != null && minecraft.gui.screen() != null) {
+			MouseHandlerAccessor mouse = (MouseHandlerAccessor) minecraft.mouseHandler;
+			mouse.craftv$setXpos(in.cursorX() * minecraft.getWindow().getScreenWidth());
+			mouse.craftv$setYpos(in.cursorY() * minecraft.getWindow().getScreenHeight());
+		}
+	}
+
 	private static void handle(Minecraft minecraft, Messages.Input in) {
 		LocalPlayer player = minecraft.player;
 		switch (in.kind()) {
@@ -41,7 +51,11 @@ public final class ClientInput {
 				}
 				if (minecraft.gui.screen() != null && (in.button() == BUTTON_ATTACK || in.button() == BUTTON_USE)) {
 					// A screen is open (the inventory): the host's mouse buttons click on it, at the host's cursor.
-					minecraft.mouseHandler.onButton(minecraft.getWindow().handle(), new MouseButtonInfo(in.button() == BUTTON_ATTACK ? 0 : 1, 0), down ? 1 : 0);
+					// 26.3's buttons are SDL's: left 1, right 3. The GLFW numbers (0, 1) sent before made the left click do nothing and
+					// the right click act as a left one (Sary, 2026-10-07: "why do I have to right-click to put something in my hotbar?")
+					int sdlButton = in.button() == BUTTON_ATTACK ? com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT
+						: com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_RIGHT;
+					minecraft.mouseHandler.onButton(minecraft.getWindow().handle(), new MouseButtonInfo(sdlButton, 0), down ? 1 : 0);
 					return;
 				}
 				KeyMapping key = switch (in.button()) {
@@ -51,6 +65,7 @@ public final class ClientInput {
 					case BUTTON_DROP -> minecraft.options.keyDrop;
 					case BUTTON_INVENTORY -> minecraft.options.keyInventory;
 					case BUTTON_SWAP_HANDS -> minecraft.options.keySwapOffhand;
+					case BUTTON_SNEAK -> minecraft.options.keyShift; // v1.5: the host's crouch key
 					default -> null;
 				};
 				if (key == null) {
@@ -72,7 +87,29 @@ public final class ClientInput {
 					player.getInventory().setSelectedSlot(Math.clamp(in.value(), 0, Inventory.getSelectionSize() - 1));
 				}
 			}
-			case INPUT_OPTION -> ViewOptions.set(in.button(), in.value());
+			case INPUT_OPTION -> {
+				if (in.button() == OPTION_GAME_MODE || in.button() == OPTION_REFILL) {
+					// v1.5: the host's F8 menu changes the owner on the integrated server
+					var server = minecraft.getSingleplayerServer();
+					if (server != null && player != null) {
+						java.util.UUID id = player.getUUID();
+						int option = in.button(), value = in.value();
+						server.execute(() -> {
+							var owner = server.getPlayerList().getPlayer(id);
+							if (owner == null) {
+								return;
+							}
+							if (option == OPTION_GAME_MODE) {
+								dev.craftv.coop.CoopServer.setCreative(owner, value == 1);
+							} else {
+								dev.craftv.coop.CoopServer.refill(owner);
+							}
+						});
+					}
+				} else {
+					ViewOptions.set(in.button(), in.value());
+				}
+			}
 			case INPUT_DAMAGE -> {
 				var server = minecraft.getSingleplayerServer();
 				if (server != null && player != null) {

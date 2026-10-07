@@ -93,7 +93,7 @@ Which runtime to install is Sary's call (the brief prefers official sources).
 allocations in a steady-state tick). Brief §6 safety: the plugin must never crash RDR2.
 
 ### D-014: Pivot to cross-game co-op in GTA V (2026-10-05)
-**Decision:** Drop "Minecraft inside RDR2". New goal (docs/BRIEF.md): Sary plays GTA V story mode, friends in
+**Decision:** Drop "Minecraft inside RDR2". New goal: Sary plays GTA V story mode, friends in
 plain vanilla Minecraft join the hidden Minecraft's world, appear in Los Santos as characters, and their blocks
 appear as props. Friends walk on a blocky copy of Los Santos built from GTA's ground.
 **Reason:** On 2026-10-04 Sary found [@Theyoungpixel's video](https://x.com/Theyoungpixel/status/2105758613520421303)
@@ -281,3 +281,22 @@ ready on the first poll with hit, height and material (tarmac), so `ProbeGround`
 probes reading that map with GTA material names) and prints the overlay to the console.
 **Reason:** It tests everything CraftV.asi does except the natives, end to end with the real Minecraft and the
 stand-in friend (brief §0).
+
+### D-032: Protocol v1.5 and Sary's second in-game run (2026-10-07)
+**Decision:**
+- GTA's guns are Minecraft items (trial keys with CraftV's model, name and a `craftv_gun` tag). Holding one sends
+  held `16 + gun`, and the host gives the GTA player that gun with GTA's own aim, fire and reload. Guns CraftV gave
+  are taken away again when put down.
+- The bow sends one WORLD_EVENT `SHOT` when it's let go, and the host hits what its crosshair is on (a camera ray).
+  Melee also uses the crosshair ray, within 3.2 m of the player, instead of a cone in front of the player.
+- Ctrl is Minecraft's sneak (BUTTON `SNEAK`); GTA's player creeps while it's held.
+- The F8 menu gets Creative mode (OPTION 7), Refill kit (OPTION 8), Fly (host only: the player is frozen and moved
+  with the movement keys) and Fall damage (counted by the host the Minecraft way, past 3 blocks).
+- Inventory clicks use SDL's button numbers (left 1, right 3), which 26.3 switched to.
+- In third person, buckets and bows aim along the host camera's ray (`OwnerAim`, read by the integrated server too).
+- Solid-block props aren't spawned inside cars or people; TNT doesn't break the copied GTA ground.
+- The compositor leaves GTA's phone corner alone and doesn't re-project camera moves in vehicles.
+**Reason:** Sary's in-game report: the jump hopped and could be repeated in the air, no phone pose, blocks drawn over
+the phone, left click did nothing in the inventory, water didn't place, the bow missed and didn't hurt anyone, sword
+hits reached too far, a car vanished when TNT was placed under it, Steve stuck out of cars and jittered in them, no
+crouch, and they wanted guns, creative, flying and a refill.

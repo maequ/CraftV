@@ -29,3 +29,6 @@ fabric/out/
 *.env
 secrets.*
 /dist/
+
+# private notes, not published
+/docs/BRIEF.md

@@ -855,8 +855,8 @@ TEST_CASE("host settings menu: F8 opens it in the game's style; arrows change se
 	CHECK(rig.game.sprites >= 3);  // banner, row background, highlight
 	CHECK(rig.game.sounds == 1);
 
-	// down to "Hit strength" (row 15), right: Normal (10) -> Strong (20)
-	for (int i = 0; i < 14; ++i) {
+	// down to "Hit strength" (row 19), right: Normal (10) -> Strong (20)
+	for (int i = 0; i < 18; ++i) {
 		rig.game.nextMenu.down = true;
 		rig.Tick(1);
 	}
@@ -874,7 +874,7 @@ TEST_CASE("host settings menu: F8 opens it in the game's style; arrows change se
 	CHECK(std::abs(rig.plugin->CurrentConfig().passthrough.meleeDamagePerHalfHeart - 5.0) < 1e-9);
 
 	// up to "Minecraft view", Enter: off
-	for (int i = 0; i < 14; ++i) {
+	for (int i = 0; i < 18; ++i) {
 		rig.game.nextMenu.up = true;
 		rig.Tick(1);
 	}
