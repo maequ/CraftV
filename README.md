@@ -6,7 +6,11 @@ You walk around Los Santos as Steve. You get Minecraft's hand, hotbar, hearts an
 build on the streets, blow up cars with TNT and shoot people with a bow. Friends can join you from plain
 Minecraft, or from their own GTA V, and you all see each other and everything you build.
 
-**Setup video:** [watch it here](VIDEO_LINK_HERE) <!-- replace VIDEO_LINK_HERE with the YouTube link -->
+<!-- replace VIDEO_LINK_HERE with the YouTube link -->
+[![Watch the setup video on YouTube](docs/media/setup-video.jpg)](VIDEO_LINK_HERE)
+
+[![Discord](https://img.shields.io/badge/Discord-join%20the%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/RN7e6Ya8Se)
+Help, bug reports, clips and people to play with are on the [Discord server](https://discord.gg/RN7e6Ya8Se).
 
 > [!WARNING]
 > **Story mode only.** Never use mods in GTA Online. You can get your Rockstar account banned. CraftV turns
@@ -15,7 +19,7 @@ Minecraft, or from their own GTA V, and you all see each other and everything yo
 > [!NOTE]
 > **This is an early version.** Some of what's listed here has only been tested without the game so far. The
 > [Tested so far](#tested-so-far) section says which parts. If something doesn't work, please
-> [open an issue](../../issues).
+> [open an issue](../../issues) or tell us on [Discord](https://discord.gg/RN7e6Ya8Se).
 
 ## Contents
 
@@ -35,19 +39,19 @@ Minecraft, or from their own GTA V, and you all see each other and everything yo
 
 ## What you can do
 
-- **Be Steve.** Your Minecraft character walks and runs where Franklin, Michael or Trevor would. He sits in
-  cars, and he holds up his arm when you use the phone.
-- **Survive.** You start with a kit: diamond sword, diamond pickaxe, bow and arrows, TNT, flint and steel,
+- **Become Steve.** Your Minecraft character takes the place of Franklin, Michael or Trevor. He sits in cars,
+  and he holds up his arm when you use the phone.
+- **Play survival.** You start with a kit: diamond sword, diamond pickaxe, bow and arrows, TNT, flint and steel,
   blocks, torches, food, redstone and a crafting table. Running uses up hunger and you eat with right click.
   If you get hurt in GTA you lose Minecraft hearts. If you die in Minecraft you get wasted in GTA.
-- **Fight.** Your sword hurts and knocks back people in GTA. Some run away and some fight back. It dents
-  cars too. Arrows hit people. TNT explodes in GTA, so cars blow up.
-- **Build.** Put blocks on the street, on roofs, anywhere. They're solid in GTA: people and cars bump into
+- **Fight people and cars.** Hit someone in GTA with the sword and they get hurt and knocked back. Some run
+  away and some fight back. Cars get dented too. Arrows hit people. TNT explodes in GTA, so cars blow up.
+- **Build anywhere.** Put blocks on the street, on roofs, anywhere. They're solid in GTA: people and cars bump into
   them and you can stand on them. Torches light up the street at night.
-- **Jump like Minecraft.** Space does a straight jump up instead of GTA's jump.
+- **Jump like in Minecraft.** Space does a straight jump up instead of GTA's jump.
 - **Play with friends.** A friend with plain Minecraft joins your world and walks around a blocky copy of
   Los Santos. A friend with their own GTA V and CraftV plays exactly like you, in the same world.
-- **Change the settings in game.** Press F8 for CraftV's menu. It looks like GTA's own menus.
+- **Change settings in game.** Press F8 for CraftV's menu. It looks like GTA's own menus.
 
 ## Tested so far
 
@@ -219,7 +223,7 @@ in `CraftV.ini` next to `CraftV.asi`, so you can also change it there.
 | Steve smears when you turn | Raise **Minecraft frame rate** in F8 |
 | Friends can't join | Check the address in F8, allow Java through Windows Firewall, and forward port 25565 for friends outside your Wi-Fi |
 | Blocks inside a building land on the roof | Expected: CraftV copies GTA's ground from above. Build outside |
-| Something else | [Open an issue](../../issues) with `CraftV.log` and `ReShade.log` (in the GTA folder) and `craftv-fabric.log` (in the `logs` folder of the CraftV game directory) |
+| Something else | Ask in [#craftv-help on Discord](https://discord.gg/RN7e6Ya8Se) or [open an issue](../../issues) with `CraftV.log` and `ReShade.log` (in the GTA folder) and `craftv-fabric.log` (in the `logs` folder of the CraftV game directory) |
 
 ## Uninstall
 
@@ -229,6 +233,9 @@ in `CraftV.ini` next to `CraftV.asi`, so you can also change it there.
 - **CraftV in Minecraft:** delete the `fabric-loader-26.3` installation in the launcher, and its game directory.
 
 ## Questions
+
+**Where can I get help?** On the [Discord server](https://discord.gg/RN7e6Ya8Se), in #craftv-help. Bring your
+`CraftV.log` and `ReShade.log`.
 
 **Can I use this in GTA Online?** No. Never. You can get banned.
 
