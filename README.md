@@ -1,197 +1,288 @@
-# CraftV: play Minecraft inside GTA V, together
+# CraftV
 
-CraftV puts **real Minecraft** into **GTA V story mode**. You walk Los Santos as Steve, with Minecraft's
-hand, hotbar, hearts and hunger. You build on the streets, blow up cars with TNT and shoot people with a bow.
-Your friends join you: in plain Minecraft, or in **their own GTA**, where each of you sees the other's Minecraft
-character, and everything either of you builds, in Los Santos.
+**Play Minecraft inside GTA V story mode, with your friends.**
+
+You walk around Los Santos as Steve. You get Minecraft's hand, hotbar, hearts and hunger on top of GTA. You can
+build on the streets, blow up cars with TNT and shoot people with a bow. Friends can join you from plain
+Minecraft, or from their own GTA V, and you all see each other and everything you build.
+
+**Setup video:** [watch it here](VIDEO_LINK_HERE) <!-- replace VIDEO_LINK_HERE with the YouTube link -->
 
 > [!WARNING]
-> **Story mode only.** Never take mods into GTA Online: using mods online can get your Rockstar account
-> banned. CraftV switches itself off the moment it sees an online session, and Script Hook V closes the game
-> if you go online. Don't try to work around either.
+> **Story mode only.** Never use mods in GTA Online. You can get your Rockstar account banned. CraftV turns
+> itself off if it sees an online session, and Script Hook V closes the game if you go online.
 
 > [!NOTE]
-> **Early version.** CraftV is new, and not everything on this page has been tried in a real game yet. See
-> [What works](#what-works) for what has, and please report what you find.
+> **This is an early version.** Some of what's listed here has only been tested without the game so far. The
+> [Tested so far](#tested-so-far) section says which parts. If something doesn't work, please
+> [open an issue](../../issues).
 
-## What it is
+## Contents
 
-CraftV runs a real Minecraft Java Edition (with the CraftV Fabric mod) next to GTA V. A small GTA V plugin
-(`CraftV.asi`) and a ReShade add-on draw Minecraft's picture into GTA's, matched to GTA's camera and depth:
-Minecraft things stand in front of and behind GTA's cars and buildings correctly. GTA moves you; Minecraft
-draws you.
+- [What you can do](#what-you-can-do)
+- [Tested so far](#tested-so-far)
+- [What you need](#what-you-need)
+- [Install](#install)
+- [Play](#play)
+- [Playing with friends](#playing-with-friends)
+- [Settings](#settings)
+- [Problems and fixes](#problems-and-fixes)
+- [Uninstall](#uninstall)
+- [Questions](#questions)
+- [Known limitations](#known-limitations)
+- [Building from source](#building-from-source)
+- [Credits](#credits)
 
-- **You are Steve.** Your Minecraft body walks, runs, sits in cars and holds up a phone when you use yours. You
-  see your Minecraft hand, hotbar, hearts and hunger.
-- **Survival.** You start with a kit (diamond sword and pickaxe, bow and arrows, TNT, flint and steel, blocks,
-  torches, food, redstone). Running costs hunger, and you eat with right click. Getting hurt in GTA costs
-  Minecraft hearts, and dying in Minecraft gets you wasted in GTA.
-- **The world reacts.**
-  - Your sword hurts and knocks back GTA's people (some run, some fight back) and dents cars.
-  - Arrows hit people.
-  - TNT explodes in GTA too.
-  - Torches light up the streets at night.
-  - Space is a straight Minecraft jump.
-- **Building.** Blocks go on GTA's streets and roofs. They're solid in GTA: people, cars and you bump into them,
-  and you can stand on them. GTA's own ground stays GTA's.
-- **Friends.**
-  - With **plain Minecraft 26.3**, a friend joins your world and walks a blocky copy of Los Santos built from
-    GTA's own ground.
-  - With **their own GTA V and CraftV**, a friend plays exactly like you, in your world: you see each other as
-    Minecraft characters in your own Los Santos.
-- **Settings in GTA's style.** Press F8 for CraftV's menu, drawn like GTA's own menus. It has the crosshair,
-  hand, HUD, frame rate, jump, damage, TNT, torch light, inventory key and more.
+## What you can do
 
-## What works
+- **Be Steve.** Your Minecraft character walks and runs where Franklin, Michael or Trevor would. He sits in
+  cars, and he holds up his arm when you use the phone.
+- **Survive.** You start with a kit: diamond sword, diamond pickaxe, bow and arrows, TNT, flint and steel,
+  blocks, torches, food, redstone and a crafting table. Running uses up hunger and you eat with right click.
+  If you get hurt in GTA you lose Minecraft hearts. If you die in Minecraft you get wasted in GTA.
+- **Fight.** Your sword hurts and knocks back people in GTA. Some run away and some fight back. It dents
+  cars too. Arrows hit people. TNT explodes in GTA, so cars blow up.
+- **Build.** Put blocks on the street, on roofs, anywhere. They're solid in GTA: people and cars bump into
+  them and you can stand on them. Torches light up the street at night.
+- **Jump like Minecraft.** Space does a straight jump up instead of GTA's jump.
+- **Play with friends.** A friend with plain Minecraft joins your world and walks around a blocky copy of
+  Los Santos. A friend with their own GTA V and CraftV plays exactly like you, in the same world.
+- **Change the settings in game.** Press F8 for CraftV's menu. It looks like GTA's own menus.
 
-Tried in a real GTA V (Legacy, build 3725) so far:
+## Tested so far
 
-- Minecraft drawn into GTA, with Minecraft's hand, hotbar and HUD over GTA's picture.
-- Placing blocks on GTA's streets.
-- Melee hits on GTA's people.
-- A plain-Minecraft friend joining the world.
-- The GTA ground copy.
+These have been tested in a real game (GTA V Legacy, build 3725):
 
-Built and tested without the game (automated tests, two Minecrafts on one PC, a simulated GTA), and not yet tried
-in a real GTA:
+- Minecraft drawn into GTA, with the hand, hotbar and HUD
+- Placing blocks on GTA's streets
+- Hitting people in GTA
+- A friend joining from plain Minecraft
+- Copying GTA's ground into Minecraft
 
-- Steve in cars and the phone pose.
-- The Minecraft jump.
-- GTA damage turning into hearts, and wasted on death.
-- TNT and arrows in GTA.
-- Torch light.
-- Solid blocks.
-- The inventory.
-- The F8 menu.
-- Two GTA players.
+These have been tested only without GTA (automated tests, two copies of Minecraft on one PC, a fake GTA):
 
-## You need
+- Steve in cars, and the phone pose
+- The Minecraft jump
+- GTA damage costing hearts, and getting wasted when you die in Minecraft
+- TNT and arrows in GTA, and torch light
+- Solid blocks
+- The inventory
+- The F8 menu
+- A friend playing from their own GTA
 
-| | Where to get it (official sources only) |
+## What you need
+
+| What | Where to get it |
 |---|---|
-| GTA V **Legacy**, story mode | Your own copy (Steam, Rockstar Games Launcher or Epic) |
-| Script Hook V | http://www.dev-c.com/gtav/scripthookv/ |
-| ReShade **with full add-on support** | https://reshade.me |
-| Minecraft Java Edition | Your own account, https://www.minecraft.net |
-| Fabric Loader for Minecraft 26.3 | https://fabricmc.net/use/installer/ |
-| Fabric API 0.161.0+26.3 | https://modrinth.com/mod/fabric-api |
-| CraftV | This repository's [Releases](../../releases) page |
+| Windows 10 or 11, and a PC that can run GTA V and Minecraft at the same time | |
+| GTA V **Legacy** (not Enhanced), story mode | [Steam](https://store.steampowered.com/app/271590/), [Rockstar Games Launcher](https://www.rockstargames.com/gta-v) or [Epic Games Store](https://store.epicgames.com/p/grand-theft-auto-v) |
+| Script Hook V | [dev-c.com/gtav/scripthookv](http://www.dev-c.com/gtav/scripthookv/) |
+| ReShade, the version **with full add-on support** | [reshade.me](https://reshade.me) |
+| Minecraft: Java Edition | [minecraft.net](https://www.minecraft.net/) |
+| Fabric Loader for Minecraft 26.3 | [fabricmc.net/use/installer](https://fabricmc.net/use/installer/) |
+| Fabric API 0.161.0+26.3 | [modrinth.com/mod/fabric-api](https://modrinth.com/mod/fabric-api/versions) |
+| CraftV | [Releases](../../releases) on this page |
 
-A PC that runs GTA V and Minecraft at the same time. Windows 10 or 11.
+Only download these from the sites above. Mod files from random download sites can contain malware.
 
 ## Install
 
-<details open>
-<summary><b>1. Minecraft (the hidden half)</b></summary>
+The whole install takes about 15 minutes. Do the three parts in order.
 
-1. Run the Fabric installer, choose Minecraft **26.3**, and click Install. A `fabric-loader-26.3` installation
-   appears in the Minecraft Launcher.
-2. In the launcher, go to Installations > `fabric-loader-26.3` > Edit > **Game directory**, and pick a new, empty
-   folder (for example `%APPDATA%\.minecraft-craftv`). CraftV changes that Minecraft's settings; your normal
-   Minecraft stays as it is.
-3. Put `fabric-api-0.161.0+26.3.jar` and `craftv-0.1.0.jar` (from the release's `Minecraft mod` folder) into that
-   folder's `mods` folder.
+### Part 1: GTA V
 
-When it starts, this Minecraft opens a world called **CraftV** by itself. It runs next to GTA, so keep it open.
-</details>
+1. Download **Script Hook V** from [dev-c.com](http://www.dev-c.com/gtav/scripthookv/). Open the zip, go
+   into its `bin` folder, and copy `ScriptHookV.dll` and `dinput8.dll` into your GTA V folder (the folder that
+   has `GTA5.exe` in it).
+2. Download the latest **CraftV** zip from [Releases](../../releases) and unzip it somewhere.
+3. Copy `CraftV.asi` and `CraftV.ini` from the CraftV zip into your GTA V folder.
+4. Download **ReShade** from [reshade.me](https://reshade.me). Pick **"Download with full add-on support"**.
+   CraftV doesn't work with the normal version.
+5. Run the ReShade installer:
+   - Pick `GTA5.exe`.
+   - Pick **DirectX 10/11/12**.
+   - When it asks about effect packages, untick all of them (CraftV brings its own) and finish.
+6. In your GTA V folder, rename **`dxgi.dll`** to **`ReShade64.asi`**. GTA V doesn't load ReShade's `dxgi.dll`,
+   but Script Hook V loads anything ending in `.asi`.
+7. Open the `Minecraft view (ReShade)` folder in the CraftV zip. Copy everything inside it (`ReShade.ini`,
+   `ReShadePreset.ini` and the `reshade-shaders` folder) into your GTA V folder. If Windows asks, replace the
+   files.
 
-<details open>
-<summary><b>2. GTA V</b></summary>
+### Part 2: Minecraft
 
-1. Install Script Hook V: copy `ScriptHookV.dll` and `dinput8.dll` from its `bin` folder into the GTA V folder
-   (the one with `GTA5.exe`).
-2. Copy `CraftV.asi` and `CraftV.ini` from the release into the same folder.
-3. Install ReShade (the **add-on** version). Pick `GTA5.exe`, choose DirectX 10/11/12, and untick every effect
-   package. Then rename the `dxgi.dll` it made to **`ReShade64.asi`** (Script Hook V's loader loads it that way).
-4. Copy everything in the release's `Minecraft view (ReShade)` folder into the GTA V folder: `ReShade.ini`,
-   `ReShadePreset.ini` and `reshade-shaders`.
-5. In GTA's settings, go to Graphics and set **Screen Type: Windowed Borderless** and **Pause Game On Focus
-   Loss: Off**. Turning Depth of Field off is recommended.
-</details>
+CraftV needs its own copy of Minecraft running next to GTA. It uses your normal Minecraft account.
 
-<details>
-<summary><b>3. A friend in their own GTA</b></summary>
+1. Download the **Fabric installer** from [fabricmc.net](https://fabricmc.net/use/installer/) and run it. Pick
+   Minecraft **26.3** and click Install. This adds a `fabric-loader-26.3` installation to the Minecraft
+   Launcher.
+2. Open the Minecraft Launcher, go to **Installations**, hover over `fabric-loader-26.3` and click **Edit**.
+   Under **Game directory**, pick a new empty folder, for example
+   `C:\Users\YOUR-NAME\AppData\Roaming\.minecraft-craftv`, and click Save. This keeps CraftV's settings away from
+   your normal Minecraft.
+3. Download **Fabric API** for 26.3 from [Modrinth](https://modrinth.com/mod/fabric-api/versions) (version
+   0.161.0+26.3).
+4. In the game directory from step 2, make a folder called `mods`. Put the Fabric API file and
+   `craftv-0.1.0.jar` (from the `Minecraft mod` folder in the CraftV zip) in it.
 
-Your friend does steps 1 and 2 on their PC. Before the first start, they copy the release's
-`Minecraft mod/For a friend/config` folder into their Minecraft game directory and write your address after `guest.join=` in
-`config/craftv.properties`. Their Minecraft then joins your world instead of hosting one.
+### Part 3: GTA settings
 
-Your address is in GTA: F8 > **Friends join at**. On the same Wi-Fi that's all. Over the internet, forward TCP
-port **25565** on your router to your PC and give your friend your public IP (`1.2.3.4:25565`). Only share it
-with people you trust.
+Start GTA V once, open **Settings > Graphics** and set:
 
-A friend with **plain Minecraft 26.3** just uses Multiplayer > Direct Connect with the same address.
-</details>
+- **Screen Type: Windowed Borderless**
+- **Pause Game On Focus Loss: Off**
+
+Turning **Depth of Field** off is also a good idea. GTA blurs its own picture, but not Minecraft's.
 
 ## Play
 
-1. Start the CraftV Minecraft from the launcher and wait for the world.
-2. Start GTA V and load story mode. The CraftV box (top right) says **MC view**.
+1. Open the Minecraft Launcher, pick **fabric-loader-26.3** and press Play. Minecraft opens a world called
+   **CraftV** by itself. Leave that window open. The first time, Windows may ask whether Java can use the
+   network: allow it on private networks so friends can join.
+2. Start GTA V and load story mode.
+3. The CraftV box in the top right says **MC view** when it's working.
 
 | Key | What it does |
 |---|---|
-| Left mouse | Minecraft's attack: break blocks; hits hurt GTA's people and dent cars |
-| Right mouse | Place blocks, eat, draw the bow, light TNT, flip levers |
-| Mouse wheel, 1-9 | Hotbar |
-| E | Minecraft's inventory, worked with the mouse (Esc closes it) |
-| Space | A straight Minecraft jump |
-| F7 | Minecraft view on and off |
-| F8 | CraftV's settings |
+| Left mouse | Break blocks and hit. People in GTA get hurt and cars get dented |
+| Right mouse | Place blocks, eat, use the bow, light TNT, flip levers |
+| Mouse wheel or 1 to 9 | Pick a hotbar slot |
+| E | Open Minecraft's inventory. Use the mouse in it. Esc closes it |
+| Space | Minecraft jump |
+| F7 | Turn the Minecraft view on or off |
+| F8 | CraftV settings |
 
-Walking, driving and the camera are GTA's. GTA's own weapons are off while the Minecraft view is on.
+Walking, driving and the camera are normal GTA controls. GTA's own guns are turned off while the Minecraft view
+is on. Your weapons are Minecraft's: the sword, the bow and TNT.
 
-## Settings (F8)
+## Playing with friends
 
-| Setting | Choices |
+Your Minecraft is the server. Your address is shown in GTA under **F8 > Friends join at**, for example
+`192.168.1.23:25565`.
+
+**Friends on the same Wi-Fi** can use that address as it is.
+
+**Friends somewhere else** need you to open a port:
+
+1. In your router's settings, forward **TCP port 25565** to your PC. Search "port forwarding" plus your router's
+   name if you're not sure how.
+2. Look up your public IP address (search "what is my IP").
+3. Give your friend `YOUR-PUBLIC-IP:25565`. Only give it to people you trust.
+
+**A friend with plain Minecraft 26.3** goes to Multiplayer > Direct Connect, types your address and joins. They
+don't need anything else. They walk around a blocky copy of Los Santos, made from GTA's ground near you.
+
+**A friend with their own GTA V** does all three install parts on their own PC. Before starting their Minecraft
+for the first time, they copy the `config` folder from `Minecraft mod\For a friend` in the CraftV zip into their
+game directory. Then they open `config\craftv.properties` in Notepad and put your address after `guest.join=`.
+Their Minecraft then joins your world instead of making its own. Each of you sees the other as a Minecraft
+character in your own GTA. Blocks either of you places show up for both and are solid for both.
+
+Only Minecraft is shared. Each of you has your own GTA people, cars and police.
+
+## Settings
+
+Press **F8** in GTA. Use the arrow keys to move and change things. Backspace closes the menu. Everything is saved
+in `CraftV.ini` next to `CraftV.asi`, so you can also change it there.
+
+| Setting | Options | What it does |
+|---|---|---|
+| Minecraft view | On, Off | Minecraft drawn into GTA. F7 does the same |
+| Minecraft quality | Low, Medium, High, Very high, Max | How sharp Minecraft looks. Lower runs faster |
+| Minecraft frame rate | 60, 90, 120, 144, Unlimited | Higher looks smoother when you turn the camera fast |
+| Crosshair | On, Off | Minecraft's + in the middle of the screen, also in third person |
+| Hand | On, Off | Your Minecraft hand and the item you hold, in first person |
+| Block outlines | Off, Placed blocks, Everywhere | The box around the block you're looking at |
+| Minecraft HUD | On, Off | The hotbar, hearts and hunger |
+| Steve in cars | On, Off | Off shows GTA's own driver in cars |
+| Jump | Minecraft, GTA | Minecraft jump or GTA's own jump and climbing |
+| GTA damage | On, Off | Getting hurt in GTA costs hearts |
+| TNT in GTA | On, Off | Minecraft explosions also happen in GTA |
+| Arrows hurt people | On, Off | Minecraft arrows hit people in GTA |
+| Torch light | On, Off | Torches light up GTA |
+| Inventory key | E, Tab, I | The key that opens the inventory |
+| Hit strength | Weak, Normal, Strong, Brutal | How much your hits hurt people in GTA |
+| Hide GTA HUD | On, Off | Hides GTA's minimap and HUD |
+| CraftV overlay | Top right, Top left, Off | The small status box |
+| Overlay details | On, Off | Extra numbers in the status box, for bug reports |
+| Ground scanning | Smooth, Normal, Fast | How fast GTA's ground gets copied. Smooth costs the least FPS |
+| Friends join at | | Your address for friends |
+
+## Problems and fixes
+
+| Problem | Fix |
 |---|---|
-| Minecraft view | On, Off |
-| Minecraft quality | Low to Max (how sharp; lower runs faster) |
-| Minecraft frame rate | 60, 90, 120, 144, Unlimited (higher is smoother when you turn) |
-| Crosshair, Hand, Minecraft HUD | On, Off |
-| Block outlines | Off, Placed blocks, Everywhere |
-| Steve in cars | On (Steve sits in the car), Off (GTA's driver shows) |
-| Jump | Minecraft, GTA |
-| GTA damage | On (GTA hurts your hearts), Off |
-| TNT in GTA, Arrows hurt people, Torch light | On, Off |
-| Inventory key | E, Tab, I |
-| Hit strength | Weak, Normal, Strong, Brutal |
-| Hide GTA HUD, CraftV overlay, Overlay details, Ground scanning | |
+| No CraftV box in GTA | Script Hook V isn't loaded. Check that `ScriptHookV.dll`, `dinput8.dll` and `CraftV.asi` are next to `GTA5.exe`, and that your Script Hook V version supports your GTA version |
+| The box shows, but no Minecraft | Check that ReShade was renamed to `ReShade64.asi`, that you got the **add-on** version, and that Minecraft is running. Look in `ReShade.log` in the GTA folder for errors |
+| The box says the link is red or yellow | Start the CraftV Minecraft first, wait for its world to load, then start GTA |
+| Everything freezes when you click on another window | Set **Pause Game On Focus Loss** to **Off** in GTA's graphics settings |
+| Low FPS | In F8, lower **Minecraft quality** and **Minecraft frame rate**, and set **Ground scanning** to Smooth |
+| Steve smears when you turn | Raise **Minecraft frame rate** in F8 |
+| Friends can't join | Check the address in F8, allow Java through Windows Firewall, and forward port 25565 for friends outside your Wi-Fi |
+| Blocks inside a building land on the roof | Expected: CraftV copies GTA's ground from above. Build outside |
+| Something else | [Open an issue](../../issues) with `CraftV.log` and `ReShade.log` (in the GTA folder) and `craftv-fabric.log` (in the `logs` folder of the CraftV game directory) |
 
-Everything is also in `CraftV.ini`, next to `CraftV.asi`.
+## Uninstall
+
+- **CraftV in GTA:** delete `CraftV.asi` and `CraftV.ini`.
+- **ReShade:** delete `ReShade64.asi`, `ReShade.ini`, `ReShadePreset.ini` and the `reshade-shaders` folder.
+- **Script Hook V:** delete `ScriptHookV.dll` and `dinput8.dll`.
+- **CraftV in Minecraft:** delete the `fabric-loader-26.3` installation in the launcher, and its game directory.
+
+## Questions
+
+**Can I use this in GTA Online?** No. Never. You can get banned.
+
+**Does it work with GTA V Enhanced?** Not yet. Only Legacy has been tested.
+
+**Do my friends need GTA V?** No. With plain Minecraft they join your world and walk around a blocky Los Santos.
+With their own GTA V and CraftV, they get everything you get.
+
+**Is my normal Minecraft affected?** No, as long as you gave the Fabric installation its own game directory.
+
+**Can I use GTA's guns?** Not while the Minecraft view is on. Press F7 to switch back to normal GTA.
+
+**What happens to my GTA health?** With GTA damage on, Minecraft's hearts decide. GTA's health is kept full,
+and every hit in GTA costs hearts instead.
 
 ## Known limitations
 
 - Only Minecraft is shared between friends. Each GTA has its own people, cars and traffic.
-- GTA's ground is copied in whole blocks, so on slopes Minecraft things can float or sink by up to half a block.
-- Indoors and under bridges, the ground copy is the roof. Blocks placed there land on the roof.
-- At most 400 blocks near you are solid in GTA (GTA crashes with too many objects).
-- Two games render at once, so expect a lower frame rate.
+- GTA's ground is copied in whole blocks, so on hills Minecraft things can float or sink by up to half a block.
+- Inside buildings and under bridges, the copied ground is the roof.
+- At most 400 blocks near you are solid in GTA. GTA crashes if a mod makes too many objects.
+- Running two games at once costs FPS.
 
 The full list is in [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
-## Problems?
-
-Open an issue with your `CraftV.log` (next to `GTA5.exe`), `ReShade.log` (same folder) and `craftv-fabric.log`
-(the `logs` folder of the CraftV Minecraft game directory).
-
 ## Building from source
 
-See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Short version: Visual Studio 2022 with C++, JDK 25, the Script
-Hook V SDK in `sdk/ScriptHookV_SDK`, ReShade's add-on headers in `sdk/reshade-src`, then
-`scripts\build-native.ps1`, `cd fabric; .\gradlew build`, and `scripts\make-dist.ps1`.
+You need Visual Studio 2022 with the C++ workload, JDK 25 (the Minecraft Launcher's Java 25 works), the
+[Script Hook V SDK](http://www.dev-c.com/gtav/scripthookv/) in `sdk/ScriptHookV_SDK`, and
+[ReShade's add-on headers](https://github.com/crosire/reshade) (v6.8.0, the `include` folder) in
+`sdk/reshade-src`. Then run:
+
+```powershell
+.\scripts\build-native.ps1
+cd fabric; .\gradlew build; cd ..
+.\scripts\make-dist.ps1
+```
+
+More in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Credits
 
-- **minecraft-gta5-passthrough** by rehan-remade (MIT): the Minecraft-into-GTA compositor, effect, frame export
-  and camera hooks CraftV's view is adapted from.
-  https://github.com/rehan-remade/universal-modder/tree/main/examples/minecraft-gta5-passthrough
-- **SkyCraft** by chasmlol (MIT): the architecture (a hidden Minecraft next to the game, talking over shared
-  memory). https://github.com/chasmlol/SkyCraft
-- **PeakCraft** by aeironnsarmiento: porting notes. https://github.com/aeironnsarmiento/PeakCraft
-- **Script Hook V** by Alexander Blade. **ReShade** by crosire (add-on API headers BSD-3-Clause; `ReShade.fxh` and
-  `ReShadeUI.fxh` CC0). **Script Hook V .NET** (zlib): GTA's surface material list.
+- [minecraft-gta5-passthrough](https://github.com/rehan-remade/universal-modder/tree/main/examples/minecraft-gta5-passthrough)
+  by rehan-remade (MIT). The way Minecraft is drawn into GTA comes from this project.
+- [SkyCraft](https://github.com/chasmlol/SkyCraft) by chasmlol (MIT). The idea of running Minecraft next to the
+  game and linking them through shared memory.
+- [PeakCraft](https://github.com/aeironnsarmiento/PeakCraft) by aeironnsarmiento, for its porting notes.
+- [Script Hook V](http://www.dev-c.com/gtav/scripthookv/) by Alexander Blade.
+- [ReShade](https://reshade.me) by crosire. The add-on headers are BSD-3-Clause; `ReShade.fxh` and `ReShadeUI.fxh`
+  are CC0.
+- [Script Hook V .NET](https://github.com/scripthookvdotnet/scripthookvdotnet) (zlib), for GTA's list of
+  surface materials.
 
-CraftV isn't affiliated with or endorsed by Mojang, Microsoft, Rockstar Games or Take-Two. Minecraft and GTA V
-aren't included; you need your own copies.
+CraftV isn't made by or connected to Mojang, Microsoft, Rockstar Games or Take-Two. You need your own copies of
+Minecraft and GTA V.
 
-License: MIT (see [LICENSE](LICENSE)).
+License: MIT. See [LICENSE](LICENSE).
