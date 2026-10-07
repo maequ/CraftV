@@ -1,0 +1,405 @@
+{
+ "fps": 30,
+ "voice": "am_michael",
+ "scenes": [
+  {
+   "id": "intro",
+   "part": 0,
+   "beats": [
+    {
+     "id": "intro1",
+     "file": "voice/intro1.wav",
+     "caption": "This is CraftV. It puts real Minecraft inside GTA V.",
+     "from": 0,
+     "frames": 168
+    },
+    {
+     "id": "intro2",
+     "file": "voice/intro2.wav",
+     "caption": "You play as Steve, with your hotbar, your hearts and your hunger, right on the streets of Los Santos.",
+     "from": 179,
+     "frames": 211
+    },
+    {
+     "id": "intro3",
+     "file": "voice/intro3.wav",
+     "caption": "You can build anywhere, blow up cars with TNT, and bring your friends along.",
+     "from": 401,
+     "frames": 185
+    },
+    {
+     "id": "intro4",
+     "file": "voice/intro4.wav",
+     "caption": "Setting it up takes about fifteen minutes, and I'll walk you through every step.",
+     "from": 597,
+     "frames": 160
+    }
+   ],
+   "frames": 775
+  },
+  {
+   "id": "warning",
+   "part": 0,
+   "beats": [
+    {
+     "id": "warn1",
+     "file": "voice/warn1.wav",
+     "caption": "Quick, but important. This is for story mode only.",
+     "from": 0,
+     "frames": 123
+    },
+    {
+     "id": "warn2",
+     "file": "voice/warn2.wav",
+     "caption": "Never take mods into GTA Online. You can get your account banned, and CraftV switches itself off if it even sees an online session.",
+     "from": 134,
+     "frames": 310
+    }
+   ],
+   "frames": 462
+  },
+  {
+   "id": "need",
+   "part": 0,
+   "beats": [
+    {
+     "id": "need1",
+     "file": "voice/need1.wav",
+     "caption": "Here's what you'll need. Your own copy of GTA V Legacy, and Minecraft Java Edition.",
+     "from": 0,
+     "frames": 216
+    },
+    {
+     "id": "need2",
+     "file": "voice/need2.wav",
+     "caption": "Then a few free tools. Script Hook V, ReShade, and Fabric for Minecraft.",
+     "from": 227,
+     "frames": 172
+    },
+    {
+     "id": "need3",
+     "file": "voice/need3.wav",
+     "caption": "And CraftV itself. Every link is in the description. Only grab them from those official sites.",
+     "from": 410,
+     "frames": 216
+    }
+   ],
+   "frames": 644
+  },
+  {
+   "id": "scripthook",
+   "part": 1,
+   "beats": [
+    {
+     "id": "gta1",
+     "file": "voice/gta1.wav",
+     "caption": "Part one is GTA. Start with Script Hook V. Open the zip, and go into the bin folder.",
+     "from": 0,
+     "frames": 217
+    },
+    {
+     "id": "gta2",
+     "file": "voice/gta2.wav",
+     "caption": "Drag these two files into your GTA folder. That's the one with GTA5.exe in it.",
+     "from": 228,
+     "frames": 227
+    },
+    {
+     "id": "gta3",
+     "file": "voice/gta3.wav",
+     "caption": "Now unzip CraftV, and drop CraftV.asi and the .ini file right next to them.",
+     "from": 466,
+     "frames": 227
+    }
+   ],
+   "frames": 711
+  },
+  {
+   "id": "reshade",
+   "part": 1,
+   "beats": [
+    {
+     "id": "rs1",
+     "file": "voice/rs1.wav",
+     "caption": "Next up, ReShade. This is what draws Minecraft into GTA's picture.",
+     "from": 0,
+     "frames": 183
+    },
+    {
+     "id": "rs2",
+     "file": "voice/rs2.wav",
+     "caption": "On reshade.me, pick the version with full add-on support. The normal one won't work.",
+     "from": 194,
+     "frames": 204
+    },
+    {
+     "id": "rs3",
+     "file": "voice/rs3.wav",
+     "caption": "In the installer, choose GTA5.exe, then DirectX 10/11/12.",
+     "from": 409,
+     "frames": 182
+    },
+    {
+     "id": "rs4",
+     "file": "voice/rs4.wav",
+     "caption": "When it offers effect packs, untick all of them. CraftV brings its own.",
+     "from": 602,
+     "frames": 168
+    }
+   ],
+   "frames": 788
+  },
+  {
+   "id": "rename",
+   "part": 1,
+   "beats": [
+    {
+     "id": "rn1",
+     "file": "voice/rn1.wav",
+     "caption": "Now, this is the step everyone misses. Find dxgi.dll in your GTA folder,",
+     "from": 0,
+     "frames": 234
+    },
+    {
+     "id": "rn2",
+     "file": "voice/rn2.wav",
+     "caption": "and rename it to ReShade64.asi. That's how Script Hook V knows to load it.",
+     "from": 245,
+     "frames": 210
+    },
+    {
+     "id": "rn3",
+     "file": "voice/rn3.wav",
+     "caption": "Last thing for GTA. Copy everything from the \"Minecraft view\" folder in the CraftV zip into your game folder.",
+     "from": 466,
+     "frames": 260
+    }
+   ],
+   "frames": 744
+  },
+  {
+   "id": "fabric",
+   "part": 2,
+   "beats": [
+    {
+     "id": "fb1",
+     "file": "voice/fb1.wav",
+     "caption": "Part two, Minecraft. CraftV runs its own copy of Minecraft next to GTA, using your normal account.",
+     "from": 0,
+     "frames": 261
+    },
+    {
+     "id": "fb2",
+     "file": "voice/fb2.wav",
+     "caption": "Run the Fabric installer, pick version 26.3, and hit Install.",
+     "from": 272,
+     "frames": 184
+    }
+   ],
+   "frames": 474
+  },
+  {
+   "id": "launcher",
+   "part": 2,
+   "beats": [
+    {
+     "id": "ln1",
+     "file": "voice/ln1.wav",
+     "caption": "In the Minecraft Launcher, open installations, and edit the new Fabric one.",
+     "from": 0,
+     "frames": 174
+    },
+    {
+     "id": "ln2",
+     "file": "voice/ln2.wav",
+     "caption": "Give it its own game folder. That way your normal Minecraft stays exactly how it is.",
+     "from": 185,
+     "frames": 195
+    },
+    {
+     "id": "ln3",
+     "file": "voice/ln3.wav",
+     "caption": "Inside that folder, make a mods folder, and drop in Fabric API and the CraftV mod.",
+     "from": 391,
+     "frames": 213
+    }
+   ],
+   "frames": 622
+  },
+  {
+   "id": "settings",
+   "part": 3,
+   "beats": [
+    {
+     "id": "st1",
+     "file": "voice/st1.wav",
+     "caption": "Part three is quick. In GTA's graphics settings, set the screen type to Windowed Borderless.",
+     "from": 0,
+     "frames": 219
+    },
+    {
+     "id": "st2",
+     "file": "voice/st2.wav",
+     "caption": "And turn off \"Pause Game On Focus Loss\", so GTA keeps running next to Minecraft.",
+     "from": 230,
+     "frames": 192
+    }
+   ],
+   "frames": 440
+  },
+  {
+   "id": "play",
+   "part": 0,
+   "beats": [
+    {
+     "id": "pl1",
+     "file": "voice/pl1.wav",
+     "caption": "And that's the setup. Every time you play, start the Fabric version of Minecraft first. It opens a world called CraftV by itself.",
+     "from": 0,
+     "frames": 295
+    },
+    {
+     "id": "pl2",
+     "file": "voice/pl2.wav",
+     "caption": "Leave it running, start GTA, and load story mode.",
+     "from": 306,
+     "frames": 126
+    },
+    {
+     "id": "pl3",
+     "file": "voice/pl3.wav",
+     "caption": "When the little CraftV box in the corner says \"MC view\", you're in.",
+     "from": 443,
+     "frames": 144
+    }
+   ],
+   "frames": 605
+  },
+  {
+   "id": "controls",
+   "part": 0,
+   "beats": [
+    {
+     "id": "ct1",
+     "file": "voice/ct1.wav",
+     "caption": "Left click breaks blocks and hits things. People react, and cars dent.",
+     "from": 0,
+     "frames": 164
+    },
+    {
+     "id": "ct2",
+     "file": "voice/ct2.wav",
+     "caption": "Right click places blocks, eats food, and pulls back your bow.",
+     "from": 175,
+     "frames": 146
+    },
+    {
+     "id": "ct3",
+     "file": "voice/ct3.wav",
+     "caption": "E opens your inventory, Space does a Minecraft jump, and F8 opens the settings.",
+     "from": 332,
+     "frames": 205
+    }
+   ],
+   "frames": 555
+  },
+  {
+   "id": "menu",
+   "part": 0,
+   "beats": [
+    {
+     "id": "f8a",
+     "file": "voice/f8a.wav",
+     "caption": "The settings menu looks just like GTA's. Turn the crosshair on or off, hide your hand, change the frame rate,",
+     "from": 0,
+     "frames": 258
+    },
+    {
+     "id": "f8b",
+     "file": "voice/f8b.wav",
+     "caption": "pick whether Steve sits in cars, and switch damage, TNT and torch light on or off. If your FPS drops, lower the quality here.",
+     "from": 269,
+     "frames": 315
+    }
+   ],
+   "frames": 602
+  },
+  {
+   "id": "friends",
+   "part": 0,
+   "beats": [
+    {
+     "id": "fr1",
+     "file": "voice/fr1.wav",
+     "caption": "Want to play with friends? Your address is in that same menu, under \"Friends join at\".",
+     "from": 0,
+     "frames": 183
+    },
+    {
+     "id": "fr2",
+     "file": "voice/fr2.wav",
+     "caption": "Friends with normal Minecraft just join that address from multiplayer.",
+     "from": 194,
+     "frames": 162
+    },
+    {
+     "id": "fr3",
+     "file": "voice/fr3.wav",
+     "caption": "Friends with their own GTA install everything too, and put your address in one config file. Then you see each other in Los Santos.",
+     "from": 367,
+     "frames": 304
+    },
+    {
+     "id": "fr4",
+     "file": "voice/fr4.wav",
+     "caption": "If they're not on your Wi-Fi, forward port 25565 on your router.",
+     "from": 682,
+     "frames": 180
+    }
+   ],
+   "frames": 880
+  },
+  {
+   "id": "trouble",
+   "part": 0,
+   "beats": [
+    {
+     "id": "tb1",
+     "file": "voice/tb1.wav",
+     "caption": "If you don't see the CraftV box at all, Script Hook V isn't loading. Check its files are next to GTA5.exe.",
+     "from": 0,
+     "frames": 302
+    },
+    {
+     "id": "tb2",
+     "file": "voice/tb2.wav",
+     "caption": "If the box shows up but Minecraft doesn't, check the ReShade rename, and make sure Minecraft started first.",
+     "from": 313,
+     "frames": 240
+    },
+    {
+     "id": "tb3",
+     "file": "voice/tb3.wav",
+     "caption": "Still stuck? Open an issue on the GitHub page with your log files.",
+     "from": 564,
+     "frames": 155
+    }
+   ],
+   "frames": 737
+  },
+  {
+   "id": "outro",
+   "part": 0,
+   "beats": [
+    {
+     "id": "out1",
+     "file": "voice/out1.wav",
+     "caption": "That's it. Go build something ridiculous in Los Santos. And remember, story mode only. Have fun.",
+     "from": 0,
+     "frames": 222
+    }
+   ],
+   "frames": 240
+  }
+ ]
+}

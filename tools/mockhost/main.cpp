@@ -407,6 +407,9 @@ namespace
 				in >> v;
 				InputMsg msg{ cmd == "slot" ? kInputSlot : kInputScroll, 0, 0, static_cast<std::int8_t>(v), 0u };
 				Out("%s INPUT %s %d", codec::Valid(msg) && endpoint_->Send(msg) ? "sent" : "NOT sent (slot 0..8, scroll -9..9 non-zero)", cmd.c_str(), v);
+			} else if (cmd == "camrig") {
+				in >> camBehind_ >> camAbove_ >> camOrbit_ >> camFov_;
+				Out("camera rig: %.1f m back, %.1f m up, %.0f deg round, fov %.0f", camBehind_, camAbove_, camOrbit_, camFov_);
 			} else if (cmd == "camflags") {
 				unsigned f = 0;
 				in >> f;
@@ -497,9 +500,10 @@ namespace
 		// in third person 4 m behind and 2 m above them, looking where they walk.
 		void SendCamera(std::uint64_t a_nowUs)
 		{
-			constexpr double kEyeHeight = 1.62, kBehind = 4.0, kAbove = 2.0;
+			constexpr double kEyeHeight = 1.62;
+			const double     kBehind = camBehind_, kAbove = camAbove_;
 			const PlayerStateMsg& s = lastState_;
-			const double          yaw = s.yaw / kRadToDeg;
+			const double          yaw = (s.yaw + (cameraThird_ ? camOrbit_ : 0.0)) / kRadToDeg;
 			const double          fx = -std::sin(yaw), fz = std::cos(yaw);  // Minecraft's facing for this yaw
 			CameraMsg             c{};
 			c.frame = ++cameraFrame_;
@@ -507,9 +511,9 @@ namespace
 			c.x = cameraThird_ ? s.x - fx * kBehind : s.x;
 			c.y = s.y + (cameraThird_ ? kAbove : kEyeHeight);
 			c.z = cameraThird_ ? s.z - fz * kBehind : s.z;
-			c.yaw = s.yaw;
+			c.yaw = static_cast<float>(s.yaw + (cameraThird_ ? camOrbit_ : 0.0));
 			c.pitch = cameraPitch_;
-			c.fovY = 60.0f;
+			c.fovY = camFov_;
 			c.feetX = s.x;
 			c.feetY = s.y;
 			c.feetZ = s.z;
@@ -761,7 +765,9 @@ namespace
 		PlayerStateMsg            lastState_{};
 		std::uint64_t             ownerStates_ = 0;
 		std::uint64_t arrowEvents_ = 0;
-		std::uint32_t extraCameraFlags_ = 0;  // 'camflags': IN_VEHICLE 4, PHONE 8, SPRINTING 16
+		std::uint32_t extraCameraFlags_ = 0;
+		double        camBehind_ = 4.0, camAbove_ = 2.0, camOrbit_ = 0.0;  // 'camrig': third-person distance, height, angle round the player
+		float         camFov_ = 60.0f;  // 'camflags': IN_VEHICLE 4, PHONE 8, SPRINTING 16
 		bool                      killed_ = false;
 		bool                      teleportNext_ = true;
 		std::uint64_t             restartAtMs_ = 0;

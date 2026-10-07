@@ -2,7 +2,7 @@
 //   <out>_composite.png  the world layer over a stand-in host picture (sky and checkerboard), the overlay on top
 //   <out>_depth.png      the world depth (near = white)
 //   <out>_overlay.png    the overlay alone over a checkerboard
-// Usage: framedump <out prefix> [--wait-ms N] [--frame NAME]
+// Usage: framedump <out prefix> [--wait-ms N] [--frame NAME] [--raw]
 #include "craftv/protocol.h"
 
 #define NOMINMAX
@@ -105,14 +105,17 @@ namespace
 int main(int argc, char** argv)
 {
 	if (argc < 2) {
-		std::fprintf(stderr, "usage: framedump <out prefix> [--wait-ms N] [--frame NAME]\n");
+		std::fprintf(stderr, "usage: framedump <out prefix> [--wait-ms N] [--frame NAME] [--raw]\n");
 		return 2;
 	}
 	const std::string out = argv[1];
 	std::wstring      frameName = kFrameMappingName;  // --frame: a second CraftV Minecraft's mapping (the stand-in guest)
 	DWORD             waitMs = 10000;
-	for (int i = 2; i + 1 < argc; ++i) {
-		if (std::strcmp(argv[i], "--wait-ms") == 0) waitMs = static_cast<DWORD>(std::atoi(argv[++i]));
+	bool              rawLayers = false;
+	for (int i = 2; i < argc; ++i) {
+		if (std::strcmp(argv[i], "--raw") == 0) rawLayers = true;
+		else if (i + 1 >= argc) break;
+		else if (std::strcmp(argv[i], "--wait-ms") == 0) waitMs = static_cast<DWORD>(std::atoi(argv[++i]));
 		else if (std::strcmp(argv[i], "--frame") == 0) frameName = std::wstring(argv[i + 1], argv[i + 1] + std::strlen(argv[i + 1])), ++i;
 	}
 	HANDLE mapping = nullptr;
@@ -166,6 +169,17 @@ int main(int argc, char** argv)
 		Read<float>(desc + 76), Read<std::uint32_t>(desc + 84));
 
 	const bool                bottomUp = (flags & kFrameBottomUp) != 0;
+	if (rawLayers) {
+		// --raw: both layers as they are (premultiplied RGBA, rows as in the mapping), for tools/video/capture.py
+		for (const auto& [suffix, layer] : { std::pair<const char*, const std::vector<std::uint8_t>*>{ "_world.rgba", &world }, { "_overlay.rgba", &overlay } }) {
+			FILE* f = nullptr;
+			if (fopen_s(&f, (out + suffix).c_str(), "wb") == 0 && f) {
+				std::fwrite(layer->data(), 1, layer->size(), f);
+				std::fclose(f);
+			}
+		}
+		std::printf("raw %u %u %d\n", w, h, bottomUp ? 1 : 0);
+	}
 	std::vector<std::uint8_t> comp(static_cast<std::size_t>(w) * h * 3), dep(comp.size()), ovl(comp.size());
 	float                     dmin = 1e9f, dmax = -1e9f;
 	std::size_t               covered = 0, overlayPixels = 0;
