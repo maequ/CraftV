@@ -20,18 +20,20 @@ What the friend needs
      folder, for example C:\Users\<you>\AppData\Roaming\.minecraft-craftv
      (CraftV changes that Minecraft's settings: render distance, frame rate. Your normal Minecraft stays as it is.)
   c. Fabric API 0.161.0+26.3 from its official page: https://modrinth.com/mod/fabric-api (Versions tab, 26.3).
-  d. Put the Fabric API jar and craftv-0.1.0.jar (in this folder) into that game directory's "mods" folder
+  d. Put the Fabric API jar and craftv-0.1.0.jar (in the "Minecraft mod" folder) into that game directory's "mods" folder
      (create the folder if it isn't there).
+  e. Copy the "config" folder from "Minecraft mod\For a friend" into that game directory too, open config\craftv.properties with
+     Notepad and put the host's address after guest.join= (for example guest.join=203.0.113.7:25565).
+     Do this before the first start: without an address, CraftV hosts its own world instead of joining.
 
 Then the GTA part, exactly as the host did it: follow INSTALL.txt (CraftV.asi, CraftV.ini, ReShade, GTA settings).
 
 Playing together
 ----------------
 1. The host starts their Minecraft and GTA as usual. Their CraftV overlay (or F8 > "Friends join at") shows the
-   address, for example 192.168.1.110:25565.
-2. The friend starts the fabric-loader-26.3 installation in the Minecraft Launcher, then Multiplayer >
-   Direct Connect > the host's address > Join Server. (To skip this every time, write the address after
-   guest.join= in config\craftv.properties in that game directory; Minecraft then joins by itself.)
+   address, for example 192.168.1.23:25565.
+2. The friend starts the fabric-loader-26.3 installation in the Minecraft Launcher. It joins the host's world by
+   itself (guest.join).
 3. The friend starts GTA V and loads story mode. Their overlay says "MC view": their GTA now drives their
    Minecraft player, and they get Survival with the starter kit.
 

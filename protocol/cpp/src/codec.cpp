@@ -87,6 +87,8 @@ namespace craftv::codec
 			return sizeof(OwnerStateMsg);
 		case kMsgBlockRegionRequest:
 			return sizeof(BlockRegionRequestMsg);
+		case kMsgWorldEvent:
+			return sizeof(WorldEventMsg);
 		default:
 			return 0;
 		}
@@ -112,7 +114,8 @@ namespace craftv::codec
 		case kMsgTerrainRequest:
 		case kMsgSessionInfo:
 		case kMsgOwnerState:
-			return a_sender == Role::kMc;  // §7.8-7.11, §7.13, §7.18
+		case kMsgWorldEvent:
+			return a_sender == Role::kMc;  // §7.8-7.11, §7.13, §7.18, §7.20
 		case kMsgTerrainPatch:
 		case kMsgCamera:
 		case kMsgView:
@@ -277,6 +280,10 @@ namespace craftv::codec
 			return a_msg.button == 0 && a_msg.down == 0 && a_msg.value != 0 && a_msg.value >= -kHotbarSlots && a_msg.value <= kHotbarSlots;
 		case kInputCursor:
 			return a_msg.button == 0 && a_msg.down == 0 && a_msg.value == 0;
+		case kInputDamage:
+			return a_msg.button <= kDamageCauseMax && a_msg.down == 0 && a_msg.value >= 1 && a_msg.cursor == 0;
+		case kInputOption:
+			return a_msg.button >= 1 && a_msg.button <= kOptionMax && a_msg.down == 0 && a_msg.value >= 0 && a_msg.cursor == 0;
 		default:
 			return false;
 		}
@@ -284,7 +291,7 @@ namespace craftv::codec
 
 	bool Valid(const OwnerStateMsg& a_msg)
 	{
-		return a_msg.held <= kHeldOther && a_msg.food <= kMaxFood && a_msg.gameMode <= kGameModeMax && Finite(a_msg.attackDamage) &&
+		return a_msg.held <= kHeldMax && a_msg.food <= kMaxFood && a_msg.gameMode <= kGameModeMax && Finite(a_msg.attackDamage) &&
 		       a_msg.attackDamage >= 0.0f && a_msg.attackDamage <= kMaxAttackDamage && Finite(a_msg.attackCharge) && a_msg.attackCharge >= 0.0f &&
 		       a_msg.attackCharge <= 1.0f && (a_msg.flags & ~kOwnerKnownFlags) == 0;
 	}
@@ -292,6 +299,13 @@ namespace craftv::codec
 	bool Valid(const BlockRegionRequestMsg& a_msg)
 	{
 		return a_msg.requestId != 0 && ChunkOk(a_msg.chunkX, a_msg.chunkZ);
+	}
+
+	bool Valid(const WorldEventMsg& a_msg)
+	{
+		return a_msg.kind >= kEventExplosion && a_msg.kind <= kEventKindMax && a_msg.reserved0[0] == 0 && a_msg.reserved0[1] == 0 &&
+		       a_msg.reserved0[2] == 0 && a_msg.reserved1 == 0 && PositionOk(a_msg.x, a_msg.y, a_msg.z) && Finite(a_msg.power) && a_msg.power >= 0.0f &&
+		       a_msg.power <= kMaxEventPower;
 	}
 
 	void SetPlayerName(RemotePlayerJoinMsg& a_msg, const char* a_name)

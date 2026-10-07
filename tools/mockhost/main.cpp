@@ -25,6 +25,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdarg>
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <deque>
@@ -274,6 +275,7 @@ namespace
 					" radius R | speed S | walk | stop | kill-link | resume-link | restart | quit");
 				Out("passthrough (v1.2): cam on|off|first|third | pitch DEG | view W H | press attack|use|pick|drop|inventory|swap|close |"
 					" hold attack|use | release attack|use | slot N | scroll D");
+				Out("v1.4: hurt HALF_HEARTS | option ID VALUE (1 crosshair, 2 hand, 3 outline, 4 frame rate/10, 5 hud, 6 vehicle body)");
 			} else if (cmd == "status") {
 				PrintStatus();
 			} else if (cmd == "friends") {
@@ -405,6 +407,21 @@ namespace
 				in >> v;
 				InputMsg msg{ cmd == "slot" ? kInputSlot : kInputScroll, 0, 0, static_cast<std::int8_t>(v), 0u };
 				Out("%s INPUT %s %d", codec::Valid(msg) && endpoint_->Send(msg) ? "sent" : "NOT sent (slot 0..8, scroll -9..9 non-zero)", cmd.c_str(), v);
+			} else if (cmd == "camflags") {
+				unsigned f = 0;
+				in >> f;
+				extraCameraFlags_ = f & (kCameraInVehicle | kCameraPhone | kCameraSprinting);
+				Out("camera flags +%u (4 in a vehicle, 8 phone, 16 sprinting)", extraCameraFlags_);
+			} else if (cmd == "hurt") {
+				int half = 0;
+				in >> half;
+				InputMsg msg{ kInputDamage, kDamageGeneric, 0, static_cast<std::int8_t>(std::clamp(half, 1, 127)), 0u };
+				Out("%s INPUT DAMAGE %d half hearts", endpoint_->Send(msg) ? "sent" : "NOT sent", half);
+			} else if (cmd == "option") {
+				int id = 0, value = 0;
+				in >> id >> value;
+				InputMsg msg{ kInputOption, static_cast<std::uint8_t>(id), 0, static_cast<std::int8_t>(value), 0u };
+				Out("%s INPUT OPTION %d = %d", codec::Valid(msg) && endpoint_->Send(msg) ? "sent" : "NOT sent (option 1..6, value 0..127)", id, value);
 			} else if (cmd == "quit" || cmd == "exit") {
 				quit_ = true;
 			} else {
@@ -497,7 +514,7 @@ namespace
 			c.feetY = s.y;
 			c.feetZ = s.z;
 			c.bodyYaw = s.yaw;
-			c.flags = kCameraPassthrough | (cameraThird_ ? 0u : kCameraFirstPerson);
+			c.flags = kCameraPassthrough | (cameraThird_ ? 0u : kCameraFirstPerson) | extraCameraFlags_;
 			c.nearClip = 0.15f;
 			c.farClip = 10000.0f;
 			if (endpoint_->Send(c)) {
@@ -533,10 +550,23 @@ namespace
 						endpoint_->CountMalformed();
 						return;
 					}
-					static const char* held[] = { "empty hand", "sword", "axe", "pickaxe", "shovel", "hoe", "block", "other item" };
+					static const char* held[] = { "empty hand", "sword", "axe", "pickaxe", "shovel", "hoe", "block", "other item", "light" };
 					if (++ownerStates_ <= 3 || ownerStates_ % 20 == 0) {
 						Out("@OWNER held=%s damage=%.1f charge=%.2f health=%u food=%u gameMode=%u flags=%u", held[m.held], m.attackDamage, m.attackCharge,
 							m.health, m.food, m.gameMode, m.flags);
+					}
+					return;
+				}
+			case kMsgWorldEvent:
+				{
+					WorldEventMsg m;
+					if (!codec::Decode(h, p, m)) {
+						endpoint_->CountMalformed();
+						return;
+					}
+					if (m.kind == kEventExplosion || ++arrowEvents_ <= 5 || arrowEvents_ % 50 == 0) {
+						Out("@EVENT %s at (%.1f, %.1f, %.1f) power %.1f id %u%s", m.kind == kEventExplosion ? "EXPLOSION" : "ARROW", m.x, m.y, m.z, m.power, m.id,
+							m.kind == kEventExplosion ? "" : " (arrow events so far: see count)");
 					}
 					return;
 				}
@@ -730,6 +760,8 @@ namespace
 		std::uint64_t             sentCameras_ = 0;
 		PlayerStateMsg            lastState_{};
 		std::uint64_t             ownerStates_ = 0;
+		std::uint64_t arrowEvents_ = 0;
+		std::uint32_t extraCameraFlags_ = 0;  // 'camflags': IN_VEHICLE 4, PHONE 8, SPRINTING 16
 		bool                      killed_ = false;
 		bool                      teleportNext_ = true;
 		std::uint64_t             restartAtMs_ = 0;

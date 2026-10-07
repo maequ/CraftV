@@ -39,6 +39,7 @@ namespace craftv::codec
 	bool Valid(const InputMsg& a_msg);
 	bool Valid(const OwnerStateMsg& a_msg);
 	bool Valid(const BlockRegionRequestMsg& a_msg);
+	bool Valid(const WorldEventMsg& a_msg);
 
 	// Copies the known prefix of a payload into a_out and validates it. Shorter payloads are malformed;
 	// longer ones are accepted (forward compatibility, §9). The payload pointer may point into shared

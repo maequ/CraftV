@@ -22,8 +22,14 @@ Copy-Item (Join-Path $root 'gta\shaders\CraftV.fx'), (Join-Path $fxh 'ReShade.fx
 $jar = Get-ChildItem (Join-Path $root 'fabric\build\libs') -Filter 'craftv-*.jar' -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -notmatch 'sources' } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $jar) { throw "build the mod first: cd fabric; .\gradlew.bat build" }
-$friend = Join-Path $dist 'For your friend (Minecraft mod)'
+$old = Join-Path $dist 'For your friend (Minecraft mod)'
+if (Test-Path $old) { Remove-Item $old -Recurse -Force }
+$mod = Join-Path $dist 'Minecraft mod'
+New-Item -ItemType Directory -Force $mod | Out-Null
+Get-ChildItem $mod -Filter 'craftv-*.jar' | Remove-Item -Force
+Copy-Item $jar.FullName $mod -Force
+$friend = Join-Path $mod 'For a friend'
 New-Item -ItemType Directory -Force $friend | Out-Null
-Copy-Item $jar.FullName, (Join-Path $root 'gta\FRIEND.txt') $friend -Force
+Copy-Item (Join-Path $root "gta/friend-config/config") $friend -Recurse -Force
 Copy-Item (Join-Path $root 'gta\FRIEND.txt') $dist -Force
 Get-ChildItem $dist -Recurse -File | ForEach-Object { "{0,-60} {1,10:N0} bytes  {2:HH:mm}" -f $_.FullName.Substring($dist.Length + 1), $_.Length, $_.LastWriteTime }

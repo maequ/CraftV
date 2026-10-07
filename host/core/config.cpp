@@ -70,6 +70,21 @@ namespace craftv::host
 		blocks.maxProps = static_cast<int>(std::clamp(ReadDouble(L"Blocks", L"MaxProps", blocks.maxProps, a_iniPath), 0.0, 1000.0));
 		blocks.spawnRadius = static_cast<float>(std::clamp(ReadDouble(L"Blocks", L"Radius", blocks.spawnRadius, a_iniPath), 8.0, 200.0));
 		blocks.despawnRadius = blocks.spawnRadius + 16.0f;
+		auto& mc = minecraft;
+		mc.crosshair = ReadBool(L"Minecraft", L"Crosshair", mc.crosshair, a_iniPath);
+		mc.hand = ReadBool(L"Minecraft", L"Hand", mc.hand, a_iniPath);
+		mc.outline = static_cast<int>(std::clamp(ReadDouble(L"Minecraft", L"BlockOutline", mc.outline, a_iniPath), 0.0, 2.0));
+		mc.frameRate = static_cast<int>(std::clamp(ReadDouble(L"Minecraft", L"FrameRate", mc.frameRate, a_iniPath), 0.0, 240.0));
+		mc.hud = ReadBool(L"Minecraft", L"Hud", mc.hud, a_iniPath);
+		mc.steveInCars = ReadBool(L"Minecraft", L"SteveInCars", mc.steveInCars, a_iniPath);
+		mc.minecraftJump = ReadBool(L"Minecraft", L"MinecraftJump", mc.minecraftJump, a_iniPath);
+		mc.jumpHeight = std::clamp(ReadDouble(L"Minecraft", L"JumpHeight", mc.jumpHeight, a_iniPath), 0.3, 5.0);
+		mc.gtaDamage = ReadBool(L"Minecraft", L"GtaDamage", mc.gtaDamage, a_iniPath);
+		mc.explosions = ReadBool(L"Minecraft", L"Explosions", mc.explosions, a_iniPath);
+		mc.arrowsHurt = ReadBool(L"Minecraft", L"ArrowsHurt", mc.arrowsHurt, a_iniPath);
+		mc.torchLight = ReadBool(L"Minecraft", L"TorchLight", mc.torchLight, a_iniPath);
+		const std::wstring key = ReadString(L"Minecraft", L"InventoryKey", L"E", a_iniPath);
+		mc.inventoryKey = _wcsicmp(key.c_str(), L"Tab") == 0 ? 0x09 : _wcsicmp(key.c_str(), L"I") == 0 ? 0x49 : 0x45;
 		debugOverlay = ReadBool(L"Debug", L"Overlay", debugOverlay, a_iniPath);
 		const std::wstring corner = ReadString(L"Debug", L"OverlayCorner", L"TopRight", a_iniPath);
 		overlayCorner = _wcsicmp(corner.c_str(), L"TopLeft") == 0 ? OverlayCorner::kTopLeft : OverlayCorner::kTopRight;
@@ -100,6 +115,20 @@ namespace craftv::host
 		ok = Write(L"Debug", L"Overlay", debugOverlay ? L"1" : L"0", iniPath) && ok;
 		ok = Write(L"Debug", L"OverlayCorner", overlayCorner == OverlayCorner::kTopLeft ? L"TopLeft" : L"TopRight", iniPath) && ok;
 		ok = Write(L"Debug", L"OverlayDetails", overlayDetails ? L"1" : L"0", iniPath) && ok;
+		const auto& mc = minecraft;
+		auto b = [](bool v) { return v ? L"1" : L"0"; };
+		ok = Write(L"Minecraft", L"Crosshair", b(mc.crosshair), iniPath) && ok;
+		ok = Write(L"Minecraft", L"Hand", b(mc.hand), iniPath) && ok;
+		ok = Write(L"Minecraft", L"BlockOutline", std::to_wstring(mc.outline), iniPath) && ok;
+		ok = Write(L"Minecraft", L"FrameRate", std::to_wstring(mc.frameRate), iniPath) && ok;
+		ok = Write(L"Minecraft", L"Hud", b(mc.hud), iniPath) && ok;
+		ok = Write(L"Minecraft", L"SteveInCars", b(mc.steveInCars), iniPath) && ok;
+		ok = Write(L"Minecraft", L"MinecraftJump", b(mc.minecraftJump), iniPath) && ok;
+		ok = Write(L"Minecraft", L"GtaDamage", b(mc.gtaDamage), iniPath) && ok;
+		ok = Write(L"Minecraft", L"Explosions", b(mc.explosions), iniPath) && ok;
+		ok = Write(L"Minecraft", L"ArrowsHurt", b(mc.arrowsHurt), iniPath) && ok;
+		ok = Write(L"Minecraft", L"TorchLight", b(mc.torchLight), iniPath) && ok;
+		ok = Write(L"Minecraft", L"InventoryKey", mc.inventoryKey == 0x09 ? L"Tab" : mc.inventoryKey == 0x49 ? L"I" : L"E", iniPath) && ok;
 		return ok;
 	}
 }

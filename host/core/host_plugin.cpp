@@ -29,6 +29,13 @@ namespace craftv::host
 		// The passthrough's view lift: re-measured every few frames, eased in so stepping between columns doesn't pop.
 		constexpr std::uint32_t kLiftProbeEvery = 4;
 		constexpr double        kLiftEase = 0.15;
+		// Steve seated in a car: the game's seated root is about his hips, a bit higher than a standing player's.
+		constexpr double        kSeatedLift = 0.3;
+		// Lights: game lights for Minecraft torches within this many metres.
+		constexpr float         kLightRadius = 40.0f;
+		constexpr Rgba          kHeldTorch{ 255, 190, 110, 255 };
+		constexpr int           kMaxExplosionsPerTick = 8;
+		constexpr double        kGtaDeadHealth = 100.0;  // GTA V's player dies at 100 health
 
 		// Overlay layout (screen fractions).
 		constexpr float kOverlayMargin = 0.01f;
@@ -67,6 +74,7 @@ namespace craftv::host
 		game_(a_game), config_(a_config), terrain_(a_config.terrain), props_(std::make_unique<BlockProps>(a_config.blocks)),
 		passthroughWanted_(a_config.passthrough.mode == PassthroughMode::kAuto)
 	{
+		inventoryVk_.store(a_config.minecraft.inventoryKey);
 	}
 
 	HostPlugin::~HostPlugin()
@@ -125,7 +133,11 @@ namespace craftv::host
 		m.feetY = f.y;
 		m.feetZ = f.z;
 		m.bodyYaw = HeadingToYaw(a_s.heading);
-		m.flags = kCameraPassthrough | (a_cam.firstPerson ? kCameraFirstPerson : 0u) | (a_s.inVehicle ? kCameraInVehicle : 0u);
+		if (a_s.inVehicle) {
+			m.feetY += kSeatedLift;
+		}
+		m.flags = kCameraPassthrough | (a_cam.firstPerson ? kCameraFirstPerson : 0u) | (a_s.inVehicle ? kCameraInVehicle : 0u) |
+		          (a_s.phone ? kCameraPhone : 0u) | (a_s.sprinting && !a_s.inVehicle ? kCameraSprinting : 0u);
 		m.nearClip = std::max(0.0f, a_cam.nearClip);
 		m.farClip = std::max(0.0f, a_cam.farClip);
 		return m;
@@ -173,9 +185,10 @@ namespace craftv::host
 			             : passthroughWanted_ ? "CraftV: Minecraft view on" : "CraftV: Minecraft view off");
 		}
 		SetPassthrough(a_linked && passthroughWanted_ && game_.PassthroughAvailable());
-		// Minecraft draws the player on foot; in a vehicle the game's own driver shows (Minecraft has no car to seat
-		// them in, and hides its player then, PROTOCOL.md §7.15 IN_VEHICLE).
-		const bool hide = passthroughActive_ && !sample_.inVehicle;
+		const bool inventoryKey = inventoryRequested_.exchange(false, std::memory_order_relaxed);  // stale presses never fire later
+		// Minecraft draws the player; in a vehicle Steve sits in the car (PROTOCOL.md §7.15 IN_VEHICLE) unless the
+		// settings say the game's own driver shows there.
+		const bool hide = passthroughActive_ && (!sample_.inVehicle || config_.minecraft.steveInCars);
 		if (hide != playerHidden_) {
 			playerHidden_ = hide;
 			game_.SetPlayerHidden(hide);
@@ -219,8 +232,16 @@ namespace craftv::host
 		} else {
 			game_.TakePassthroughInput(in);  // also keeps GTA's weapon controls off
 		}
+		if (optionsDirty_) {
+			SendOptions();
+		}
 		if (menu_.Open()) {
 			in = PassthroughInput{};
+		}
+		// The inventory opens on foot (holding the player still in a moving car would crash it); it closes anywhere.
+		in.inventory = in.inventory || (inventoryKey && !menu_.Open() && (screenOpen || !sample_.inVehicle));
+		if (!screenOpen && !menu_.Open() && !sample_.inVehicle) {
+			game_.TickJump(config_.minecraft.minecraftJump, static_cast<float>(config_.minecraft.jumpHeight));
 		}
 		if (in.inventory) {
 			endpoint_->Send(InputMsg{ kInputButton, kButtonInventory, 1, 0, 0 });
@@ -262,6 +283,110 @@ namespace craftv::host
 		if (config_.passthrough.hideGtaHud) {
 			game_.HideHudThisFrame();
 		}
+		TickHealth();
+		if (config_.minecraft.torchLight) {
+			lights_.Draw(game_, config_.world, sample_.x, sample_.y, sample_.z, kLightRadius);
+			if (hasOwner_ && owner_.held == kHeldLight && (owner_.flags & kOwnerDead) == 0) {
+				game_.DrawLight(sample_.x, sample_.y, sample_.z + 0.3f, kHeldTorch, 7.0f, 3.0f);  // a torch in the hand
+			}
+		}
+	}
+
+	void HostPlugin::SendOptions()
+	{
+		const auto& mc = config_.minecraft;
+		auto option = [this](std::uint8_t a_id, int a_value) {
+			return endpoint_->Send(InputMsg{ kInputOption, a_id, 0, static_cast<std::int8_t>(std::clamp(a_value, 0, 127)), 0 });
+		};
+		const bool ok = option(kOptionCrosshair, mc.crosshair) && option(kOptionHand, mc.hand) && option(kOptionOutline, mc.outline) &&
+		                option(kOptionFrameRate, mc.frameRate / 10) && option(kOptionHud, mc.hud) && option(kOptionVehicleBody, mc.steveInCars);
+		if (ok) {
+			optionsDirty_ = false;
+		}
+	}
+
+	// Minecraft's hearts decide: damage in the game becomes Minecraft damage (the game's health is kept full), dying in
+	// Minecraft is "wasted" in the game, and dying in the game (a fall it can't survive) kills Minecraft too.
+	void HostPlugin::TickHealth()
+	{
+		if (!config_.minecraft.gtaDamage || !hasOwner_ || sample_.maxHealth <= kGtaDeadHealth) {
+			lastHealth_ = -1;
+			return;
+		}
+		const bool mcDead = (owner_.flags & kOwnerDead) != 0;
+		if (mcDead && !ownerWasDead_ && !sample_.playerDead) {
+			game_.KillPlayer();
+			HostLog::Info("health: dead in Minecraft, wasted in the game");
+		}
+		ownerWasDead_ = mcDead;
+		if (sample_.playerDead && !gtaWasDead_ && !mcDead) {
+			endpoint_->Send(InputMsg{ kInputDamage, kDamageGeneric, 0, 127, 0 });
+			HostLog::Info("health: died in the game, so in Minecraft too");
+		}
+		gtaWasDead_ = sample_.playerDead;
+		if (mcDead || sample_.playerDead) {
+			lastHealth_ = -1;
+			damageCarry_ = 0.0;
+			return;
+		}
+		const double perHalfHeart = (sample_.maxHealth - kGtaDeadHealth) / 20.0;  // the game's 100 health over 10 hearts
+		if (lastHealth_ >= 0 && sample_.health < lastHealth_ && nowMs_ >= ignoreDamageUntilMs_) {
+			damageCarry_ += (lastHealth_ - sample_.health) / perHalfHeart;
+		}
+		if (damageCarry_ >= 1.0) {
+			const int          half = static_cast<int>(std::min(damageCarry_, 127.0));
+			const std::uint8_t cause = sample_.inVehicle ? kDamageVehicle : (sample_.falling || sample_.inAir) ? kDamageFall : kDamageGeneric;
+			if (endpoint_->Send(InputMsg{ kInputDamage, cause, 0, static_cast<std::int8_t>(half), 0 })) {
+				damageCarry_ -= half;
+				++damageSent_;
+			}
+		}
+		if (sample_.health < sample_.maxHealth) {
+			game_.SetPlayerHealth(sample_.maxHealth);
+		}
+		lastHealth_ = sample_.maxHealth;
+	}
+
+	void HostPlugin::OnWorldEvent(const WorldEventMsg& a_msg)
+	{
+		double x, y, z;
+		PointFromMinecraft(a_msg.x, a_msg.y, a_msg.z, config_.world, x, y, z);
+		if (a_msg.kind == kEventExplosion) {
+			if (config_.minecraft.explosions && explosionsThisTick_ < kMaxExplosionsPerTick) {
+				++explosionsThisTick_;
+				++explosions_;
+				game_.Explode(static_cast<float>(x), static_cast<float>(y), static_cast<float>(z), a_msg.power);
+				const double dx = x - sample_.x, dy = y - sample_.y, dz = z - sample_.z;
+				if (dx * dx + dy * dy + dz * dz < 4.0 * a_msg.power * a_msg.power) {
+					ignoreDamageUntilMs_ = nowMs_ + 600;  // Minecraft's own blast already cost hearts: don't count the game's copy too
+				}
+				HostLog::Info("explosion from Minecraft at %.1f %.1f %.1f (power %.1f)", x, y, z, a_msg.power);
+			}
+			return;
+		}
+		if (a_msg.kind == kEventProjectile && config_.minecraft.arrowsHurt) {
+			for (std::uint32_t id : arrowIds_) {
+				if (id == a_msg.id && id != 0) {
+					return;  // it already hit someone
+				}
+			}
+			const float damage = static_cast<float>(a_msg.power * config_.passthrough.meleeDamagePerHalfHeart);
+			if (game_.ProjectileHit(static_cast<float>(x), static_cast<float>(y), static_cast<float>(z), damage) > 0) {
+				arrowIds_[arrowNext_] = a_msg.id;
+				arrowNext_ = (arrowNext_ + 1) % static_cast<int>(std::size(arrowIds_));
+				++arrowHits_;
+			}
+		}
+	}
+
+	void HostPlugin::MeasureFrame(std::uint64_t a_nowUs)
+	{
+		if (lastTickUs_ != 0 && a_nowUs > lastTickUs_ && a_nowUs - lastTickUs_ < 2000000) {
+			const double ms = (a_nowUs - lastTickUs_) / 1000.0;
+			frameMsAvg_ = frameMsAvg_ == 0.0 ? ms : frameMsAvg_ + (ms - frameMsAvg_) * 0.02;
+			frameMsMax_ = std::max(frameMsMax_, ms);
+		}
+		lastTickUs_ = a_nowUs;
 	}
 
 	namespace
@@ -303,6 +428,44 @@ namespace craftv::host
 		double Distance(double a, double b) { return a > b ? a - b : b - a; }
 	}
 
+	namespace
+	{
+		// The menu's rows, top to bottom.
+		enum MenuRowId
+		{
+			kRowView,
+			kRowQuality,
+			kRowFrameRate,
+			kRowCrosshair,
+			kRowHand,
+			kRowOutline,
+			kRowMcHud,
+			kRowSteveInCars,
+			kRowJump,
+			kRowGtaDamage,
+			kRowExplosions,
+			kRowArrows,
+			kRowTorches,
+			kRowInventoryKey,
+			kRowHits,
+			kRowHideGtaHud,
+			kRowOverlay,
+			kRowOverlayDetails,
+			kRowScan,
+			kRowJoin,
+			kRowCount
+		};
+		constexpr Step kFrameRates[] = { { "60", 60 }, { "90", 90 }, { "120", 120 }, { "144", 144 }, { "Unlimited", 0 } };
+		constexpr const char* kOutlines[] = { "Off", "Placed blocks", "Everywhere" };
+		struct KeyStep
+		{
+			const char* name;
+			int         vk;
+		};
+		constexpr KeyStep kInventoryKeys[] = { { "E", 0x45 }, { "Tab", 0x09 }, { "I", 0x49 } };
+		const char* OnOff(bool a_on) { return a_on ? "On" : "Off"; }
+	}
+
 	// The settings menu (F8): rows built from the live settings each frame, changes applied at once and saved.
 	void HostPlugin::TickMenu()
 	{
@@ -312,9 +475,13 @@ namespace craftv::host
 		if (!menu_.Open()) {
 			return;
 		}
+		const auto& mc = config_.minecraft;
 		const int quality = Nearest(kQuality, [&](const Step& s) { return Distance(static_cast<double>(s.value), static_cast<double>(config_.passthrough.maxPixels)); });
 		const int hits = Nearest(kHits, [&](const Step& s) { return Distance(static_cast<double>(s.value), config_.passthrough.meleeDamagePerHalfHeart); });
 		const int scan = Nearest(kScan, [&](const ScanStep& s) { return Distance(s.budgetUs, config_.terrain.probeBudgetUs); });
+		const int rate = mc.frameRate == 0 ? static_cast<int>(std::size(kFrameRates)) - 1
+		                                   : Nearest(kFrameRates, [&](const Step& s) { return s.value == 0 ? 1e9 : Distance(static_cast<double>(s.value), static_cast<double>(mc.frameRate)); });
+		const int key = Nearest(kInventoryKeys, [&](const KeyStep& s) { return Distance(s.vk, mc.inventoryKey); });
 		const char* overlay = !config_.debugOverlay ? "Off" : config_.overlayCorner == OverlayCorner::kTopLeft ? "Top left" : "Top right";
 		static char address[kAddressMaxBytes + 1];
 		if (hasSession_ && (session_.flags & kSessionOpen)) {
@@ -322,50 +489,109 @@ namespace craftv::host
 		} else {
 			std::snprintf(address, sizeof(address), "%s", "not open yet");
 		}
-		const MenuRow rows[] = {
-			{ "Minecraft view", passthroughWanted_ ? "On" : "Off", "Minecraft drawn into GTA. F7 also switches it.", true },
+		const MenuRow rows[kRowCount] = {
+			{ "Minecraft view", OnOff(passthroughWanted_), "Minecraft drawn into GTA. F7 also switches it.", true },
 			{ "Minecraft quality", kQuality[quality].name, "How sharp Minecraft looks. Lower runs faster.", true },
-			{ "Hide GTA HUD", config_.passthrough.hideGtaHud ? "On" : "Off", "Hide GTA's minimap and HUD in the Minecraft view.", true },
+			{ "Minecraft frame rate", kFrameRates[rate].name, "Higher is smoother when you turn the camera; costs some FPS.", true },
+			{ "Crosshair", OnOff(mc.crosshair), "Minecraft's + in the middle of the screen, in third person too.", true },
+			{ "Hand", OnOff(mc.hand), "Your Minecraft hand and the item you hold, in first person.", true },
+			{ "Block outlines", kOutlines[mc.outline], "The box around the block you look at. The hidden ground never gets one.", true },
+			{ "Minecraft HUD", OnOff(mc.hud), "The hotbar, hearts and hunger.", true },
+			{ "Steve in cars", OnOff(mc.steveInCars), "Steve sits in the car. Off: GTA's own driver shows.", true },
+			{ "Jump", mc.minecraftJump ? "Minecraft" : "GTA", "Minecraft: a straight jump up. GTA: the game's own jump.", true },
+			{ "GTA damage", OnOff(mc.gtaDamage), "Getting hurt in GTA costs hearts. Dying in Minecraft gets you wasted.", true },
+			{ "TNT in GTA", OnOff(mc.explosions), "Minecraft explosions blow up GTA too (cars, people).", true },
+			{ "Arrows hurt people", OnOff(mc.arrowsHurt), "Minecraft arrows hit GTA's people.", true },
+			{ "Torch light", OnOff(mc.torchLight), "Minecraft torches (and one in your hand) light up GTA.", true },
+			{ "Inventory key", kInventoryKeys[key].name, "Opens Minecraft's inventory. Esc closes it.", true },
 			{ "Hit strength", kHits[hits].name, "How hard your Minecraft hits are on people and cars.", true },
+			{ "Hide GTA HUD", OnOff(config_.passthrough.hideGtaHud), "Hide GTA's minimap and HUD in the Minecraft view.", true },
 			{ "CraftV overlay", overlay, "The small CraftV status box.", true },
-			{ "Overlay details", config_.overlayDetails ? "On" : "Off", "Extra numbers in the status box, for bug reports.", true },
-			{ "Ground scanning", kScan[scan].name, "Copying GTA's ground for friends. Smooth costs least.", true },
+			{ "Overlay details", OnOff(config_.overlayDetails), "Extra numbers in the status box, for bug reports.", true },
+			{ "Ground scanning", kScan[scan].name, "Copying GTA's ground into Minecraft. Smooth costs least.", true },
 			{ "Friends join at", address, "In Minecraft: Multiplayer, Direct Connect.", false },
 		};
-		constexpr int count = static_cast<int>(sizeof(rows) / sizeof(rows[0]));
-		int             row = 0;
-		const MenuAction action = menu_.Input(game_, count, row);
+		int              row = 0;
+		const MenuAction action = menu_.Input(game_, kRowCount, row);
 		if (action != MenuAction::kNone && rows[row].choice) {
 			ApplyMenu(row, action == MenuAction::kPrevious ? -1 : 1);
 			config_.Save();
 		}
 		int w = 0, h = 0;
 		const float aspect = game_.ScreenSize(w, h) && h > 0 ? static_cast<float>(w) / static_cast<float>(h) : 16.0f / 9.0f;
-		menu_.Draw(game_, rows, count, aspect);
+		menu_.Draw(game_, rows, kRowCount, aspect);
 	}
 
 	void HostPlugin::ApplyMenu(int a_row, int a_direction)
 	{
+		auto& mc = config_.minecraft;
 		switch (a_row) {
-		case 0:
+		case kRowView:
 			passthroughWanted_ = !passthroughWanted_;
 			config_.passthrough.mode = passthroughWanted_ ? PassthroughMode::kAuto : PassthroughMode::kOff;
 			break;
-		case 1: {
+		case kRowQuality: {
 			const int i = Nearest(kQuality, [&](const Step& s) { return Distance(static_cast<double>(s.value), static_cast<double>(config_.passthrough.maxPixels)); });
 			config_.passthrough.maxPixels = kQuality[Wrap<std::size(kQuality)>(i, a_direction)].value;
 			viewSent_ = ViewMsg{};  // Minecraft's window is sized again
 			break;
 		}
-		case 2:
-			config_.passthrough.hideGtaHud = !config_.passthrough.hideGtaHud;
+		case kRowFrameRate: {
+			int i = 0;
+			for (int k = 0; k < static_cast<int>(std::size(kFrameRates)); ++k) {
+				if (static_cast<int>(kFrameRates[k].value) == mc.frameRate) {
+					i = k;
+				}
+			}
+			mc.frameRate = static_cast<int>(kFrameRates[Wrap<std::size(kFrameRates)>(i, a_direction)].value);
 			break;
-		case 3: {
+		}
+		case kRowCrosshair:
+			mc.crosshair = !mc.crosshair;
+			break;
+		case kRowHand:
+			mc.hand = !mc.hand;
+			break;
+		case kRowOutline:
+			mc.outline = Wrap<std::size(kOutlines)>(mc.outline, a_direction);
+			break;
+		case kRowMcHud:
+			mc.hud = !mc.hud;
+			break;
+		case kRowSteveInCars:
+			mc.steveInCars = !mc.steveInCars;
+			break;
+		case kRowJump:
+			mc.minecraftJump = !mc.minecraftJump;
+			break;
+		case kRowGtaDamage:
+			mc.gtaDamage = !mc.gtaDamage;
+			lastHealth_ = -1;
+			break;
+		case kRowExplosions:
+			mc.explosions = !mc.explosions;
+			break;
+		case kRowArrows:
+			mc.arrowsHurt = !mc.arrowsHurt;
+			break;
+		case kRowTorches:
+			mc.torchLight = !mc.torchLight;
+			break;
+		case kRowInventoryKey: {
+			const int i = Nearest(kInventoryKeys, [&](const KeyStep& s) { return Distance(s.vk, mc.inventoryKey); });
+			mc.inventoryKey = kInventoryKeys[Wrap<std::size(kInventoryKeys)>(i, a_direction)].vk;
+			inventoryVk_.store(mc.inventoryKey);
+			break;
+		}
+		case kRowHits: {
 			const int i = Nearest(kHits, [&](const Step& s) { return Distance(static_cast<double>(s.value), config_.passthrough.meleeDamagePerHalfHeart); });
 			config_.passthrough.meleeDamagePerHalfHeart = static_cast<double>(kHits[Wrap<std::size(kHits)>(i, a_direction)].value);
 			break;
 		}
-		case 4: {
+		case kRowHideGtaHud:
+			config_.passthrough.hideGtaHud = !config_.passthrough.hideGtaHud;
+			break;
+		case kRowOverlay: {
 			// Top right -> Top left -> Off -> Top right (or back)
 			const int i = !config_.debugOverlay ? 2 : config_.overlayCorner == OverlayCorner::kTopLeft ? 1 : 0;
 			const int n = (i + a_direction + 3) % 3;
@@ -373,10 +599,10 @@ namespace craftv::host
 			config_.overlayCorner = n == 1 ? OverlayCorner::kTopLeft : OverlayCorner::kTopRight;
 			break;
 		}
-		case 5:
+		case kRowOverlayDetails:
 			config_.overlayDetails = !config_.overlayDetails;
 			break;
-		case 6: {
+		case kRowScan: {
 			const int i = Nearest(kScan, [&](const ScanStep& s) { return Distance(s.budgetUs, config_.terrain.probeBudgetUs); });
 			const ScanStep& s = kScan[Wrap<std::size(kScan)>(i, a_direction)];
 			config_.terrain.probesPerTick = s.perTick;
@@ -387,6 +613,7 @@ namespace craftv::host
 		default:
 			break;
 		}
+		optionsDirty_ = true;  // Minecraft's half of these changes
 	}
 
 	void HostPlugin::Tick(std::uint64_t a_nowMs, std::uint64_t a_nowUs)
@@ -407,6 +634,8 @@ namespace craftv::host
 		if (state_ == PluginState::kFaulted || state_ == PluginState::kOnlineBlocked) {
 			return;
 		}
+		MeasureFrame(a_nowUs);
+		explosionsThisTick_ = 0;
 		game_.Sample(sample_);
 		if (OnlineSession(sample_)) {
 			HostLog::Warn("online session detected (gameInProgress=%d sessionStarted=%d inSession=%d): CraftV is off until the game restarts",
@@ -483,6 +712,7 @@ namespace craftv::host
 		const std::uint32_t ev = endpoint_->TakeEvents();
 		if (ev & (kEvConnected | kEvPeerRestarted | kEvStale | kEvPeerDetached)) {
 			props_->Clear(game_);  // Minecraft is the authority: a new one is asked again; with none, nothing stays solid
+			lights_.Clear();
 		}
 		if (ev & (kEvConnected | kEvPeerRestarted)) {
 			hasOwner_ = false;
@@ -490,6 +720,7 @@ namespace craftv::host
 			terrain_.Reset();      // its requests and friends come again (§7.10, §7.11)
 			friends_.Clear();
 			hasSession_ = false;
+			optionsDirty_ = true;  // a new Minecraft gets the owner-view settings
 		}
 	}
 
@@ -523,6 +754,7 @@ namespace craftv::host
 			}
 			++blockMessagesReceived_;
 			props_->OnBlockSet(m, game_);
+			lights_.OnBlockSet(m);
 			return;
 		}
 		case kMsgBlockBreakRequest:
@@ -581,6 +813,15 @@ namespace craftv::host
 			}
 			owner_ = m;
 			hasOwner_ = true;
+			return;
+		}
+		case kMsgWorldEvent: {
+			WorldEventMsg m;
+			if (!codec::Decode(a_h, a_p, m)) {
+				endpoint_->CountMalformed();
+				return;
+			}
+			OnWorldEvent(m);
 			return;
 		}
 		case kMsgSessionInfo: {
@@ -717,15 +958,17 @@ namespace craftv::host
 		if (a_nowMs >= nextCostReportMs_) {
 			if (nextCostReportMs_ != 0) {
 				const auto& ts = terrain_.Stats();
-				HostLog::Info("status: %s, link %s, tick avg %.1f us max %.1f us (ever %.1f us), %llu PLAYER_STATEs, %llu block msgs, %d friends, "
-							  "terrain %llu sent %llu empty %llu retried %llu probes",
-					ToString(state_), endpoint_ ? ToString(endpoint_->State()) : "-", cost_.avgUs, cost_.maxUs, cost_.maxEverUs,
+				HostLog::Info("status: %s, link %s, tick avg %.1f us max %.1f us (ever %.1f us), game frame avg %.1f ms (%.0f fps) max %.0f ms, "
+							  "%llu PLAYER_STATEs, %llu block msgs, %d friends, terrain %llu sent %llu empty %llu retried %llu probes",
+					ToString(state_), endpoint_ ? ToString(endpoint_->State()) : "-", cost_.avgUs, cost_.maxUs, cost_.maxEverUs, frameMsAvg_,
+					frameMsAvg_ > 0.0 ? 1000.0 / frameMsAvg_ : 0.0, frameMsMax_,
 					static_cast<unsigned long long>(playerStatesSent_), static_cast<unsigned long long>(blockMessagesReceived_), friends_.Count(),
 					static_cast<unsigned long long>(ts.served), static_cast<unsigned long long>(ts.empty), static_cast<unsigned long long>(ts.deferred),
 					static_cast<unsigned long long>(ts.probes));
 			}
 			nextCostReportMs_ = a_nowMs + kCostReportPeriodMs;
 			cost_.maxUs = 0;
+			frameMsMax_ = 0.0;
 		}
 	}
 

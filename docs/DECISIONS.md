@@ -168,6 +168,31 @@ once. Each column is one straight-down ray from 1200 m to -250 m against map col
 means friends stand on roofs and bridges, which is the "blocky copy" a friend sees; underneath bridges isn't
 modelled yet (KNOWN_LIMITATIONS).
 
+### D-031: As much Minecraft as possible in GTA (2026-10-07)
+**Decision:** protocol v1.4 and the features Sary asked for after their first outdoor run:
+- **Steve in cars.** He's drawn seated; GTA's driver stays hidden.
+- **Phone pose.**
+- **Minecraft jump.** Space jumps straight up with a velocity push; GTA's jump and climbing are off. This can be
+  turned off.
+- **Hearts decide.**
+  - GTA damage becomes Minecraft damage, and GTA's health is kept full.
+  - Dying in Minecraft kills the GTA player.
+  - A death in GTA kills Minecraft.
+- **Hunger from sprinting.** Computed on the server from movement, at 0.1 per metre like vanilla.
+- **TNT.** TNT and creeper explosions become GTA explosions. GTA damage is ignored for 0.6 s near a blast, since
+  Minecraft's own blast already counted.
+- **Arrows.** They hurt GTA people they pass within 0.9 m of.
+- **Torch light.** Torches and lamps light GTA (the 16 nearest within 40 m), as does a torch in hand.
+- **Kit.** Bow, arrows, TNT, flint and steel, redstone, crafting table. Older players get these extras once.
+- **Inventory key.** E opens the inventory, read from Script Hook V's keyboard hook instead of a game control.
+- **Owner always drawn.** Vanilla skips entities in unmeshed sections, which made Steve vanish after drives.
+- **No outline on hidden ground.**
+- **F8 settings, sent as INPUT OPTION:** crosshair (in third person too), hand, HUD, outline and frame rate.
+- **Source guard.** A world takes the source of its first terrain patch, game or test host, and refuses the other.
+  The mock's fake sea had ended up in Sary's world.
+**Reason:** Sary: "it has to be as much Minecraft as it can", plus the bug list from 2026-10-06 (invisible character,
+outlines everywhere, swimming, no inventory, can't eat because hunger never drops).
+
 ### D-030: Two GTA players (guests) (2026-10-06)
 **Decision:** a friend can play exactly like the owner: his own GTA V + CraftV.asi + ReShade drive the CraftV Fabric mod in
 his own Minecraft (Fabric 26.3 through the official launcher, his own account), which joins the owner's world as a

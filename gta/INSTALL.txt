@@ -25,9 +25,11 @@ and hunger, the blocks you place, and your friends with their own skins.
 4) Play
    Minecraft must be running first. Then start GTA and load story mode.
    The CraftV overlay (top right) says "MC view" while it's on. F7 turns it on and off.
-   Left mouse: break blocks and hit (people in GTA get hurt too). Right mouse: place and use.
-   Mouse wheel and 1-9: the hotbar. Tab: Minecraft's inventory (use the mouse; Esc closes it).
-   F8: CraftV's settings menu. Walking, driving and the camera are GTA's own.
+   Left mouse: break blocks and hit (people in GTA get hurt too). Right mouse: place, use, eat, draw the bow.
+   Mouse wheel and 1-9: the hotbar. E: Minecraft's inventory (use the mouse; Esc closes it).
+   Space: a straight Minecraft jump. F8: CraftV's settings (crosshair, hand, frame rate, jump, damage...).
+   You're in Survival: running costs hunger, eat with right mouse. Getting hurt in GTA costs hearts, and dying
+   in Minecraft gets you wasted. TNT blows up GTA too, arrows hurt people, torches light up the street.
    Blocks you and friends build are solid in GTA (people, cars and you bump into them).
 
 If something's wrong, send CraftV.log (next to GTA5.exe).

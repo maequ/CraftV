@@ -53,6 +53,15 @@ namespace craftv::host
 		a_z = (a_mc.y - a_cfg.yOffset) / s + a_cfg.feetOffset;
 	}
 
+	// Minecraft -> game for a point that isn't the player (an explosion, an arrow): no feet offset.
+	inline void PointFromMinecraft(double a_mcX, double a_mcY, double a_mcZ, const WorldConfig& a_cfg, double& a_x, double& a_y, double& a_z)
+	{
+		const double s = a_cfg.blocksPerMetre;
+		a_x = a_mcX / s;
+		a_y = -a_mcZ / s;
+		a_z = (a_mcY - a_cfg.yOffset) / s;
+	}
+
 	// Wraps degrees into [-180, 180).
 	inline float WrapDegrees(float a_deg)
 	{

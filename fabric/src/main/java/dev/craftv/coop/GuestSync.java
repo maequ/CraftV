@@ -76,6 +76,8 @@ public final class GuestSync {
 		}
 		if (config.ownerKit && player.getInventory().isEmpty()) {
 			CoopServer.giveKit(player);
+		} else if (config.ownerKit) {
+			CoopServer.giveKitExtras(player);
 		}
 		CraftLog.info("guest: " + name + " plays through their own GTA (" + config.ownerGameMode.getName() + ")");
 	}

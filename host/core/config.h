@@ -42,6 +42,24 @@ namespace craftv::host
 		int   spawnsPerTick = 20;
 	};
 
+	// [Minecraft]: how much of the game is Minecraft while the passthrough is on (the settings menu changes these).
+	struct MinecraftConfig
+	{
+		bool   crosshair = true;      // Minecraft's crosshair, in third person too
+		bool   hand = true;           // the first-person hand and held item
+		int    outline = 1;           // block outline: 0 none, 1 placed blocks only (not the hidden ground), 2 everywhere
+		int    frameRate = 90;        // Minecraft's frames per second while composited; 0 = unlimited
+		bool   hud = true;            // Minecraft's hotbar, hearts and hunger
+		bool   steveInCars = true;    // Steve sits in cars (the game's driver is hidden); off: the game's driver shows
+		bool   minecraftJump = true;  // a straight-up Minecraft jump instead of the game's
+		double jumpHeight = 1.3;      // metres (Minecraft's jump is 1.25 blocks)
+		bool   gtaDamage = true;      // getting hurt in the game costs Minecraft hearts; dying in Minecraft is "wasted"
+		bool   explosions = true;     // Minecraft TNT explodes in the game too
+		bool   arrowsHurt = true;     // Minecraft arrows hurt the game's people
+		bool   torchLight = true;     // Minecraft torches light up the game
+		int    inventoryKey = 0x45;   // a Windows virtual key: E (0x45), Tab (0x09) or I (0x49)
+	};
+
 	struct Config
 	{
 		// Set by the ASI, not the .ini: the name in HELLO and the logs, e.g. "CraftV-GTA5 0.1.0".
@@ -57,6 +75,8 @@ namespace craftv::host
 		PassthroughConfig passthrough{};
 		// [Blocks]
 		BlocksConfig blocks{};
+		// [Minecraft]
+		MinecraftConfig minecraft{};
 		// [Debug]
 		bool          debugOverlay = true;
 		OverlayCorner overlayCorner = OverlayCorner::kTopRight;

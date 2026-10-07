@@ -50,7 +50,7 @@ namespace
 		g_plugin->Tick(craftv::clock::NowMs(), craftv::clock::NowUs());
 	}
 
-	// F7: the Minecraft view on/off. F8: CraftV's settings menu. (Script Hook V calls this on the game's window thread.)
+	// F7: the Minecraft view on/off. F8: CraftV's settings menu. E (or the chosen key): Minecraft's inventory. (Script Hook V calls this on the game's window thread.)
 	void OnKeyboard(DWORD a_key, WORD, BYTE, BOOL, BOOL, BOOL a_wasDownBefore, BOOL a_isUpNow)
 	{
 		if (a_wasDownBefore || a_isUpNow || !g_plugin) {
@@ -60,6 +60,8 @@ namespace
 			g_plugin->RequestPassthroughToggle();
 		} else if (a_key == VK_F8) {
 			g_plugin->RequestMenuToggle();  // CraftV's settings, in the game's own menu style
+		} else if (static_cast<int>(a_key) == g_plugin->InventoryKey()) {
+			g_plugin->RequestInventory();  // Minecraft's inventory (E by default, like Minecraft)
 		}
 	}
 

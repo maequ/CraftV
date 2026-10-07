@@ -43,6 +43,8 @@ public final class GuestClient {
 	public static void init() {
 		ClientPlayNetworking.registerGlobalReceiver(CraftNet.Columns.TYPE, (p, ctx) -> TerrainIndex.putFromServer(p.chunkX(), p.chunkZ(), p.bytes()));
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, minecraft) -> minecraft.execute(GuestClient::left));
+		// explosions and arrows near this guest go to their GTA (PROTOCOL.md §7.20)
+		ClientPlayNetworking.registerGlobalReceiver(CraftNet.Event.TYPE, (p, ctx) -> LinkService.get().send(p.message()));
 	}
 
 	/** In someone else's world (no integrated server here). */

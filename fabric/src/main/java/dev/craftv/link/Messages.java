@@ -745,6 +745,8 @@ public final class Messages {
 				case INPUT_SLOT -> button == 0 && down == 0 && value >= 0 && value < HOTBAR_SLOTS;
 				case INPUT_SCROLL -> button == 0 && down == 0 && value != 0 && value >= -HOTBAR_SLOTS && value <= HOTBAR_SLOTS;
 				case INPUT_CURSOR -> button == 0 && down == 0 && value == 0;
+				case INPUT_DAMAGE -> button >= 0 && button <= DAMAGE_CAUSE_MAX && down == 0 && value >= 1 && cursor == 0;
+				case INPUT_OPTION -> button >= 1 && button <= OPTION_MAX && down == 0 && value >= 0 && cursor == 0;
 				default -> false;
 			};
 		}
@@ -779,7 +781,7 @@ public final class Messages {
 		}
 
 		public boolean valid() {
-			return held >= HELD_EMPTY && held <= HELD_OTHER && health >= 0 && health <= 255 && food >= 0 && food <= MAX_FOOD && gameMode >= 0
+			return held >= HELD_EMPTY && held <= HELD_MAX && health >= 0 && health <= 255 && food >= 0 && food <= MAX_FOOD && gameMode >= 0
 				&& gameMode <= GAME_MODE_MAX && Float.isFinite(attackDamage) && attackDamage >= 0.0F && attackDamage <= MAX_ATTACK_DAMAGE
 				&& Float.isFinite(attackCharge) && attackCharge >= 0.0F && attackCharge <= 1.0F && (flags & ~OWNER_KNOWN_FLAGS) == 0;
 		}
@@ -811,6 +813,42 @@ public final class Messages {
 
 		public boolean valid() {
 			return requestId != 0 && chunkOk(chunkX, chunkZ);
+		}
+	}
+
+	// ---- §7.20 WORLD_EVENT (v1.4) -----------------------------------------------------------------
+	public record WorldEvent(int kind, float power, double x, double y, double z, int id) implements Payload {
+		@Override
+		public int type() {
+			return MSG_WORLD_EVENT;
+		}
+
+		@Override
+		public int payloadBytes() {
+			return WORLD_EVENT_BYTES;
+		}
+
+		@Override
+		public void write(MemorySegment s, long off) {
+			s.set(U8, off, (byte) kind);
+			s.set(U8, off + 1, (byte) 0);
+			s.set(U8, off + 2, (byte) 0);
+			s.set(U8, off + 3, (byte) 0);
+			s.set(F32, off + 4, power);
+			s.set(F64, off + 8, x);
+			s.set(F64, off + 16, y);
+			s.set(F64, off + 24, z);
+			s.set(I32, off + 32, id);
+			s.set(I32, off + 36, 0);
+		}
+
+		public static WorldEvent read(MemorySegment s, long off) {
+			return new WorldEvent(Byte.toUnsignedInt(s.get(U8, off)), s.get(F32, off + 4), s.get(F64, off + 8), s.get(F64, off + 16), s.get(F64, off + 24),
+				s.get(I32, off + 32));
+		}
+
+		public boolean valid() {
+			return kind >= EVENT_EXPLOSION && kind <= EVENT_KIND_MAX && positionOk(x, y, z) && Float.isFinite(power) && power >= 0.0F && power <= MAX_EVENT_POWER;
 		}
 	}
 

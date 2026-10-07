@@ -10,6 +10,7 @@
 //   - never throws, never blocks; no heap allocation after the first tick
 #pragma once
 
+#include "block_lights.h"
 #include "block_props.h"
 #include "config.h"
 #include "friends.h"
@@ -76,6 +77,14 @@ namespace craftv::host
 		// F8: the settings menu, any thread.
 		void RequestMenuToggle() { menuToggleRequested_.store(true, std::memory_order_relaxed); }
 		bool MenuOpen() const { return menu_.Open(); }
+		// The inventory key (CraftV.ini [Minecraft] InventoryKey), any thread: opens or closes Minecraft's inventory.
+		void RequestInventory() { inventoryRequested_.store(true, std::memory_order_relaxed); }
+		int  InventoryKey() const { return inventoryVk_.load(std::memory_order_relaxed); }
+		const BlockLights& Lights() const { return lights_; }
+		double FrameMsAvg() const { return frameMsAvg_; }
+		std::uint64_t ExplosionsShown() const { return explosions_; }
+		std::uint64_t ArrowHits() const { return arrowHits_; }
+		std::uint64_t DamageSent() const { return damageSent_; }
 		const Config& CurrentConfig() const { return config_; }
 
 		// True while the game is in a state where the player's position means something.
@@ -105,6 +114,10 @@ namespace craftv::host
 		void SetPassthrough(bool a_on);
 		void TickMenu();
 		void ApplyMenu(int a_row, int a_direction);
+		void SendOptions();
+		void TickHealth();
+		void OnWorldEvent(const proto::WorldEventMsg& a_msg);
+		void MeasureFrame(std::uint64_t a_nowUs);
 
 		IGame&                    game_;
 		Config                    config_;
@@ -144,6 +157,22 @@ namespace craftv::host
 		double                    viewLift_ = 0.0;        // blocks: shifts Minecraft's view so its terrain meets the game's ground here
 		double                    viewLiftTarget_ = 0.0;
 		std::uint32_t             liftProbeTick_ = 0;
+		// Minecraft-in-GTA (v1.4)
+		BlockLights               lights_;
+		std::atomic<bool>         inventoryRequested_{ false };
+		std::atomic<int>          inventoryVk_{ 0x45 };
+		bool                      optionsDirty_ = true;   // the owner-view options go to Minecraft when it connects or they change
+		int                       lastHealth_ = -1;      // the game's player health after the last tick, -1 = not tracking
+		double                    damageCarry_ = 0.0;    // half hearts not sent yet
+		bool                      ownerWasDead_ = false;
+		bool                      gtaWasDead_ = false;
+		std::uint32_t             arrowIds_[16] = {};    // arrows that already hit someone (each hits once)
+		int                       arrowNext_ = 0;
+		int                       explosionsThisTick_ = 0;
+		std::uint64_t             ignoreDamageUntilMs_ = 0;  // a Minecraft explosion already hurt the player in Minecraft
+		std::uint64_t             explosions_ = 0, arrowHits_ = 0, damageSent_ = 0;
+		std::uint64_t             lastTickUs_ = 0;
+		double                    frameMsAvg_ = 0.0, frameMsMax_ = 0.0;
 		TickCost                  cost_{};
 		std::uint64_t             nextCostReportMs_ = 0;
 	};

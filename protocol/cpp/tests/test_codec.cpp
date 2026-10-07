@@ -501,7 +501,7 @@ TEST_CASE("codec: v1.2 validation rejects bad values")
 	bad.pitch = 91.0f;
 	CHECK(!codec::Valid(bad));
 	bad = cam;
-	bad.flags = 1u << 3;
+	bad.flags = 1u << 5;
 	CHECK(!codec::Valid(bad));
 	bad = cam;
 	bad.feetY = 5000.0;
@@ -521,12 +521,12 @@ TEST_CASE("codec: v1.2 validation rejects bad values")
 	CHECK(codec::Valid(InputMsg{ kInputScroll, 0, 0, -1, 0 }));
 	CHECK(!codec::Valid(InputMsg{ kInputScroll, 0, 0, 0, 0 }));
 	CHECK(!codec::Valid(InputMsg{ kInputButton, 8, 1, 0, 0 }));
-	CHECK(!codec::Valid(InputMsg{ 5, 0, 0, 0, 0 }));
+	CHECK(!codec::Valid(InputMsg{ 7, 0, 0, 0, 0 }));
 
 	auto owner = golden::OwnerState();
 	CHECK(codec::Valid(owner));
 	auto badOwner = owner;
-	badOwner.held = 8;
+	badOwner.held = 9;
 	CHECK(!codec::Valid(badOwner));
 	badOwner = owner;
 	badOwner.attackCharge = 1.5f;
@@ -545,7 +545,7 @@ TEST_CASE("codec: v1.3 BLOCK_REGION_REQUEST and the SOLID/REGION block flags")
 	CHECK(!codec::Valid(BlockRegionRequestMsg{ 0, 0, 0, 0 }));
 	CHECK(!codec::Valid(BlockRegionRequestMsg{ kMaxChunkCoord + 1, 0, 1, 0 }));
 	CHECK(codec::Valid(BlockSetMsg{ 1, 64, 1, 1, kBlockSetSolid | kBlockSetRegion, 77 }));
-	CHECK(!codec::Valid(BlockSetMsg{ 1, 64, 1, 1, 1u << 3, 0 }));
+	CHECK(!codec::Valid(BlockSetMsg{ 1, 64, 1, 1, 1u << 4, 0 }));
 	bool seen = false;
 	for (const auto& v : golden::AllVectors()) {
 		if (v.name == "BLOCK_REGION_REQUEST") {
@@ -564,6 +564,42 @@ TEST_CASE("codec: v1.3 INPUT CURSOR")
 {
 	CHECK(codec::Valid(InputMsg{ kInputCursor, 0, 0, 0, 0xFFFF0000u }));
 	CHECK(!codec::Valid(InputMsg{ kInputCursor, 1, 0, 0, 0 }));
-	CHECK(!codec::Valid(InputMsg{ 5, 0, 0, 0, 0 }));
+	CHECK(!codec::Valid(InputMsg{ 7, 0, 0, 0, 0 }));
 }
 
+
+TEST_CASE("codec: v1.4 WORLD_EVENT, INPUT DAMAGE/OPTION and the new flags")
+{
+	CHECK(codec::AllowedFrom(kMsgWorldEvent, Role::kMc));
+	CHECK(!codec::AllowedFrom(kMsgWorldEvent, Role::kHost));
+	CHECK_EQ(codec::FixedPayloadBytes(kMsgWorldEvent), std::uint32_t(40));
+	CHECK(codec::Valid(golden::WorldEvent()));
+	auto ev = golden::WorldEvent();
+	ev.kind = 3;
+	CHECK(!codec::Valid(ev));
+	ev = golden::WorldEvent();
+	ev.power = -1.0f;
+	CHECK(!codec::Valid(ev));
+	ev = golden::WorldEvent();
+	ev.reserved1 = 1;
+	CHECK(!codec::Valid(ev));
+
+	CHECK(codec::Valid(InputMsg{ kInputDamage, kDamageBullet, 0, 6, 0 }));
+	CHECK(!codec::Valid(InputMsg{ kInputDamage, kDamageCauseMax + 1, 0, 6, 0 }));
+	CHECK(!codec::Valid(InputMsg{ kInputDamage, kDamageBullet, 0, 0, 0 }));
+	CHECK(codec::Valid(InputMsg{ kInputOption, kOptionCrosshair, 0, 1, 0 }));
+	CHECK(codec::Valid(InputMsg{ kInputOption, kOptionFrameRate, 0, 0, 0 }));
+	CHECK(!codec::Valid(InputMsg{ kInputOption, 0, 0, 1, 0 }));
+	CHECK(!codec::Valid(InputMsg{ kInputOption, kOptionMax + 1, 0, 1, 0 }));
+	CHECK(!codec::Valid(InputMsg{ kInputOption, kOptionHud, 0, -1, 0 }));
+
+	CHECK(codec::Valid(BlockSetMsg{ 1, 64, 1, 1, kBlockSetLight | kBlockSetRegion, 77 }));
+	auto cam = golden::Camera();
+	cam.flags |= kCameraPhone | kCameraSprinting;
+	CHECK(codec::Valid(cam));
+	cam.flags |= 1u << 5;
+	CHECK(!codec::Valid(cam));
+	auto owner = golden::OwnerState();
+	owner.held = kHeldLight;
+	CHECK(codec::Valid(owner));
+}

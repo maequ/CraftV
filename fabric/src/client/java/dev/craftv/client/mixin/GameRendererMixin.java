@@ -33,6 +33,14 @@ abstract class GameRendererMixin {
 		FrameExporter.captureWorld(this.mainRenderTarget);
 	}
 
+	@Inject(method = "renderItemInHand", at = @At("HEAD"), cancellable = true)
+	private void craftv$handOff(net.minecraft.client.renderer.state.level.CameraRenderState camera, net.minecraft.client.renderer.state.level.PlayerRenderState player,
+		com.mojang.renderpearl.api.textures.GpuTextureView target, CallbackInfo ci) {
+		if (HostCamera.frame() != null && !dev.craftv.client.passthrough.ViewOptions.hand) {
+			ci.cancel(); // the host's settings hide the first-person hand
+		}
+	}
+
 	@Inject(method = "render", at = @At("TAIL"))
 	private void craftv$captureOverlay(CallbackInfo ci) {
 		FrameExporter.captureOverlay(this.mainRenderTarget);

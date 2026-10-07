@@ -32,6 +32,10 @@ namespace craftv::host
 		bool  onMount = false;         // RDR2: on a horse. GTA V: on a bike
 		bool  inVehicle = false;       // IS_PED_IN_ANY_VEHICLE
 		bool  swimming = false;        // IS_PED_SWIMMING
+		bool  sprinting = false;       // IS_PED_SPRINTING
+		bool  phone = false;           // IS_PED_RUNNING_MOBILE_PHONE_TASK
+		int   health = 0;              // GET_ENTITY_HEALTH (GTA V: the player dies at 100)
+		int   maxHealth = 0;           // GET_ENTITY_MAX_HEALTH
 
 		// The gameplay camera
 		float camPitch = 0;  // GET_GAMEPLAY_CAM_ROT(2).x, positive = looking up
@@ -92,7 +96,7 @@ namespace craftv::host
 		bool usePressed = false, useReleased = false;        // right mouse
 		int  scroll = 0;                                     // +1 next hotbar slot, -1 previous
 		int  slot = -1;                                      // 0..8 when a number key was pressed
-		bool inventory = false;                              // Tab: open (or close) Minecraft's inventory
+		bool inventory = false;                              // open (or close) Minecraft's inventory
 		bool closeScreen = false;                            // Esc while a Minecraft screen is open
 		bool cursorValid = false;                            // while a Minecraft screen is open:
 		float cursorX = 0, cursorY = 0;                      //   the mouse over the picture, 0..1
@@ -142,6 +146,18 @@ namespace craftv::host
 		virtual void Melee(float /*damage*/) {}
 		// A short on-screen message (the game's notification feed).
 		virtual void Notify(const char* /*text*/) {}
+		// Every frame on foot while the passthrough is on: with a_minecraft, the game's own jump is replaced by a
+		// straight-up jump of about a_heightMetres (Minecraft's).
+		virtual void TickJump(bool /*minecraft*/, float /*heightMetres*/) {}
+		// The player's health (the game's units). Minecraft's hearts decide life and death in the passthrough.
+		virtual void SetPlayerHealth(int /*health*/) {}
+		virtual void KillPlayer() {}
+		// A Minecraft explosion (TNT) at a game position; a_power is Minecraft's radius (TNT 4).
+		virtual void Explode(float /*x*/, float /*y*/, float /*z*/, float /*power*/) {}
+		// A flying Minecraft arrow at a game position: hurts and knocks over the people it passes through. Returns how many.
+		virtual int ProjectileHit(float /*x*/, float /*y*/, float /*z*/, float /*damage*/) { return 0; }
+		// A light for this frame (a Minecraft torch near the player).
+		virtual void DrawLight(float /*x*/, float /*y*/, float /*z*/, Rgba /*color*/, float /*range*/, float /*intensity*/) {}
 
 		// ---- solid blocks (Phase 4). Defaults: none.
 		// Whether the collision prop's model is streamed in (requests it until it is).

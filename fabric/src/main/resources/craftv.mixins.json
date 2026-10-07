@@ -4,10 +4,12 @@
   "compatibilityLevel": "JAVA_25",
   "mixins": [
     "EntityInWallMixin",
+    "AbstractArrowAccessor",
     "FlowingFluidMixin",
     "GtaPlayerPhysicsMixin",
     "LevelChunkMixin",
-    "OwnerSafetyMixin"
+    "OwnerSafetyMixin",
+    "ServerExplosionMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }

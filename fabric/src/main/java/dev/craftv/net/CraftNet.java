@@ -87,11 +87,53 @@ public final class CraftNet {
 		}
 	}
 
+	/** Guest to server: their GTA player got hurt (PROTOCOL.md §7.17 INPUT DAMAGE): cause, half hearts. */
+	public record Hurt(int cause, int halfHearts) implements CustomPacketPayload {
+		public static final Type<Hurt> TYPE = typeOf("hurt");
+		public static final StreamCodec<RegistryFriendlyByteBuf, Hurt> CODEC = StreamCodec.composite(ByteBufCodecs.VAR_INT, Hurt::cause, ByteBufCodecs.VAR_INT,
+			Hurt::halfHearts, Hurt::new);
+
+		@Override
+		public Type<Hurt> type() {
+			return TYPE;
+		}
+	}
+
+	/** Guest to server: what their GTA player is doing (GtaWorld.STATE_* flags), when it changes. */
+	public record GtaState(int flags) implements CustomPacketPayload {
+		public static final Type<GtaState> TYPE = typeOf("gta_state");
+		public static final StreamCodec<RegistryFriendlyByteBuf, GtaState> CODEC = StreamCodec.composite(ByteBufCodecs.VAR_INT, GtaState::flags, GtaState::new);
+
+		@Override
+		public Type<GtaState> type() {
+			return TYPE;
+		}
+	}
+
+	/** Server to guest: an explosion or a flying arrow near them (PROTOCOL.md §7.20), for their GTA. */
+	public record Event(int kind, float power, double x, double y, double z, int id) implements CustomPacketPayload {
+		public static final Type<Event> TYPE = typeOf("world_event");
+		public static final StreamCodec<RegistryFriendlyByteBuf, Event> CODEC = StreamCodec.composite(ByteBufCodecs.VAR_INT, Event::kind, ByteBufCodecs.FLOAT,
+			Event::power, ByteBufCodecs.DOUBLE, Event::x, ByteBufCodecs.DOUBLE, Event::y, ByteBufCodecs.DOUBLE, Event::z, ByteBufCodecs.INT, Event::id, Event::new);
+
+		public Messages.WorldEvent message() {
+			return new Messages.WorldEvent(kind, power, x, y, z, id);
+		}
+
+		@Override
+		public Type<Event> type() {
+			return TYPE;
+		}
+	}
+
 	/** Both sides: called from the common initializer. */
 	public static void register() {
 		PayloadTypeRegistry.serverboundPlay().register(GtaHello.TYPE, GtaHello.CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(Snap.TYPE, Snap.CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(Patch.TYPE, Patch.CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(Hurt.TYPE, Hurt.CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(GtaState.TYPE, GtaState.CODEC);
 		PayloadTypeRegistry.clientboundPlay().register(Columns.TYPE, Columns.CODEC);
+		PayloadTypeRegistry.clientboundPlay().register(Event.TYPE, Event.CODEC);
 	}
 }

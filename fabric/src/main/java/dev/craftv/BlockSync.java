@@ -73,6 +73,13 @@ public final class BlockSync {
 		return ground == NO_GROUND || pos.getY() > ground;
 	}
 
+	/** A light worth showing in the host game too (PROTOCOL.md §7.20 LIGHT): torches, lanterns, glowstone, lit lamps. */
+	public static final int HOST_LIGHT_LEVEL = 10;
+
+	public static boolean lightForHost(BlockPos pos, BlockState state) {
+		return state.getLightEmission() >= HOST_LIGHT_LEVEL && !TerrainIndex.isTerrain(pos.getX(), pos.getY(), pos.getZ(), state);
+	}
+
 	/** From LevelChunkMixin, after a chunk's block actually changed (server side only). */
 	public static void onBlockChanged(Level level, BlockPos pos, BlockState newState) {
 		LinkService link = LinkService.get();
@@ -85,7 +92,7 @@ public final class BlockSync {
 			return;
 		}
 		int[] applying = APPLYING.get();
-		int flags = (applying != null ? BLOCK_SET_ECHO : 0) | (solidForHost(level, pos, newState) ? BLOCK_SET_SOLID : 0);
+		int flags = (applying != null ? BLOCK_SET_ECHO : 0) | (solidForHost(level, pos, newState) ? BLOCK_SET_SOLID : 0) | (lightForHost(pos, newState) ? BLOCK_SET_LIGHT : 0);
 		int requestId = applying != null ? applying[0] : 0;
 		link.send(new Messages.BlockSet(pos.getX(), pos.getY(), pos.getZ(), Block.getId(newState), flags, requestId));
 		if (applying == null) {
@@ -130,8 +137,9 @@ public final class BlockSync {
 							continue;
 						}
 						pos.set(r.chunkX() * 16 + x, baseY + y, r.chunkZ() * 16 + z);
-						if (solidForHost(level, pos, state)) {
-							link.send(new Messages.BlockSet(pos.getX(), pos.getY(), pos.getZ(), Block.getId(state), BLOCK_SET_SOLID | BLOCK_SET_REGION, r.requestId()));
+						int flags = (solidForHost(level, pos, state) ? BLOCK_SET_SOLID : 0) | (lightForHost(pos, state) ? BLOCK_SET_LIGHT : 0);
+						if (flags != 0) {
+							link.send(new Messages.BlockSet(pos.getX(), pos.getY(), pos.getZ(), Block.getId(state), flags | BLOCK_SET_REGION, r.requestId()));
 							sent++;
 						}
 					}

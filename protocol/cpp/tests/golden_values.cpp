@@ -195,6 +195,18 @@ namespace craftv::golden
 		return m;
 	}
 
+	WorldEventMsg WorldEvent()
+	{
+		WorldEventMsg m{};
+		m.kind = kEventExplosion;
+		m.power = 4.0f;
+		m.x = -14.5;
+		m.y = 30.25;
+		m.z = 1438.75;
+		m.id = 12345;
+		return m;
+	}
+
 	BlockRegionRequestMsg BlockRegionRequest()
 	{
 		return BlockRegionRequestMsg{ -3, 92, 77, 0 };
@@ -232,6 +244,7 @@ namespace craftv::golden
 		all.push_back(Make("INPUT", Input()));
 		all.push_back(Make("OWNER_STATE", OwnerState()));
 		all.push_back(Make("BLOCK_REGION_REQUEST", BlockRegionRequest()));
+		all.push_back(Make("WORLD_EVENT", WorldEvent()));
 
 		std::uint8_t        payload[kTestPatternFixedBytes + kTestPatternMaxFill];
 		const std::uint32_t bytes = codec::BuildTestPattern(kTestPatternIndex, payload);

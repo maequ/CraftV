@@ -56,7 +56,18 @@ namespace craftv::host
 			68, 69, 70, 91, 92, 99, 100, 114, 115, 116,   // vehicle and passenger weapons
 		};
 		constexpr int kControlAttack = 24, kControlAim = 25;
-		constexpr int kControlSelectWeapon = 37;  // Tab (GTA's weapon wheel, off in the passthrough): Minecraft's inventory
+		constexpr int kControlJump = 22;  // Space: GTA's jump (and climb), replaced by Minecraft's straight jump
+		constexpr float kGravity = 9.81f;
+		constexpr int   kJumpPushFrames = 3;  // the push is repeated a few frames: the ped's ground task eats a single one
+		// Minecraft arrows: people this close to an arrow's path are hit (metres, around the ped's middle).
+		constexpr float kArrowReach = 0.9f, kArrowHeight = 1.1f;
+		// ADD_EXPLOSION's types (eExplosionType): 0 grenade, 2 sticky bomb, 4 rocket. TNT (power 4) is a sticky bomb.
+		constexpr int kExplosionSticky = 2;
+		void AddExplosion(float a_x, float a_y, float a_z, int a_type, float a_scale, float a_shake)
+		{
+			// ASSUMPTION: the modern signature (alloc8or's nativedb) ends with noDamage; the 2016 SDK stops before it.
+			invoke<Void>(0xE3AD2BDBAEE269AC, a_x, a_y, a_z, a_type, a_scale, TRUE, FALSE, a_shake, FALSE);
+		}
 		// While Minecraft's inventory is open: the cursor and its buttons (INPUT_CURSOR_X/Y, ACCEPT, CANCEL), Esc.
 		constexpr int kCursorX = 239, kCursorY = 240, kCursorAccept = 237, kCursorCancel = 238, kPause = 199, kPauseAlt = 200;
 		constexpr int kControlNext[] = { 14, 16 }, kControlPrevious[] = { 15, 17 };  // wheel down/up: the next/previous weapon
@@ -140,6 +151,10 @@ namespace craftv::host
 		s.onMount = PED::IS_PED_ON_ANY_BIKE(ped) != FALSE;
 		s.inVehicle = PED::IS_PED_IN_ANY_VEHICLE(ped, FALSE) != FALSE;
 		s.swimming = PED::IS_PED_SWIMMING(ped) != FALSE;
+		s.sprinting = AI::IS_PED_SPRINTING(ped) != FALSE;
+		s.phone = PED::IS_PED_RUNNING_MOBILE_PHONE_TASK(ped) != FALSE;
+		s.health = ENTITY::GET_ENTITY_HEALTH(ped);
+		s.maxHealth = ENTITY::GET_ENTITY_MAX_HEALTH(ped);
 		s.camPitch = CAM::GET_GAMEPLAY_CAM_ROT(kRotationOrderZxy).x;
 	}
 
@@ -240,7 +255,6 @@ namespace craftv::host
 				a_out.slot = i;
 			}
 		}
-		a_out.inventory = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kControlSelectWeapon) != FALSE;
 		if (playerHidden_) {
 			// Kept hidden every frame: switching character, respawning or a cutscene gives a new or visible ped.
 			const Ped ped = PLAYER::PLAYER_PED_ID();
@@ -260,7 +274,6 @@ namespace craftv::host
 		a_out.attackReleased = CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, kCursorAccept) != FALSE;
 		a_out.usePressed = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kCursorCancel) != FALSE;
 		a_out.useReleased = CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(0, kCursorCancel) != FALSE;
-		a_out.inventory = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kControlSelectWeapon) != FALSE;
 		a_out.closeScreen = CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kPause) || CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kPauseAlt);
 		if (playerHidden_) {
 			ENTITY::SET_ENTITY_VISIBLE(PLAYER::PLAYER_PED_ID(), FALSE, FALSE);
@@ -511,6 +524,90 @@ namespace craftv::host
 		UI::_SET_NOTIFICATION_TEXT_ENTRY(g_notificationEntry);
 		UI::_ADD_TEXT_COMPONENT_STRING(const_cast<char*>(a_text));
 		UI::_DRAW_NOTIFICATION(FALSE, FALSE);
+	}
+
+	// Minecraft's jump: straight up, no run-up, no climbing. GTA's own jump is off while this is on.
+	void GtaGame::TickJump(bool a_minecraft, float a_heightMetres)
+	{
+		if (!a_minecraft) {
+			jumpFrames_ = 0;
+			return;
+		}
+		CONTROLS::DISABLE_CONTROL_ACTION(0, kControlJump, TRUE);
+		const Ped ped = PLAYER::PLAYER_PED_ID();
+		const float up = std::sqrt(2.0f * kGravity * a_heightMetres);
+		if (jumpFrames_ > 0) {
+			--jumpFrames_;
+			const Vector3 v = ENTITY::GET_ENTITY_VELOCITY(ped);
+			if (v.z < up * 0.9f) {
+				ENTITY::SET_ENTITY_VELOCITY(ped, v.x, v.y, up);
+			}
+			return;
+		}
+		if (!CONTROLS::IS_DISABLED_CONTROL_JUST_PRESSED(0, kControlJump)) {
+			return;
+		}
+		if (ENTITY::IS_ENTITY_IN_AIR(ped) || PED::IS_PED_RAGDOLL(ped) || PED::IS_PED_SWIMMING(ped) || PED::IS_PED_CLIMBING(ped) || PED::IS_PED_FALLING(ped) ||
+			!PED::IS_PED_ON_FOOT(ped)) {
+			return;  // Minecraft can't jump in the air either
+		}
+		const Vector3 v = ENTITY::GET_ENTITY_VELOCITY(ped);
+		ENTITY::SET_ENTITY_VELOCITY(ped, v.x, v.y, up);
+		jumpFrames_ = kJumpPushFrames;
+		if (jumpsLogged_ < 3) {
+			++jumpsLogged_;
+			HostLog::Info("jump: Minecraft jump, %.1f m/s up (check in game that the player leaves the ground)", up);
+		}
+	}
+
+	void GtaGame::SetPlayerHealth(int a_health)
+	{
+		ENTITY::SET_ENTITY_HEALTH(PLAYER::PLAYER_PED_ID(), a_health);
+	}
+
+	void GtaGame::KillPlayer()
+	{
+		ENTITY::SET_ENTITY_HEALTH(PLAYER::PLAYER_PED_ID(), 0);
+	}
+
+	void GtaGame::Explode(float a_x, float a_y, float a_z, float a_power)
+	{
+		const float scale = std::fmin(std::fmax(a_power / 4.0f, 0.25f), 4.0f);
+		AddExplosion(a_x, a_y, a_z, kExplosionSticky, scale, 0.6f * scale);
+	}
+
+	int GtaGame::ProjectileHit(float a_x, float a_y, float a_z, float a_damage)
+	{
+		const Ped me = PLAYER::PLAYER_PED_ID();
+		int       handles[kMaxWorldEntities];
+		const int peds = worldGetAllPeds(handles, kMaxWorldEntities);
+		int       hit = 0;
+		for (int i = 0; i < peds; ++i) {
+			const Ped q = handles[i];
+			if (q == me || ENTITY::IS_ENTITY_DEAD(q) || PED::IS_PED_IN_ANY_VEHICLE(q, FALSE)) {
+				continue;
+			}
+			const Vector3 o = ENTITY::GET_ENTITY_COORDS(q, TRUE);
+			const float   dx = o.x - a_x, dy = o.y - a_y;
+			if (dx * dx + dy * dy > kArrowReach * kArrowReach || std::fabs(o.z - a_z) > kArrowHeight) {
+				continue;
+			}
+			PED::SET_PED_TO_RAGDOLL(q, kKnockDownMs, kKnockDownMs, 0, FALSE, FALSE, FALSE);
+			ApplyDamageToPed(q, static_cast<int>(a_damage + 0.5f));
+			if (!ENTITY::IS_ENTITY_DEAD(q)) {
+				AI::TASK_SMART_FLEE_PED(q, me, 100.0f, static_cast<Any>(-1), FALSE, FALSE);
+			}
+			++hit;
+		}
+		if (hit > 0) {
+			HostLog::Info("arrow: hit %d (damage %.0f)", hit, a_damage);
+		}
+		return hit;
+	}
+
+	void GtaGame::DrawLight(float a_x, float a_y, float a_z, Rgba a_color, float a_range, float a_intensity)
+	{
+		GRAPHICS::DRAW_LIGHT_WITH_RANGE(a_x, a_y, a_z, a_color.r, a_color.g, a_color.b, a_range, a_intensity);
 	}
 
 	void GtaGame::RequestCollision(float a_x, float a_y, float a_z)

@@ -31,7 +31,7 @@ import net.minecraft.world.level.levelgen.presets.WorldPreset;
 public final class MirrorWorld {
 	public static final String WORLD_NAME = "CraftV";
 	public static final boolean FRIEND = "friend".equals(System.getProperty("craftv.role"));
-	private static final boolean AUTO_WORLD = Boolean.getBoolean("craftv.autoWorld");
+	private static final boolean AUTO_WORLD_PROPERTY = Boolean.getBoolean("craftv.autoWorld");
 	private static final String JOIN = System.getProperty("craftv.join", "localhost:25565");
 	private static final long JOIN_RETRY_MS = 5000;
 	private static final ResourceKey<WorldPreset> PRESET = ResourceKey.create(Registries.WORLD_PRESET, Identifier.fromNamespaceAndPath(CraftV.MOD_ID, "mirror"));
@@ -48,13 +48,20 @@ public final class MirrorWorld {
 			return JOIN;
 		}
 		var config = dev.craftv.coop.CoopServer.config();
-		return AUTO_WORLD || config == null ? "" : config.guestJoin;
+		return AUTO_WORLD_PROPERTY || config == null ? "" : config.guestJoin;
+	}
+
+	/** Open the CraftV world by itself: the dev runs (-Dcraftv.autoWorld), or a launcher install that isn't joining anyone. */
+	private static boolean autoWorld() {
+		var config = dev.craftv.coop.CoopServer.config();
+		return AUTO_WORLD_PROPERTY || (!FRIEND && config != null && config.hostAutoWorld && config.guestJoin.isEmpty());
 	}
 
 	public static void tick(Minecraft minecraft) {
 		String join = joinAddress();
 		boolean joining = !join.isEmpty();
-		if ((!AUTO_WORLD && !joining) || minecraft.level != null || minecraft.gui.overlay() != null) {
+		boolean auto = autoWorld();
+		if ((!auto && !joining) || minecraft.level != null || minecraft.gui.overlay() != null) {
 			return;
 		}
 		if (!(minecraft.gui.screen() instanceof TitleScreen title)) {

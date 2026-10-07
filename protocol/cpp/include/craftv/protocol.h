@@ -18,7 +18,7 @@ namespace craftv::proto
 	// ---- identity (PROTOCOL.md §2, §3) --------------------------------------------------------
 	inline constexpr std::uint32_t kMagic = 0x56465243;  // bytes 43 52 46 56 = "CRFV"
 	inline constexpr std::uint16_t kVersionMajor = 1;
-	inline constexpr std::uint16_t kVersionMinor = 3;
+	inline constexpr std::uint16_t kVersionMinor = 4;
 	inline constexpr wchar_t       kDefaultMappingName[] = L"Local\\CraftV_Shared_v1";
 
 	enum class Role : std::uint32_t
@@ -184,6 +184,7 @@ namespace craftv::proto
 		kMsgInput = 16,
 		kMsgOwnerState = 17,
 		kMsgBlockRegionRequest = 18,
+		kMsgWorldEvent = 19,  // v1.4
 		kMsgTestPattern = 0x7F00,
 	};
 	inline constexpr std::uint16_t kTypeVersion1 = 1;
@@ -268,8 +269,9 @@ namespace craftv::proto
 		kBlockSetEcho = 1u << 0,
 		kBlockSetSolid = 1u << 1,   // v1.3: solid in the host game (§7.19)
 		kBlockSetRegion = 1u << 2,  // v1.3: answers a BLOCK_REGION_REQUEST
+		kBlockSetLight = 1u << 3,   // v1.4: the block gives off light (a torch, a lamp): lit in the host game too
 	};
-	inline constexpr std::uint32_t kBlockSetKnownFlags = kBlockSetEcho | kBlockSetSolid | kBlockSetRegion;
+	inline constexpr std::uint32_t kBlockSetKnownFlags = kBlockSetEcho | kBlockSetSolid | kBlockSetRegion | kBlockSetLight;
 	struct BlockSetMsg
 	{
 		static constexpr MsgType kType = kMsgBlockSet;
@@ -498,8 +500,10 @@ namespace craftv::proto
 		kCameraFirstPerson = 1u << 0,
 		kCameraPassthrough = 1u << 1,  // the host composites MC's frame export (§11): render the owner's view for it
 		kCameraInVehicle = 1u << 2,
+		kCameraPhone = 1u << 3,      // v1.4: the host's player has their phone out
+		kCameraSprinting = 1u << 4,  // v1.4: the host's player is sprinting
 	};
-	inline constexpr std::uint32_t kCameraKnownFlags = kCameraFirstPerson | kCameraPassthrough | kCameraInVehicle;
+	inline constexpr std::uint32_t kCameraKnownFlags = kCameraFirstPerson | kCameraPassthrough | kCameraInVehicle | kCameraPhone | kCameraSprinting;
 	inline constexpr float         kMinFov = 1.0f;
 	inline constexpr float         kMaxFov = 179.0f;
 	struct CameraMsg
@@ -546,7 +550,31 @@ namespace craftv::proto
 		kInputSlot = 2,
 		kInputScroll = 3,
 		kInputCursor = 4,  // v1.3
+		kInputDamage = 5,  // v1.4: the host's player got hurt in the host game: button = cause, value = half hearts
+		kInputOption = 6,  // v1.4: a host setting for the owner's view: button = option, value = its value
 	};
+	enum DamageCause : std::uint8_t
+	{
+		kDamageGeneric = 0,
+		kDamageMelee = 1,
+		kDamageBullet = 2,
+		kDamageExplosion = 3,
+		kDamageVehicle = 4,
+		kDamageFall = 5,
+		kDamageFire = 6,
+		kDamageDrown = 7,
+	};
+	inline constexpr std::uint8_t kDamageCauseMax = kDamageDrown;
+	enum OptionId : std::uint8_t
+	{
+		kOptionCrosshair = 1,  // 0 hidden, 1 shown (in third person too)
+		kOptionHand = 2,       // 0 hidden, 1 shown (the first-person hand and held item)
+		kOptionOutline = 3,    // 0 none, 1 on placed blocks only, 2 everywhere
+		kOptionFrameRate = 4,  // Minecraft's frame rate while composited, in tens (6 = 60); 0 = unlimited
+		kOptionHud = 5,        // 0 hidden, 1 shown (hotbar, hearts, hunger)
+		kOptionVehicleBody = 6,  // 0 the host shows its own driver, 1 the owner is drawn seated in host vehicles
+	};
+	inline constexpr std::uint8_t kOptionMax = kOptionVehicleBody;
 	enum InputButton : std::uint8_t
 	{
 		kButtonAttack = 1,
@@ -581,7 +609,9 @@ namespace craftv::proto
 		kHeldHoe = 5,
 		kHeldBlock = 6,
 		kHeldOther = 7,
+		kHeldLight = 8,  // v1.4: a torch, lantern or glowstone: the host lights up around the player
 	};
+	inline constexpr std::uint8_t kHeldMax = kHeldLight;
 	enum OwnerFlags : std::uint32_t
 	{
 		kOwnerDead = 1u << 0,
@@ -615,6 +645,29 @@ namespace craftv::proto
 	};
 	static_assert(sizeof(BlockRegionRequestMsg) == 16);
 	static_assert(offsetof(BlockRegionRequestMsg, requestId) == 8);
+
+	// §7.20 (v1.4): something happened in Minecraft that the host game shows too
+	enum WorldEventKind : std::uint8_t
+	{
+		kEventExplosion = 1,   // TNT, a creeper...: power = Minecraft's explosion radius
+		kEventProjectile = 2,  // an arrow (or trident...) in flight, every tick: power = the damage it would do, id = its entity
+	};
+	inline constexpr std::uint8_t kEventKindMax = kEventProjectile;
+	inline constexpr float        kMaxEventPower = 1000.0f;
+	struct WorldEventMsg
+	{
+		static constexpr MsgType kType = kMsgWorldEvent;
+		std::uint8_t  kind;
+		std::uint8_t  reserved0[3];
+		float         power;
+		double        x, y, z;
+		std::uint32_t id;
+		std::uint32_t reserved1;
+	};
+	static_assert(sizeof(WorldEventMsg) == 40);
+	static_assert(offsetof(WorldEventMsg, power) == 4);
+	static_assert(offsetof(WorldEventMsg, x) == 8);
+	static_assert(offsetof(WorldEventMsg, id) == 32);
 
 	// §11 (v1.2): the frame mapping MC writes for the passthrough
 	inline constexpr const wchar_t* kFrameMappingName = L"Local\\CraftV_Frame_v1";

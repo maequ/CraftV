@@ -72,6 +72,24 @@ public final class ClientInput {
 					player.getInventory().setSelectedSlot(Math.clamp(in.value(), 0, Inventory.getSelectionSize() - 1));
 				}
 			}
+			case INPUT_OPTION -> ViewOptions.set(in.button(), in.value());
+			case INPUT_DAMAGE -> {
+				var server = minecraft.getSingleplayerServer();
+				if (server != null && player != null) {
+					// the owner: the integrated server is here
+					java.util.UUID id = player.getUUID();
+					int cause = in.button(), half = in.value();
+					server.execute(() -> {
+						var owner = server.getPlayerList().getPlayer(id);
+						if (owner != null) {
+							dev.craftv.coop.GtaWorld.hurt(owner, cause, half);
+						}
+					});
+				} else if (net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(dev.craftv.net.CraftNet.Hurt.TYPE)) {
+					// a guest: the owner's server applies it
+					net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(new dev.craftv.net.CraftNet.Hurt(in.button(), in.value()));
+				}
+			}
 			case INPUT_SCROLL -> {
 				if (player != null) {
 					Inventory inventory = player.getInventory();

@@ -67,12 +67,14 @@ public final class CoopServer {
 		terrain = new TerrainService(config);
 		tracker = new FriendTracker(LinkService.get()::send);
 		GuestSync.init(config);
+		GtaWorld.init();
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> publishTried = false);
 		ServerLifecycleEvents.SERVER_STOPPED.register(server -> dev.craftv.terrain.TerrainIndex.clear()); // the next world has its own
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
 			tracker.resetAll(); // §7.10: everyone is gone when the world closes
 			hovering.clear();
 			GuestSync.clear();
+			GtaWorld.clear();
 			address = "";
 			friendsOnline = 0;
 		});
@@ -88,6 +90,7 @@ public final class CoopServer {
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
 			hovering.remove(handler.player.getUUID());
 			GuestSync.left(handler.player);
+			GtaWorld.left(handler.player);
 		});
 	}
 
@@ -134,6 +137,8 @@ public final class CoopServer {
 			}
 			if (config.ownerKit && player.getInventory().isEmpty()) {
 				giveKit(player);
+			} else if (config.ownerKit) {
+				giveKitExtras(player); // the survival extras added after their kit
 			}
 			// The puppet hovers while the host isn't moving it, instead of falling through unbuilt ground (a
 			// Survival owner can't fly; PlayerPuppet holds them in place instead).
@@ -161,14 +166,53 @@ public final class CoopServer {
 		Inventory inv = player.getInventory();
 		inv.setItem(0, new ItemStack(Items.DIAMOND_SWORD));
 		inv.setItem(1, new ItemStack(Items.DIAMOND_PICKAXE));
-		inv.setItem(2, new ItemStack(Items.DIAMOND_AXE));
-		inv.setItem(3, new ItemStack(Items.DIAMOND_SHOVEL));
-		inv.setItem(4, new ItemStack(Items.OAK_PLANKS, 64));
-		inv.setItem(5, new ItemStack(Items.STONE_BRICKS, 64));
-		inv.setItem(6, new ItemStack(Items.GLASS, 64));
+		inv.setItem(2, new ItemStack(Items.BOW));
+		inv.setItem(3, new ItemStack(Items.TNT, 16));
+		inv.setItem(4, new ItemStack(Items.FLINT_AND_STEEL));
+		inv.setItem(5, new ItemStack(Items.OAK_PLANKS, 64));
+		inv.setItem(6, new ItemStack(Items.STONE_BRICKS, 64));
 		inv.setItem(7, new ItemStack(Items.TORCH, 64));
-		inv.setItem(8, new ItemStack(Items.COOKED_BEEF, 64));
-		CraftLog.info(player.getGameProfile().name() + ": gave the starter kit (sword, pickaxe, axe, shovel, planks, stone bricks, glass, torches, steak)");
+		inv.setItem(8, new ItemStack(Items.COOKED_BEEF, 32));
+		player.addTag(KIT_EXTRAS_TAG);
+		addRest(player);
+		CraftLog.info(player.getGameProfile().name() + ": gave the starter kit (sword, pickaxe, bow, TNT, flint and steel, planks, stone bricks, torches, steak, and more in the inventory)");
+	}
+
+	private static final String KIT_EXTRAS_TAG = "craftv_kit_v2";
+
+	/** Players who got the first kit (2026-10-06) get what it lacked once: a bow, arrows, TNT and redstone. */
+	static void giveKitExtras(ServerPlayer player) {
+		if (player.entityTags().contains(KIT_EXTRAS_TAG)) {
+			return;
+		}
+		player.addTag(KIT_EXTRAS_TAG);
+		Inventory inv = player.getInventory();
+		inv.add(new ItemStack(Items.BOW));
+		inv.add(new ItemStack(Items.TNT, 16));
+		inv.add(new ItemStack(Items.FLINT_AND_STEEL));
+		addRest(player);
+		CraftLog.info(player.getGameProfile().name() + ": gave the new kit extras (bow, arrows, TNT, flint and steel, redstone, crafting table)");
+	}
+
+	/** The rest of the kit, in the inventory: things to craft with, redstone that does something, arrows. */
+	private static void addRest(ServerPlayer player) {
+		Inventory inv = player.getInventory();
+		inv.add(new ItemStack(Items.ARROW, 64));
+		inv.add(new ItemStack(Items.DIAMOND_AXE));
+		inv.add(new ItemStack(Items.DIAMOND_SHOVEL));
+		inv.add(new ItemStack(Items.CRAFTING_TABLE));
+		inv.add(new ItemStack(Items.FURNACE));
+		inv.add(new ItemStack(Items.GLASS, 64));
+		inv.add(new ItemStack(Items.REDSTONE, 64));
+		inv.add(new ItemStack(Items.REDSTONE_TORCH, 16));
+		inv.add(new ItemStack(Items.REDSTONE_LAMP, 16));
+		inv.add(new ItemStack(Items.LEVER, 8));
+		inv.add(new ItemStack(Items.STONE_BUTTON, 8));
+		inv.add(new ItemStack(Items.LANTERN, 8));
+		inv.add(new ItemStack(Items.SHIELD));
+		inv.add(new ItemStack(Items.WATER_BUCKET));
+		inv.add(new ItemStack(Items.COAL, 32));
+		inv.add(new ItemStack(Items.OAK_LOG, 32));
 	}
 
 	private static ServerPlayer owner(MinecraftServer server) {
@@ -184,6 +228,7 @@ public final class CoopServer {
 		try {
 			terrain.tick(server);
 			GuestSync.tick(server);
+			GtaWorld.tick(server);
 			LinkService link = LinkService.get();
 			// A new host, or the link back from STALE (GTA pauses its scripts when it loses focus, and while the
 			// link is stale every message for it is dropped, JOINs included): announce every friend again (§7.10).

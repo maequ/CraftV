@@ -69,12 +69,59 @@ public final class PassthroughClient {
 		}
 		// Don't compete with the host for the GPU: the host re-projects Minecraft's frames to its own frame rate, and
 		// while it's paused (GTA's pause and settings menus stop its scripts) nobody sees Minecraft at all.
-		int fps = on ? FPS_COMPOSITING : hide ? FPS_HOST_PAUSED : 0;
+		int fps = on ? compositingFps() : hide ? FPS_HOST_PAUSED : 0;
 		if (fps != 0 && fps != fpsApplied) {
 			fpsApplied = fps;
 			minecraft.options.framerateLimit().set(fps);
 		}
 		PlayerSync.tick();
+		sendGtaState(minecraft, on ? HostCamera.live() : null);
+		logFps(minecraft, on);
+	}
+
+	private static final int FPS_UNLIMITED = 260; // Options.framerateLimit's "Unlimited"
+	private static final long FPS_LOG_NANOS = 30_000_000_000L;
+	private static long nextFpsLog;
+	private static boolean screenWasOpen;
+	private static int lastGtaState = -1;
+
+	/** The host's setting (INPUT OPTION FRAME_RATE): higher keeps Steve from smearing when the camera turns fast. */
+	private static int compositingFps() {
+		int fps = ViewOptions.frameRate;
+		return fps <= 0 ? FPS_UNLIMITED : Math.clamp(fps, 30, FPS_UNLIMITED - 10);
+	}
+
+	/** Sprinting and driving decide hunger on the server (GtaWorld): the owner's directly, a guest's with a payload. */
+	private static void sendGtaState(Minecraft minecraft, Messages.Camera c) {
+		LocalPlayer player = minecraft.player;
+		if (player == null) {
+			lastGtaState = -1;
+			return;
+		}
+		int flags = c == null ? 0
+			: ((c.flags() & CAMERA_SPRINTING) != 0 ? dev.craftv.coop.GtaWorld.STATE_SPRINTING : 0)
+				| ((c.flags() & CAMERA_IN_VEHICLE) != 0 ? dev.craftv.coop.GtaWorld.STATE_IN_VEHICLE : 0);
+		if (flags == lastGtaState) {
+			return;
+		}
+		lastGtaState = flags;
+		if (minecraft.getSingleplayerServer() != null) {
+			dev.craftv.coop.GtaWorld.setState(player.getUUID(), flags);
+		} else if (net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(dev.craftv.net.CraftNet.GtaState.TYPE)) {
+			net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(new dev.craftv.net.CraftNet.GtaState(flags));
+		}
+	}
+
+	/** For bug reports (Sary saw a menu at 1 FPS): Minecraft's frame rate every 30 s, and when a screen opens. */
+	private static void logFps(Minecraft minecraft, boolean on) {
+		long now = System.nanoTime();
+		boolean screen = minecraft.gui.screen() != null;
+		if (on && (now >= nextFpsLog || screen != screenWasOpen)) {
+			nextFpsLog = now + FPS_LOG_NANOS;
+			CraftLog.info("passthrough: Minecraft at " + minecraft.getFps() + " fps (cap " + compositingFps() + ")"
+				+ (screen ? ", screen open: " + minecraft.gui.screen().getClass().getSimpleName() : ""));
+		}
+		screenWasOpen = screen;
 	}
 
 	/** End of every client tick. */
@@ -113,6 +160,7 @@ public final class PassthroughClient {
 			options.renderDistance().set(OWNER_RENDER_DISTANCE);
 		}
 		options.entityShadows().set(false);
+		options.chunkSectionFadeInTime().set(0.0); // chunks pop in at once: no fading blocks over GTA
 		options.save();
 		CraftLog.info("passthrough: options set for compositing (no clouds, no bobbing, 60 fps cap, runs unfocused)");
 	}
@@ -159,8 +207,9 @@ public final class PassthroughClient {
 		if (stack.isEmpty()) {
 			return HELD_EMPTY;
 		}
-		if (stack.getItem() instanceof BlockItem) {
-			return HELD_BLOCK;
+		if (stack.getItem() instanceof BlockItem item) {
+			// a torch, lantern or glowstone: GTA lights up around the player (PROTOCOL.md §7.18 LIGHT)
+			return item.getBlock().defaultBlockState().getLightEmission() >= dev.craftv.BlockSync.HOST_LIGHT_LEVEL ? HELD_LIGHT : HELD_BLOCK;
 		}
 		String path = BuiltInRegistries.ITEM.getKey(stack.getItem()).getPath();
 		if (path.endsWith("_sword")) {

@@ -31,7 +31,7 @@ public final class Proto {
 	// ---- identity (§2, §3) ----------------------------------------------------------------------
 	public static final int MAGIC = 0x56465243; // bytes 43 52 46 56 = "CRFV"
 	public static final int VERSION_MAJOR = 1;
-	public static final int VERSION_MINOR = 3;
+	public static final int VERSION_MINOR = 4;
 	public static final String DEFAULT_MAPPING_NAME = "Local\\CraftV_Shared_v1";
 
 	public static final int ROLE_NONE = 0;
@@ -107,7 +107,7 @@ public final class Proto {
 		}
 		return switch (type) {
 			case MSG_PLAYER_STATE, MSG_TERRAIN_PATCH, MSG_CAMERA, MSG_VIEW, MSG_INPUT, MSG_BLOCK_REGION_REQUEST -> senderRole == ROLE_HOST; // §7.3: MC -> host is reserved
-			case MSG_REMOTE_PLAYER_JOIN, MSG_REMOTE_PLAYER_STATE, MSG_REMOTE_PLAYER_LEAVE, MSG_TERRAIN_REQUEST, MSG_SESSION_INFO, MSG_OWNER_STATE ->
+			case MSG_REMOTE_PLAYER_JOIN, MSG_REMOTE_PLAYER_STATE, MSG_REMOTE_PLAYER_LEAVE, MSG_TERRAIN_REQUEST, MSG_SESSION_INFO, MSG_OWNER_STATE, MSG_WORLD_EVENT ->
 				senderRole == ROLE_MC;
 			default -> true;
 		};
@@ -137,6 +137,7 @@ public final class Proto {
 	public static final int MSG_INPUT = 16;
 	public static final int MSG_OWNER_STATE = 17;
 	public static final int MSG_BLOCK_REGION_REQUEST = 18; // v1.3 (§7.19)
+	public static final int MSG_WORLD_EVENT = 19; // v1.4 (§7.20)
 	public static final int MSG_TEST_PATTERN = 0x7F00;
 	public static final int TYPE_VERSION_1 = 1;
 
@@ -157,6 +158,7 @@ public final class Proto {
 	public static final int INPUT_BYTES = 8;
 	public static final int OWNER_STATE_BYTES = 16;
 	public static final int BLOCK_REGION_REQUEST_BYTES = 16;
+	public static final int WORLD_EVENT_BYTES = 40;
 
 	public static final int SOFTWARE_MAX_BYTES = 40;
 	public static final int PLAYER_ON_GROUND = 1;
@@ -169,7 +171,8 @@ public final class Proto {
 	public static final int BLOCK_AIR = 0;
 	public static final int BLOCK_SET_ECHO = 1;
 	public static final int BLOCK_SET_SOLID = 1 << 1, BLOCK_SET_REGION = 1 << 2; // v1.3 (§7.19)
-	public static final int BLOCK_SET_KNOWN_FLAGS = BLOCK_SET_ECHO | BLOCK_SET_SOLID | BLOCK_SET_REGION;
+	public static final int BLOCK_SET_LIGHT = 1 << 3; // v1.4: gives off light, lit in the host game too
+	public static final int BLOCK_SET_KNOWN_FLAGS = BLOCK_SET_ECHO | BLOCK_SET_SOLID | BLOCK_SET_REGION | BLOCK_SET_LIGHT;
 	public static final int FACE_MAX = 5;
 	public static final int FACE_UNKNOWN = 0xFF;
 	public static final int LOG_TRACE = 0, LOG_DEBUG = 1, LOG_INFO = 2, LOG_WARN = 3, LOG_ERROR = 4;
@@ -199,18 +202,27 @@ public final class Proto {
 	public static final int ADDRESS_MAX_BYTES = 64;
 	// §7.15-7.18 passthrough (v1.2)
 	public static final int CAMERA_FIRST_PERSON = 1, CAMERA_PASSTHROUGH = 1 << 1, CAMERA_IN_VEHICLE = 1 << 2;
-	public static final int CAMERA_KNOWN_FLAGS = CAMERA_FIRST_PERSON | CAMERA_PASSTHROUGH | CAMERA_IN_VEHICLE;
+	public static final int CAMERA_PHONE = 1 << 3, CAMERA_SPRINTING = 1 << 4; // v1.4
+	public static final int CAMERA_KNOWN_FLAGS = CAMERA_FIRST_PERSON | CAMERA_PASSTHROUGH | CAMERA_IN_VEHICLE | CAMERA_PHONE | CAMERA_SPRINTING;
 	public static final float MIN_FOV = 1.0F, MAX_FOV = 179.0F;
 	public static final int VIEW_MIN_SIDE = 64, VIEW_MAX_WIDTH = 3840, VIEW_MAX_HEIGHT = 2160, HOST_MAX_SIDE = 16384;
 	public static final long VIEW_MAX_PIXELS = 2560L * 1440;
-	public static final int INPUT_BUTTON = 1, INPUT_SLOT = 2, INPUT_SCROLL = 3, INPUT_CURSOR = 4;
+	public static final int INPUT_BUTTON = 1, INPUT_SLOT = 2, INPUT_SCROLL = 3, INPUT_CURSOR = 4, INPUT_DAMAGE = 5, INPUT_OPTION = 6;
+	public static final int DAMAGE_GENERIC = 0, DAMAGE_MELEE = 1, DAMAGE_BULLET = 2, DAMAGE_EXPLOSION = 3, DAMAGE_VEHICLE = 4, DAMAGE_FALL = 5, DAMAGE_FIRE = 6,
+		DAMAGE_DROWN = 7, DAMAGE_CAUSE_MAX = 7;
+	public static final int OPTION_CROSSHAIR = 1, OPTION_HAND = 2, OPTION_OUTLINE = 3, OPTION_FRAME_RATE = 4, OPTION_HUD = 5, OPTION_VEHICLE_BODY = 6,
+		OPTION_MAX = 6;
 	public static final int BUTTON_ATTACK = 1, BUTTON_USE = 2, BUTTON_PICK = 3, BUTTON_DROP = 4, BUTTON_INVENTORY = 5, BUTTON_SWAP_HANDS = 6,
 		BUTTON_CLOSE_SCREEN = 7;
 	public static final int HOTBAR_SLOTS = 9;
-	public static final int HELD_EMPTY = 0, HELD_SWORD = 1, HELD_AXE = 2, HELD_PICKAXE = 3, HELD_SHOVEL = 4, HELD_HOE = 5, HELD_BLOCK = 6, HELD_OTHER = 7;
+	public static final int HELD_EMPTY = 0, HELD_SWORD = 1, HELD_AXE = 2, HELD_PICKAXE = 3, HELD_SHOVEL = 4, HELD_HOE = 5, HELD_BLOCK = 6, HELD_OTHER = 7, HELD_LIGHT = 8,
+		HELD_MAX = HELD_LIGHT;
 	public static final int OWNER_DEAD = 1, OWNER_SCREEN_OPEN = 1 << 1, OWNER_KNOWN_FLAGS = OWNER_DEAD | OWNER_SCREEN_OPEN;
 	public static final int MAX_FOOD = 20;
 	public static final float MAX_ATTACK_DAMAGE = 1000.0F;
+	// §7.20 WORLD_EVENT (v1.4)
+	public static final int EVENT_EXPLOSION = 1, EVENT_PROJECTILE = 2, EVENT_KIND_MAX = 2;
+	public static final float MAX_EVENT_POWER = 1000.0F;
 	// §11 the frame mapping (v1.2)
 	public static final String FRAME_MAPPING_NAME = "Local\\CraftV_Frame_v1";
 	public static final int FRAME_MAGIC = 0x52465643; // bytes 43 56 46 52 = "CVFR"

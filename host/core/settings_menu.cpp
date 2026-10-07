@@ -90,11 +90,23 @@ namespace craftv::host
 		a_game.DrawMenuText(x + w - kTextPad * px, y + kSubtitleTextTop * py, right, counter);
 		y += kSubtitleHeight * py;
 
-		a_game.DrawSprite(kDict, "gradient_bgd", x, y, w, kRowHeight * py * static_cast<float>(a_count), kWhite);
-		for (int i = 0; i < a_count; ++i) {
+		const int shown = a_count < kMaxRows ? a_count : kMaxRows;
+		if (selected_ < first_) {
+			first_ = selected_;
+		} else if (selected_ >= first_ + shown) {
+			first_ = selected_ - shown + 1;
+		}
+		if (first_ > a_count - shown) {
+			first_ = a_count - shown;
+		}
+		if (first_ < 0) {
+			first_ = 0;
+		}
+		a_game.DrawSprite(kDict, "gradient_bgd", x, y, w, kRowHeight * py * static_cast<float>(shown), kWhite);
+		for (int i = first_; i < first_ + shown; ++i) {
 			const MenuRow& row = a_rows[i];
 			const bool     selected = i == selected_;
-			const float    top = y + kRowHeight * py * static_cast<float>(i);
+			const float    top = y + kRowHeight * py * static_cast<float>(i - first_);
 			if (selected) {
 				a_game.DrawSprite(kDict, "gradient_nav", x, top, w, kRowHeight * py, kWhite);
 			}
@@ -115,7 +127,7 @@ namespace craftv::host
 				a_game.DrawMenuText(x + w - kTextPad * px, top + kTextTop * py, value, row.value);
 			}
 		}
-		y += kRowHeight * py * static_cast<float>(a_count) + kDescriptionGap * py;
+		y += kRowHeight * py * static_cast<float>(shown) + kDescriptionGap * py;
 
 		const MenuRow& current = a_rows[selected_ < a_count ? selected_ : 0];
 		a_game.DrawBox(x, y, w, kDescriptionBar * py, kBlack);

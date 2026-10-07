@@ -33,6 +33,8 @@ public final class CoopConfig {
 	public final boolean devNoAuth;
 	/** A guest's Minecraft (DECISIONS D-030): the owner's address, joined automatically from the title screen. Empty: no. */
 	public final String guestJoin;
+	/** Open (or create) the CraftV world at the title screen when not joining anyone: a normal launcher install just works. */
+	public final boolean hostAutoWorld;
 
 	private CoopConfig(Properties p) {
 		open = Boolean.parseBoolean(p.getProperty("friends.open", "true"));
@@ -45,6 +47,7 @@ public final class CoopConfig {
 		buildingDepth = clamp(intValue(p, "terrain.buildingDepth", TerrainColumns.DEFAULT_BUILDING_DEPTH), 1, 256);
 		devNoAuth = Boolean.getBoolean("craftv.devNoAuth");
 		guestJoin = p.getProperty("guest.join", "").trim();
+		hostAutoWorld = Boolean.parseBoolean(p.getProperty("host.autoWorld", "true").trim());
 	}
 
 	public static CoopConfig load(Path gameDir) {
@@ -89,6 +92,8 @@ public final class CoopConfig {
 					# Playing through GTA in a friend's world: their address (as Minecraft shows it, for example 203.0.113.7:25565).
 					# This Minecraft then joins it by itself. Leave empty to host your own world.
 					guest.join=
+					# Hosting (guest.join empty): open the CraftV world by itself when Minecraft starts. false = pick worlds yourself.
+					host.autoWorld=true
 					""");
 			}
 		} catch (IOException e) {

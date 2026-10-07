@@ -29,6 +29,12 @@ namespace craftv::host
 			float a_farClip) override;
 		void Melee(float a_damage) override;
 		void Notify(const char* a_text) override;
+		void TickJump(bool a_minecraft, float a_heightMetres) override;
+		void SetPlayerHealth(int a_health) override;
+		void KillPlayer() override;
+		void Explode(float a_x, float a_y, float a_z, float a_power) override;
+		int  ProjectileHit(float a_x, float a_y, float a_z, float a_damage) override;
+		void DrawLight(float a_x, float a_y, float a_z, Rgba a_color, float a_range, float a_intensity) override;
 
 		// solid blocks (Phase 4): invisible, frozen collision boxes
 		bool BlockPropReady() override;
@@ -56,6 +62,8 @@ namespace craftv::host
 
 		ProbeStats stats_{};
 		bool       playerHidden_ = false;
+		int        jumpFrames_ = 0;  // frames left pushing the player up after a Minecraft jump
+		int        jumpsLogged_ = 0;
 		int        propCandidate_ = 0;
 		int        propWaitFrames_ = 0;
 	};

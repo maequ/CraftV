@@ -5,6 +5,7 @@
 
 add_library(craftv_host_core STATIC
 	core/block_props.cpp
+	core/block_lights.cpp
 	core/config.cpp
 	core/host_log.cpp
 	core/host_plugin.cpp

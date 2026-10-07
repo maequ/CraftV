@@ -84,6 +84,16 @@ As of Phase 2 (2026-10-05). "Planned" names the phase expected to fix it.
 - The parked RDR2 plugin (`rdr2/`, `CraftV_RDR2.asi`) was built against ScriptHookRDR2 and never run in RDR2. It
   has no terrain scanning.
 
+## Minecraft in GTA (D-031, built 2026-10-07, not yet run in GTA)
+- **The jump** pushes the GTA player up with a velocity. Whether GTA's ped physics keeps that push hasn't been tried in
+  game. If it doesn't, switch Jump to GTA in F8.
+- **GTA damage:** GTA's health is reset to full every frame, and the difference becomes hearts. A hit that kills in one
+  frame (a big explosion) kills in Minecraft too. Armor in Minecraft reduces GTA damage like any other damage.
+- **Arrows** only hurt people on foot, and each arrow hurts once. They fly through GTA people in Minecraft.
+- **TNT** is a GTA sticky-bomb explosion scaled by Minecraft's radius: cars blow up, people ragdoll, the police may come.
+- **Torch light** is limited to the 16 nearest within 40 m.
+- **The phone pose** is Minecraft's spyglass arm.
+
 ## Two GTA players (D-030, not yet run in GTA)
 - Only Minecraft is shared: each GTA has its own people, cars and traffic, and hitting a GTA person only happens in
   your own GTA. Hitting the other player is Minecraft's own PvP.

@@ -126,6 +126,24 @@ namespace
 		void CompositorPose(float, float, float, float, double, double, double, float, float) override { ++poses; }
 		void Melee(float a_damage) override { melee.push_back(a_damage); }
 		void Notify(const char* a_text) override { notes.emplace_back(a_text); }
+		void TickJump(bool a_minecraft, float) override { jumpTicks += a_minecraft ? 1 : 0; }
+		void SetPlayerHealth(int a_health) override { sample.health = a_health; ++healthSets; }
+		void KillPlayer() override { ++kills; }
+		void Explode(float a_x, float a_y, float a_z, float a_power) override { explosions.push_back({ a_x, a_y, a_z, a_power }); }
+		int  ProjectileHit(float, float, float, float a_damage) override
+		{
+			arrowDamage.push_back(a_damage);
+			return pedAtArrow ? 1 : 0;
+		}
+		void DrawLight(float a_x, float a_y, float a_z, Rgba, float, float) override { lightsDrawn.push_back({ a_x, a_y, a_z, 0.0f }); }
+		struct Point
+		{
+			float x, y, z, w;
+		};
+		int                jumpTicks = 0, healthSets = 0, kills = 0;
+		bool               pedAtArrow = true;
+		std::vector<Point> explosions, lightsDrawn;
+		std::vector<float> arrowDamage;
 
 		// solid blocks
 		struct Prop
@@ -740,9 +758,9 @@ TEST_CASE("host passthrough: off without the compositor; with it, CAMERA every t
 	CHECK(rig.views[0].width == 1600 && rig.views[0].height == 900);
 	CHECK((rig.cameras.back().flags & kCameraPassthrough) != 0);
 
-	rig.game.sample.inVehicle = true;  // driving: GTA's own driver shows, Minecraft hides its player
+	rig.game.sample.inVehicle = true;  // driving: Steve sits in the car, GTA's driver stays hidden
 	rig.Tick(2);
-	CHECK(!rig.game.hidden);
+	CHECK(rig.game.hidden);
 	CHECK((rig.cameras.back().flags & kCameraInVehicle) != 0);
 	rig.game.sample.inVehicle = false;
 	rig.Tick(2);
@@ -832,18 +850,22 @@ TEST_CASE("host settings menu: F8 opens it in the game's style; arrows change se
 	};
 	CHECK(has("CraftV"));
 	CHECK(has("Minecraft view"));
-	CHECK(has("Hit strength"));
+	CHECK(has("Crosshair"));
+	CHECK(!has("Hit strength"));  // further down: the list scrolls
 	CHECK(rig.game.sprites >= 3);  // banner, row background, highlight
 	CHECK(rig.game.sounds == 1);
 
-	// down three times to "Hit strength", right: Normal (10) -> Strong (20)
-	for (int i = 0; i < 3; ++i) {
+	// down to "Hit strength" (row 15), right: Normal (10) -> Strong (20)
+	for (int i = 0; i < 14; ++i) {
 		rig.game.nextMenu.down = true;
 		rig.Tick(1);
 	}
 	rig.game.nextMenu.right = true;
 	rig.Tick(1);
 	CHECK(std::abs(rig.plugin->CurrentConfig().passthrough.meleeDamagePerHalfHeart - 20.0) < 1e-9);
+	rig.game.menuTexts.clear();
+	rig.Tick(1);
+	CHECK(has("Hit strength"));  // scrolled into view
 	// left twice: Strong -> Normal -> Weak (5)
 	rig.game.nextMenu.left = true;
 	rig.Tick(1);
@@ -852,7 +874,7 @@ TEST_CASE("host settings menu: F8 opens it in the game's style; arrows change se
 	CHECK(std::abs(rig.plugin->CurrentConfig().passthrough.meleeDamagePerHalfHeart - 5.0) < 1e-9);
 
 	// up to "Minecraft view", Enter: off
-	for (int i = 0; i < 3; ++i) {
+	for (int i = 0; i < 14; ++i) {
 		rig.game.nextMenu.up = true;
 		rig.Tick(1);
 	}
@@ -973,3 +995,121 @@ TEST_CASE("host passthrough: Tab opens the inventory; while it's open the cursor
 	CHECK(rig.game.melee.empty());  // clicking in the inventory hits nobody
 }
 
+
+// ---- Minecraft in GTA (protocol v1.4) ------------------------------------------------------------
+
+namespace
+{
+	// A rig with the passthrough on and Minecraft's owner state known.
+	void PassthroughOn(Rig& a_rig, OwnerStateMsg a_owner = OwnerStateMsg{})
+	{
+		a_rig.game.sample = StoryPlayer(0, 0, 50, 0);
+		a_rig.game.sample.health = 200;
+		a_rig.game.sample.maxHealth = 200;
+		a_rig.game.camera.valid = true;
+		a_rig.game.camera.z = 51.6f;
+		a_rig.game.available = true;
+		a_rig.Tick(10);
+		REQUIRE(a_rig.mc->Connected());
+		REQUIRE(a_rig.mc->Send(a_owner));
+		a_rig.Tick(3);
+		REQUIRE(a_rig.plugin->PassthroughActive());
+	}
+
+	int CountInputs(const Rig& a_rig, std::uint8_t a_kind)
+	{
+		int n = 0;
+		for (const auto& in : a_rig.inputs) {
+			n += in.kind == a_kind ? 1 : 0;
+		}
+		return n;
+	}
+}
+
+TEST_CASE("host v1.4: the owner-view settings reach Minecraft; the inventory key opens it on foot only; the jump is Minecraft's")
+{
+	Rig rig(L"opts");
+	PassthroughOn(rig);
+	CHECK(CountInputs(rig, kInputOption) == 6);
+	bool crosshair = false, rate = false;
+	for (const auto& in : rig.inputs) {
+		crosshair = crosshair || (in.kind == kInputOption && in.button == kOptionCrosshair && in.value == 1);
+		rate = rate || (in.kind == kInputOption && in.button == kOptionFrameRate && in.value == 9);
+	}
+	CHECK(crosshair);
+	CHECK(rate);
+	CHECK(rig.game.jumpTicks > 0);
+
+	rig.inputs.clear();
+	rig.plugin->RequestInventory();
+	rig.Tick(2);
+	CHECK(CountInputs(rig, kInputButton) == 2);  // press + release of INVENTORY
+	rig.inputs.clear();
+	rig.game.sample.inVehicle = true;
+	rig.plugin->RequestInventory();
+	rig.Tick(2);
+	CHECK(CountInputs(rig, kInputButton) == 0);  // not while driving
+	CHECK(rig.plugin->InventoryKey() == 0x45);
+}
+
+TEST_CASE("host v1.4: GTA damage costs Minecraft hearts and the game's health stays full; dying in Minecraft is wasted")
+{
+	Rig rig(L"health");
+	PassthroughOn(rig);
+	rig.inputs.clear();
+	rig.game.sample.health = 170;  // 30 of GTA's 100 = 6 half hearts
+	rig.Tick(2);
+	int half = 0;
+	for (const auto& in : rig.inputs) {
+		half += in.kind == kInputDamage ? in.value : 0;
+	}
+	CHECK(half == 6);
+	CHECK(rig.game.sample.health == 200);  // restored: Minecraft's hearts decide
+	CHECK(rig.game.kills == 0);
+
+	OwnerStateMsg dead{};
+	dead.flags = kOwnerDead;
+	REQUIRE(rig.mc->Send(dead));
+	rig.Tick(3);
+	CHECK(rig.game.kills == 1);
+	rig.Tick(3);
+	CHECK(rig.game.kills == 1);  // once per death
+}
+
+TEST_CASE("host v1.4: Minecraft explosions and arrows reach the game; torches light it")
+{
+	Rig rig(L"world");
+	PassthroughOn(rig);
+	WorldEventMsg boom{};
+	boom.kind = kEventExplosion;
+	boom.power = 4.0f;
+	boom.x = 10.5;
+	boom.y = 49.0;  // Minecraft y = game z (no feet offset for a point)
+	boom.z = -20.5;
+	REQUIRE(rig.mc->Send(boom));
+	WorldEventMsg arrow{};
+	arrow.kind = kEventProjectile;
+	arrow.power = 6.0f;
+	arrow.x = 3.0;
+	arrow.y = 51.0;
+	arrow.z = 0.0;
+	arrow.id = 77;
+	REQUIRE(rig.mc->Send(arrow));
+	REQUIRE(rig.mc->Send(arrow));  // the same arrow next tick: it already hit
+	rig.Tick(3);
+	REQUIRE(rig.game.explosions.size() == 1);
+	CHECK(Near(rig.game.explosions[0].x, 10.5) && Near(rig.game.explosions[0].y, 20.5) && Near(rig.game.explosions[0].z, 49.0));
+	CHECK(rig.game.arrowDamage.size() == 1);
+	CHECK(Near(rig.game.arrowDamage[0], 60.0));  // 6 half hearts x Normal (10)
+	CHECK(rig.plugin->ArrowHits() == 1);
+
+	BlockSetMsg torch{ 2, 50, -3, 1234, kBlockSetLight, 0 };
+	REQUIRE(rig.mc->Send(torch));
+	rig.Tick(2);
+	CHECK(rig.plugin->Lights().Count() == 1);
+	CHECK(!rig.game.lightsDrawn.empty());
+	BlockSetMsg gone{ 2, 50, -3, 0, 0, 0 };
+	REQUIRE(rig.mc->Send(gone));
+	rig.Tick(2);
+	CHECK(rig.plugin->Lights().Count() == 0);
+}

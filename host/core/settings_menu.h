@@ -26,7 +26,7 @@ namespace craftv::host
 	class SettingsMenu
 	{
 	public:
-		static constexpr int kMaxRows = 12;
+		static constexpr int kMaxRows = 12;  // shown at once; the list scrolls past that, as the game's menus do
 
 		bool Open() const { return open_; }
 		void Toggle(IGame& a_game);
@@ -39,5 +39,6 @@ namespace craftv::host
 	private:
 		bool open_ = false;
 		int  selected_ = 0;
+		mutable int first_ = 0;  // the top row shown
 	};
 }

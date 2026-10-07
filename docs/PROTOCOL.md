@@ -262,7 +262,7 @@ compiler and the JIT, and for ARM64 if it is ever a target.
 
 ## 7. Messages
 
-Type ranges: `1–0xFF` core (`1–7` since v1.0, `8–13` since v1.1, `14–17` since v1.2, `18` since v1.3), `0x100–0x7EFF` reserved for later phases, `0x7F00–0x7FFF`
+Type ranges: `1–0xFF` core (`1–7` since v1.0, `8–13` since v1.1, `14–17` since v1.2, `18` since v1.3, `19` since v1.4), `0x100–0x7EFF` reserved for later phases, `0x7F00–0x7FFF`
 test/debug only. Every core payload has a **fixed size**. "Dir" says who may send it: H = host, M = MC.
 A message received from a side that may not send it is counted as malformed and ignored.
 
@@ -287,6 +287,7 @@ A message received from a side that may not send it is counted as malformed and 
 | `16` | `INPUT` | H | 8 (v1.2) |
 | `17` | `OWNER_STATE` | M | 16 (v1.2) |
 | `18` | `BLOCK_REGION_REQUEST` | H | 16 (v1.3) |
+| `19` | `WORLD_EVENT` | M | 40 (v1.4) |
 | `0x7F00` | `TEST_PATTERN` | H, M | 16–272 (variable, test only) |
 
 ### 7.1 `HELLO` (1), 64 bytes
@@ -296,7 +297,7 @@ Sent right after attach and again whenever a new peer session is seen.
 | Offset | Size | Type | Field | Notes |
 |---|---|---|---|---|
 | 0 | 2 | u16 | `versionMajor` | `1` |
-| 2 | 2 | u16 | `versionMinor` | `3` (v1.3) |
+| 2 | 2 | u16 | `versionMinor` | `4` (v1.4) |
 | 4 | 4 | u32 | `role` | `1` host, `2` MC |
 | 8 | 4 | u32 | `pid` | |
 | 12 | 4 | u32 | `session` | same as the record header's |
@@ -588,7 +589,7 @@ The host window has the focus, so the host forwards the owner's Minecraft contro
 
 | Offset | Size | Type | Field | Notes |
 |---|---|---|---|---|
-| 0 | 1 | u8 | `kind` | `1` BUTTON, `2` SLOT, `3` SCROLL, `4` CURSOR (v1.3) |
+| 0 | 1 | u8 | `kind` | `1` BUTTON, `2` SLOT, `3` SCROLL, `4` CURSOR (v1.3), `5` DAMAGE (v1.4), `6` OPTION (v1.4) |
 | 1 | 1 | u8 | `button` | BUTTON: `1` ATTACK, `2` USE, `3` PICK, `4` DROP, `5` INVENTORY, `6` SWAP_HANDS, `7` CLOSE_SCREEN; else `0` |
 | 2 | 1 | u8 | `down` | BUTTON: `1` pressed, `0` released; else `0` |
 | 3 | 1 | i8 | `value` | SLOT: hotbar slot `0..8`; SCROLL: `-9..9` slots, non-zero (positive = next); else `0` |
@@ -597,6 +598,26 @@ The host window has the focus, so the host forwards the owner's Minecraft contro
 While a Minecraft screen is open (OWNER_STATE `SCREEN_OPEN`), BUTTON `ATTACK` and `USE` are the left and right mouse
 buttons on that screen, at the last CURSOR.
 
+**v1.4:**
+
+- **DAMAGE**: the host's player got hurt in the host game.
+  - `button` is the cause: `0` generic, `1` melee, `2` bullet, `3` explosion, `4` vehicle, `5` fall, `6` fire,
+    `7` drown.
+  - `value` is the damage in half hearts, `1..127`; `127` kills.
+  - MC hurts the owner by that much, with no invulnerability frames.
+- **OPTION**: a host setting for the owner's view. `button` is the option and `value` its value, `0..127`:
+
+  | `button` | Option | `value` |
+  |---|---|---|
+  | `1` | crosshair | `0`/`1` |
+  | `2` | hand | `0`/`1` |
+  | `3` | block outline | `0` none, `1` placed blocks only, `2` everywhere |
+  | `4` | frame rate | in tens; `0` = unlimited |
+  | `5` | HUD | `0`/`1` |
+  | `6` | vehicle body | `0` hidden, `1` seated |
+
+  The host sends all of them on connect and when they change.
+
 ### 7.18 `OWNER_STATE` (17), 16 bytes, M → H (v1.2)
 
 The owner's Minecraft state the host acts on (a melee hit uses the held item, brief §8). Sent when a field
@@ -604,7 +625,7 @@ changes, at most 20 times a second, and at least once a second while connected.
 
 | Offset | Size | Type | Field | Notes |
 |---|---|---|---|---|
-| 0 | 1 | u8 | `held` | `0` empty hand, `1` sword, `2` axe, `3` pickaxe, `4` shovel, `5` hoe, `6` block, `7` other item |
+| 0 | 1 | u8 | `held` | `0` empty hand, `1` sword, `2` axe, `3` pickaxe, `4` shovel, `5` hoe, `6` block, `7` other item, `8` light (v1.4: torch, lantern, glowstone) |
 | 1 | 1 | u8 | `health` | half hearts, rounded up, `0..255` (20 = full) |
 | 2 | 1 | u8 | `food` | `0..20` |
 | 3 | 1 | u8 | `gameMode` | as §7.9 |
@@ -628,6 +649,28 @@ while the host was away, get their collision this way; the host can forget far c
 **`BLOCK_SET` flags since v1.3** (§7.4): bit 1 `SOLID`: the block should stop people and cars in the host game (a full
 collision cube that isn't part of CraftV's terrain and stands above the terrain's surface). bit 2 `REGION`: an
 answer to a `BLOCK_REGION_REQUEST`. A `BLOCK_SET` without `SOLID` removes any collision the host has at that position.
+bit 3 `LIGHT` (v1.4): the block gives off light (emission 10 or more, not terrain), and the host lights that spot too. Region
+answers include light blocks. A `BLOCK_SET` without `LIGHT` removes the host's light there.
+
+**`CAMERA` flags since v1.4** (§7.15): bit 3 `PHONE` (the host's player has their phone out), bit 4 `SPRINTING`.
+
+### 7.20 `WORLD_EVENT` (19), 40 bytes, M → H (v1.4)
+
+Something in Minecraft the host game shows too.
+
+| Offset | Size | Type | Field | Notes |
+|---|---|---|---|---|
+| 0 | 1 | u8 | `kind` | `1` EXPLOSION, `2` PROJECTILE |
+| 1 | 3 | | reserved | `0` |
+| 4 | 4 | f32 | `power` | EXPLOSION: Minecraft's radius (TNT 4). PROJECTILE: the damage it would do, in half hearts. `[0, 1000]` |
+| 8 | 8 | f64 | `x` | Minecraft position |
+| 16 | 8 | f64 | `y` | |
+| 24 | 8 | f64 | `z` | |
+| 32 | 4 | u32 | `id` | PROJECTILE: Minecraft's entity id (the host hurts each person once per arrow). EXPLOSION: `0` |
+| 36 | 4 | | reserved | `0` |
+
+- EXPLOSION: sent once, when the explosion goes off.
+- PROJECTILE: sent every tick for each flying arrow within 128 blocks of a GTA player.
 
 ## 8. Defensive rules (both sides)
 
@@ -653,7 +696,8 @@ answer to a `BLOCK_REGION_REQUEST`. A `BLOCK_SET` without `SOLID` removes any co
 - **History:** v1.0 (2026-10-02) core messages 1–7. v1.1 (2026-10-05) co-op messages 8–13 (`DECISIONS.md`
   D-016). A v1.0 peer skips them as unknown types, so v1.0 and v1.1 still link up. v1.2 (2026-10-06) the
   passthrough messages 14–17 and the frame mapping (§11, `DECISIONS.md` D-027). v1.3 (2026-10-06)
-  `BLOCK_REGION_REQUEST` and the `SOLID`/`REGION` block flags (Phase 4, D-029).
+  `BLOCK_REGION_REQUEST` and the `SOLID`/`REGION` block flags (Phase 4, D-029). v1.4 (2026-10-07) `WORLD_EVENT`, INPUT
+  `DAMAGE`/`OPTION`, the `LIGHT` block flag, the `PHONE`/`SPRINTING` camera flags and held `LIGHT` (D-031).
 
 ## 10. Golden vectors
 

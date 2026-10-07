@@ -80,6 +80,7 @@ class GoldenVectorsTest {
 		m.put("INPUT", new Messages.Input(INPUT_BUTTON, BUTTON_ATTACK, 1, 0));
 		m.put("OWNER_STATE", new Messages.OwnerState(HELD_PICKAXE, 17, 18, 0, 5.0F, 0.75F, 0));
 		m.put("BLOCK_REGION_REQUEST", new Messages.BlockRegionRequest(-3, 92, 77));
+		m.put("WORLD_EVENT", new Messages.WorldEvent(EVENT_EXPLOSION, 4.0F, -14.5, 30.25, 1438.75, 12345));
 		m.put("TEST_PATTERN", new Messages.TestPattern(5));
 		return m;
 	}
@@ -175,6 +176,11 @@ class GoldenVectorsTest {
 				case "INPUT" -> assertEquals(new Messages.Input(INPUT_BUTTON, BUTTON_ATTACK, 1, 0), Messages.Input.read(s, p));
 				case "OWNER_STATE" -> assertEquals(new Messages.OwnerState(HELD_PICKAXE, 17, 18, 0, 5.0F, 0.75F, 0), Messages.OwnerState.read(s, p));
 				case "BLOCK_REGION_REQUEST" -> assertEquals(new Messages.BlockRegionRequest(-3, 92, 77), Messages.BlockRegionRequest.read(s, p));
+				case "WORLD_EVENT" -> {
+					var m = Messages.WorldEvent.read(s, p);
+					assertTrue(m.valid());
+					assertEquals(new Messages.WorldEvent(EVENT_EXPLOSION, 4.0F, -14.5, 30.25, 1438.75, 12345), m);
+				}
 				default -> fail("unexpected golden " + e.getKey());
 			}
 		}
@@ -192,7 +198,7 @@ class GoldenVectorsTest {
 		assertFalse(new Messages.BlockBreakRequest(1, 0, 0, 0, 6, 0).valid());
 		assertTrue(new Messages.BlockBreakRequest(1, 0, 0, 0, FACE_UNKNOWN, 0).valid());
 		assertFalse(new Messages.BlockBreakRequest(0, 0, 0, 0, 1, 0).valid());
-		assertFalse(new Messages.BlockSet(0, 0, 0, 1, 1 << 3, 0).valid());
+		assertFalse(new Messages.BlockSet(0, 0, 0, 1, 1 << 4, 0).valid());
 		assertTrue(new Messages.BlockSet(0, 0, 0, 1, BLOCK_SET_SOLID | BLOCK_SET_REGION, 7).valid());
 	}
 
@@ -231,7 +237,7 @@ class GoldenVectorsTest {
 		assertTrue(CAMERA.valid());
 		assertFalse(new Messages.Camera(1, 1, 0, 64, 0, 0, 0, 0, 0.5F, 0, 64, 0, 0, 0, 0, 0).valid(), "fov below 1");
 		assertFalse(new Messages.Camera(1, 1, 0, 64, 0, 0, 91, 0, 70, 0, 64, 0, 0, 0, 0, 0).valid(), "pitch above 90");
-		assertFalse(new Messages.Camera(1, 1, 0, 64, 0, 0, 0, 0, 70, 0, 64, 0, 0, 1 << 3, 0, 0).valid(), "unknown flag");
+		assertFalse(new Messages.Camera(1, 1, 0, 64, 0, 0, 0, 0, 70, 0, 64, 0, 0, 1 << 5, 0, 0).valid(), "unknown flag");
 		assertFalse(new Messages.Camera(1, 1, 0, 64, 0, 0, 0, Float.NaN, 70, 0, 64, 0, 0, 0, 0, 0).valid());
 		assertFalse(new Messages.View(3840, 2160, 3840, 2160).valid(), "more pixels than VIEW_MAX_PIXELS");
 		assertTrue(new Messages.View(2560, 1080, 5120, 2160).valid());
@@ -240,11 +246,25 @@ class GoldenVectorsTest {
 		assertTrue(new Messages.Input(INPUT_SCROLL, 0, 0, -1).valid());
 		assertFalse(new Messages.Input(INPUT_SCROLL, 0, 0, 0).valid());
 		assertFalse(new Messages.Input(INPUT_BUTTON, 8, 1, 0).valid());
-		assertFalse(new Messages.OwnerState(8, 20, 20, 0, 1, 1, 0).valid());
+		assertFalse(new Messages.OwnerState(9, 20, 20, 0, 1, 1, 0).valid());
+		assertTrue(new Messages.OwnerState(HELD_LIGHT, 20, 20, 0, 1, 1, 0).valid());
 		assertFalse(new Messages.OwnerState(HELD_SWORD, 20, 20, 0, 1, 1.5F, 0).valid());
 		assertTrue(allowedFrom(MSG_CAMERA, ROLE_HOST));
 		assertFalse(allowedFrom(MSG_CAMERA, ROLE_MC));
 		assertTrue(allowedFrom(MSG_OWNER_STATE, ROLE_MC));
 		assertFalse(allowedFrom(MSG_OWNER_STATE, ROLE_HOST));
+	}
+
+	@Test
+	void v14ValidationAndDirections() {
+		assertTrue(allowedFrom(MSG_WORLD_EVENT, ROLE_MC));
+		assertFalse(allowedFrom(MSG_WORLD_EVENT, ROLE_HOST));
+		assertFalse(new Messages.WorldEvent(3, 1, 0, 64, 0, 0).valid());
+		assertFalse(new Messages.WorldEvent(EVENT_EXPLOSION, -1, 0, 64, 0, 0).valid());
+		assertTrue(new Messages.Input(INPUT_DAMAGE, DAMAGE_BULLET, 0, 6).valid());
+		assertFalse(new Messages.Input(INPUT_DAMAGE, DAMAGE_BULLET, 0, 0).valid());
+		assertTrue(new Messages.Input(INPUT_OPTION, OPTION_CROSSHAIR, 0, 1).valid());
+		assertFalse(new Messages.Input(INPUT_OPTION, OPTION_MAX + 1, 0, 1).valid());
+		assertTrue(new Messages.BlockSet(0, 0, 0, 1, BLOCK_SET_LIGHT | BLOCK_SET_REGION, 3).valid());
 	}
 }

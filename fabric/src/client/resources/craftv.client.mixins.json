@@ -3,6 +3,7 @@
   "package": "dev.craftv.client.mixin",
   "compatibilityLevel": "JAVA_25",
   "client": [
+    "AvatarRendererMixin",
     "CameraMixin",
     "EntityPickMixin",
     "EntityRenderDispatcherMixin",
@@ -10,7 +11,9 @@
     "GameRendererMixin",
     "GlCommandEncoderMixin",
     "HiddenWaterMixin",
+    "HudMixin",
     "KeyMappingAccessor",
+    "LevelExtractorMixin",
     "LivingEntityMixin",
     "MinecraftMixin",
     "MouseHandlerAccessor",
