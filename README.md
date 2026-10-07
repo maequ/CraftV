@@ -6,8 +6,7 @@ You walk around Los Santos as Steve. You get Minecraft's hand, hotbar, hearts an
 build on the streets, blow up cars with TNT and shoot people with a bow. Friends can join you from plain
 Minecraft, or from their own GTA V, and you all see each other and everything you build.
 
-<!-- replace VIDEO_LINK_HERE with the YouTube link -->
-[![Watch the setup video on YouTube](docs/media/setup-video.jpg)](VIDEO_LINK_HERE)
+[![Watch the setup video on YouTube](docs/media/setup-video.jpg)](https://www.youtube.com/watch?v=KuSXDtZwNgM&t=114s)
 
 [![Discord](https://img.shields.io/badge/Discord-join%20the%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/RN7e6Ya8Se)
 Help, bug reports, clips and people to play with are on the [Discord server](https://discord.gg/RN7e6Ya8Se).

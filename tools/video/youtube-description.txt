@@ -3,7 +3,7 @@ How to set up CraftV: play Minecraft inside GTA V story mode, with your friends.
 STORY MODE ONLY. Never use mods in GTA Online, you can get your Rockstar account banned.
 
 Downloads (only get them from these sites):
-CraftV: GITHUB_LINK_HERE
+CraftV: https://github.com/maequ/CraftV
 Script Hook V: http://www.dev-c.com/gtav/scripthookv/
 ReShade (the version with full add-on support): https://reshade.me
 Fabric installer: https://fabricmc.net/use/installer/
