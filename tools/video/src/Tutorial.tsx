@@ -87,8 +87,18 @@ export const Tutorial: React.FC = () => {
         </Sequence>
       ))}
       {music.file && (
-        <Audio src={staticFile(music.file)} loop
-          volume={(f) => interpolate(f, [0, 45, start - 90, start], [0, music.volume, music.volume, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })} />
+        <Audio src={staticFile(music.file)}
+          volume={(f) => {
+            // under the voice the music sits lower; between lines it comes back up (eased over ~0.4 s)
+            let gap = Infinity;
+            for (const { beat, start: s } of allBeats) {
+              const d = f < s ? s - f : f > s + beat.frames ? f - (s + beat.frames) : 0;
+              gap = Math.min(gap, d);
+            }
+            const duck = 0.45 + 0.55 * Math.min(1, gap / 12);
+            const edge = interpolate(f, [0, 30, start - 60, start], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+            return music.volume * duck * edge;
+          }} />
       )}
       <Captions beats={allBeats} />
       {placed.slice(1).map((s, i) => (
