@@ -16,7 +16,7 @@ Help, bug reports, clips and people to play with are on the [Discord server](htt
 > itself off if it sees an online session, and Script Hook V closes the game if you go online.
 
 > [!NOTE]
-> **This is an early version.** Some of what's listed here has only been tested without the game so far. The
+> **This is early access.** Some of what's listed here has only been tested without the game so far. The
 > [Tested so far](#tested-so-far) section says which parts. If something doesn't work, please
 > [open an issue](../../issues) or tell us on [Discord](https://discord.gg/RN7e6Ya8Se).
 
